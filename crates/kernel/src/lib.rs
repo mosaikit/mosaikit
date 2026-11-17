@@ -7,6 +7,7 @@
 
 pub mod access;
 pub mod acl;
+pub mod actions;
 pub mod blobs;
 pub mod brand;
 pub mod comments;

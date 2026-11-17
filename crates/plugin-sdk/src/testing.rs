@@ -262,6 +262,18 @@ impl MockHost {
         })
     }
 
+    /// The actions the caller may do, for `Ctx::can_on`: `(item id, action)` pairs. Any other pair answers
+    /// `allowed: false`. The mock does not know levels: list the pairs a manager would pass too.
+    pub fn with_resource_actions(self, allowed: &[(&str, &str)]) -> MockHost {
+        let allowed: Vec<(String, String)> =
+            allowed.iter().map(|(a, b)| (a.to_string(), b.to_string())).collect();
+        self.on("resource.can", move |req| {
+            let id = req.get("id").and_then(Value::as_str).ok_or("id is required")?;
+            let action = req.get("action").and_then(Value::as_str).ok_or("action is required")?;
+            Ok(json!({ "allowed": allowed.iter().any(|(i, a)| i == id && a == action) }))
+        })
+    }
+
     /// The people and groups of the tenant for `directory.search`, with the answers of the real host: a
     /// case-insensitive substring of the username or name (`q` 1 to 64 characters), name order, 20 rows
     /// by default and at most 50, `{id, username, name}` for people and `{id, name}` for groups. People are

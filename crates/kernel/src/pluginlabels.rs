@@ -24,6 +24,10 @@ pub struct PluginLabelDef {
     pub plugin: String,
     #[serde(default)]
     pub label: String,
+    /// page that replaces the share dialog for the resources of the plugin: `<place>` of the plugin, or
+    /// `<plugin id>/<place>` of another one
+    #[serde(default)]
+    pub share_page: Option<String>,
     #[serde(default)]
     pub i18n: BTreeMap<String, PluginLabelText>,
 }
@@ -58,18 +62,23 @@ pub fn normalize(defs: &[PluginLabelDef], warn: &mut dyn FnMut(String)) -> BTree
                 (!v.is_empty()).then(|| (l.split(['-', '_']).next().unwrap_or(l).to_ascii_lowercase(), v))
             })
             .collect();
-        let label = match clean(&d.label) {
-            l if !l.is_empty() => l,
-            _ => {
-                warn(format!("plugin_labels: the plugin {id} has no label, it keeps its own name"));
-                continue;
-            }
-        };
+        let share_page = d.share_page.as_deref().map(clean).filter(|s| !s.is_empty());
+        if share_page.as_deref().is_some_and(|s| s.len() > 200 || s.chars().any(char::is_control)) {
+            warn(format!("plugin_labels: the share_page of {id} is not valid, it is ignored"));
+            continue;
+        }
+        let label = clean(&d.label);
+        if label.is_empty() && share_page.is_none() {
+            warn(format!(
+                "plugin_labels: the plugin {id} has no label and no share_page, it keeps its own name"
+            ));
+            continue;
+        }
         if label.chars().count() > 60 || i18n.values().any(|v| v.chars().count() > 60) {
             warn(format!("plugin_labels: a name of {id} is longer than 60 characters, it is ignored"));
             continue;
         }
-        out.insert(id, DisplayOverride { label, i18n });
+        out.insert(id, DisplayOverride { label, share_page, i18n });
     }
     out
 }
@@ -97,6 +106,17 @@ mod tests {
         assert!(w.is_empty());
         let d = &m["com.mosaikit.files"];
         assert_eq!((d.label.as_str(), d.i18n["it"].as_str()), ("Files", "File"));
+    }
+
+    #[test]
+    fn a_share_page_alone_is_enough_and_the_name_stays_the_plugins_own() {
+        let (m, w) = run("[[plugin_labels]]
+plugin = \"com.mosaikit.files\"
+share_page = \" com.geo/sharing \"
+");
+        assert!(w.is_empty(), "{w:?}");
+        let d = &m["com.mosaikit.files"];
+        assert_eq!((d.label.as_str(), d.share_page.as_deref()), ("", Some("com.geo/sharing")));
     }
 
     #[test]

@@ -154,6 +154,10 @@ export interface PluginView {
   permissions: { hooks: string[]; files: boolean; content: boolean; network: string[]; frame_src: string[]; calls?: string[]; script_eval?: boolean; files_read?: boolean; files_write?: boolean; resources_read?: string[]; contributions?: string[]; embeds?: string[]; run_commands?: string[]; run_targets?: string[]; directory?: boolean; realtime?: boolean; media?: boolean }
   /** the pages of an app in the navigation of the shell (recent servers) */
   nav?: NavEntry[]
+  /** page that replaces the share dialog for the resources of the app: `<place>` or `<plugin id>/<place>` (recent servers) */
+  share_page?: string
+  /** the kinds of resource of the app, with the actions a share can carry (recent servers) */
+  resources?: { name: string; label?: string; actions?: string[] }[]
 }
 
 /** A plugin available to a tenant, as its Tenant Manager sees it (or every plugin, for the Administrator). */
@@ -241,6 +245,8 @@ export interface Grant {
   level: Level
   granted_at: string
   builtin?: 'all'
+  /** the actions of the share besides the level (declared by the plugin) */
+  actions?: string[]
 }
 
 export interface ResourceMeta {

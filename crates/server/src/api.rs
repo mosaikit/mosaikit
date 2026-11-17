@@ -835,7 +835,8 @@ async fn resource_grants(
 ) -> ApiResult<Json<Value>> {
     let rid = uuid(&p.rid)?;
     let m = acl::meta(&s.k, &c, rid).await?;
-    Ok(Json(json!({ "resource": m, "grants": acl::grants(&s.k, &c, rid).await? })))
+    let actions = mosaikit_kernel::actions::declared(&s.k, &m.plugin_id, &m.kind);
+    Ok(Json(json!({ "resource": m, "grants": acl::grants(&s.k, &c, rid).await?, "actions": actions })))
 }
 
 #[derive(Deserialize)]
@@ -846,6 +847,10 @@ struct GrantReq {
     principal_id: Uuid,
     /// read | write | manage; absent or null = revoke
     level: Option<String>,
+    /// actions of the share (declared by the plugin for the kind of the resource): replace the stored ones;
+    /// absent: the stored ones stay
+    #[serde(default)]
+    actions: Option<Vec<String>>,
 }
 
 async fn resource_set_grant(
@@ -855,7 +860,16 @@ async fn resource_set_grant(
     Json(r): Json<GrantReq>,
 ) -> ApiResult<Json<Value>> {
     let level = r.level.as_deref().map(Level::parse).transpose()?;
-    acl::set_grant(&s.k, &c, uuid(&p.rid)?, &r.principal_type, r.principal_id, level).await?;
+    acl::set_grant_with(
+        &s.k,
+        &c,
+        uuid(&p.rid)?,
+        &r.principal_type,
+        r.principal_id,
+        level,
+        r.actions.as_deref(),
+    )
+    .await?;
     Ok(ok())
 }
 

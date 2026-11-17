@@ -5,6 +5,14 @@ in Help › What is new (one `## <version>` heading per version, `- ` items, `##
 language of the person: this file in English, [CHANGELOG.it.md](CHANGELOG.it.md) in Italian (keep them
 in step).
 
+## 1.1.0
+
+- Plugins: a share can carry **actions** besides the level. `[[resources]] actions = ["download", "run"]` declares them per resource type; the grants API (`PUT /resources/{id}/grants`) takes `actions` next to `level` and lists them; `resource.shares` returns them; manage implies all. The logic asks `ctx.can_on(id, "download")`, and `resources().list_with_action(plugin, "download", ...)` / `resources.list` with `with_action` keeps the items the caller may act on. A grant on a folder reaches what is inside, like the level. A plugin that declares nothing sees no change.
+- Plugins: `msk.pickPrincipals({ kind?, exclude?, multiple?, title? })` opens a picker of the people and groups of the tenant and returns what the person chose.
+- Plugins: `[ui] share_page` replaces the share dialog of the shell with a page of the plugin (or of another one, `<plugin id>/<place>`) for its resources: the Share button and `msk.share` open it with `?resource=<id>`. A distribution sets it for an official app with `[[plugin_labels]] share_page` (the `label` is then optional).
+- Shell: the cards of "For you" stay inside the page, no horizontal scroll; the totals of the groups in the sidebar are badges with the number centred; an app with unread notifications has a red dot in the sidebar, the flyout and the drawer; the label of a collapsed group keeps its style when the group has unread notifications.
+- Development: `cargo xtask dev --dist` finds the official plugins in `MOSAIKIT_PLUGINS_DIR` or in `mosaikit-plugins` next to the checkout.
+
 ## 1.0.17
 
 - Plugins: the rows of the plugin's own list and of a single record (`msk.crud(...).list()` and `get()`) carry `visibility` (`private`, `shared`, `organization`, `public`), next to `shared` and `my_level`, the same state as `resources.list`; no call per row is needed to show the exact badge. A public link does not carry it.

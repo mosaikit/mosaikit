@@ -107,8 +107,18 @@ impl Plugins {
     pub(crate) fn put(&self, mut p: LoadedPlugin) -> Arc<LoadedPlugin> {
         // the name the distribution gives the app: over the English text here, over every language in `localized`
         if let Some(d) = self.1.get(&p.id) {
-            p.manifest.name = d.label.clone();
-            p.manifest.contribution.label = d.label.clone();
+            if !d.label.is_empty() {
+                p.manifest.name = d.label.clone();
+                p.manifest.contribution.label = d.label.clone();
+            }
+            if let Some(sp) = &d.share_page {
+                let ui = p.manifest.ui.get_or_insert_with(|| mosaikit_mskp::UiDecl {
+                    entry: "index.html".into(),
+                    public_view: None,
+                    share_page: None,
+                });
+                ui.share_page = Some(sp.clone());
+            }
             p.manifest.display = Some(d.clone());
         }
         let p = Arc::new(p);
@@ -334,6 +344,10 @@ pub struct PluginView {
     pub resources: Vec<mosaikit_mskp::ResourceDecl>,
     /// the pages of an app in the navigation of the shell (`[[nav]]`)
     pub nav: Vec<mosaikit_mskp::NavDecl>,
+    /// page that replaces the share dialog for the resources of the plugin (`[ui] share_page`, or the one the
+    /// distribution sets): `<place>` of the plugin or `<plugin id>/<place>`
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub share_page: Option<String>,
 }
 
 impl PluginView {
@@ -363,6 +377,7 @@ impl PluginView {
             permissions: m.permissions.clone(),
             resources: m.resources.clone(),
             nav: m.nav.clone(),
+            share_page: m.ui.as_ref().and_then(|u| u.share_page.clone()),
         }
     }
 }

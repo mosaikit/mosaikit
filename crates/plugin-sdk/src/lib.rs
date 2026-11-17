@@ -209,6 +209,15 @@ impl Ctx {
         self.perms.iter().any(|p| p == key)
     }
 
+    /// The caller may do `action` (one of `[[resources]] actions` of the plugin) on the item `id`: manage level,
+    /// or a share of the caller (own, or of a group, on the item or a folder above it) that lists the action.
+    /// The item is of this plugin or of one in `[permissions] resources_read`. Errors carry a code:
+    /// `permission_denied`, `not_found`, `invalid_argument`.
+    pub fn can_on(&self, id: &str, action: &str) -> Result<bool> {
+        let v = host::call("resource.can", json!({ "id": id, "action": action }))?;
+        Ok(v.get("allowed").and_then(Value::as_bool).unwrap_or(false))
+    }
+
     /// A setting of the plugin (`[[config]]`), if it has a value.
     pub fn setting(&self, key: &str) -> Option<&serde_json::Value> {
         self.config.get(key).filter(|v| !v.is_null())
@@ -333,6 +342,21 @@ impl Resources {
         limit: Option<u32>,
     ) -> Result<Value> {
         host::call("resources.list", json!({ "plugin": plugin, "kind": kind, "q": q, "limit": limit }))
+    }
+
+    /// Like [`Resources::list`], keeping the items on which the caller may do `action` (see [`Ctx::can_on`]).
+    pub fn list_with_action(
+        &self,
+        plugin: &str,
+        action: &str,
+        kind: Option<&str>,
+        q: Option<&str>,
+        limit: Option<u32>,
+    ) -> Result<Value> {
+        host::call(
+            "resources.list",
+            json!({ "plugin": plugin, "kind": kind, "q": q, "limit": limit, "with_action": action }),
+        )
     }
 
     /// Who an item is shared with, for a caller who manages it (the sharing dialog's rule): `{ id, visibility,

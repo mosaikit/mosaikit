@@ -2,7 +2,7 @@ import { Bridge, BridgeError } from './bridge.ts'
 import { API_VERSION, checkHostApi } from './version.ts'
 import { translate, type Vars } from './text.ts'
 import { setBusy, withBusy } from './busy.ts'
-import type { RealtimeEvent, RealtimeMessage, RealtimePerson, RealtimeStatus, BandApi, BandState, DirectoryApi, EmbedsApi, Schedule, SchedulesApi, DirectorySearch, ExtensionView, FileEntry, Hello, HostEventName, ListResult, Listing, Notify, PublicResource, Rect, ResourceMeta, Row, SiteInfo, TabInfo, Unzipped, UploadProgress, FolderSuggestion, FileInfo, FileTicket, UiContext, Values, WebProbe, SharePreselect } from './protocol.ts'
+import type { RealtimeEvent, RealtimeMessage, RealtimePerson, RealtimeStatus, BandApi, BandState, DirectoryApi, EmbedsApi, Schedule, SchedulesApi, DirectorySearch, ExtensionView, FileEntry, Hello, HostEventName, ListResult, Listing, Notify, PublicResource, Rect, ResourceMeta, Row, SiteInfo, TabInfo, Unzipped, UploadProgress, FolderSuggestion, FileInfo, FileTicket, UiContext, Values, WebProbe, SharePreselect, SharePrincipal, PickPrincipalsOptions } from './protocol.ts'
 
 /** The extensions of the plugin on a resource (fields and actions other plugins add to its items). */
 export interface ExtensionsClient {
@@ -464,6 +464,16 @@ export class Msk {
    */
   async share(id: string, opts?: SharePreselect): Promise<void> {
     await this.bridge.call('share', opts ? { id, principals: opts.principals, level: opts.level } : { id })
+  }
+
+  /**
+   * Opens the picker of the host: the person searches the people and groups of the tenant (with their own rights:
+   * the Tenant Manager and holders of the `share` permission) and chooses. Returns what they chose, empty when they
+   * cancel. `{ type: 'all' }` is the built-in group «All members». For a page that replaces the share dialog
+   * (`[ui] share_page`), which adds people without the dialog of the shell.
+   */
+  async pickPrincipals(opts: PickPrincipalsOptions = {}): Promise<SharePrincipal[]> {
+    return this.bridge.call<SharePrincipal[]>('principals.pick', { ...opts })
   }
 
   toast(text: string, error = false) {

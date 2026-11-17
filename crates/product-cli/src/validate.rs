@@ -236,7 +236,8 @@ fn check_plugin_labels(d: &Distribution, r: &mut Report) {
         }
         seen.push(id);
         let label = e.get("label").and_then(|v| v.as_str()).unwrap_or("");
-        if label.trim().is_empty() {
+        let share_page = e.get("share_page").and_then(|v| v.as_str()).unwrap_or("");
+        if label.trim().is_empty() && share_page.trim().is_empty() {
             r.add(
                 Level::Error,
                 format!("[[plugin_labels]] {id}: `label` is empty, the plugin keeps its own name"),

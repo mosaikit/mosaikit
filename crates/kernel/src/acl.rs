@@ -118,6 +118,8 @@ pub struct GrantInfo {
     pub detail: String,
     pub level: &'static str,
     pub granted_at: DateTime<Utc>,
+    /// the actions of the share besides the level (`[[resources]] actions` of the plugin)
+    pub actions: Vec<String>,
     /// `Some("all")`: the built-in group with every member of the tenant
     #[serde(skip_serializing_if = "Option::is_none")]
     pub builtin: Option<String>,
@@ -129,7 +131,7 @@ pub async fn grants(k: &Kernel, c: &Caller, rid: Uuid) -> Result<Vec<GrantInfo>>
         "select g.principal_type, g.principal_id,
                 case when g.principal_type = 'user' then coalesce(nullif(u.display_name, ''), u.username) else gr.name end,
                 case when g.principal_type = 'user' then u.username || '@' || h.slug else 'group' end,
-                g.level, g.granted_at, gr.builtin
+                g.level, g.granted_at, gr.builtin, g.actions
          from core.grants g
          left join core.users u on g.principal_type = 'user' and u.id = g.principal_id
          left join core.tenants h on h.id = u.home_tenant_id
@@ -149,6 +151,7 @@ pub async fn grants(k: &Kernel, c: &Caller, rid: Uuid) -> Result<Vec<GrantInfo>>
             level: Level::from_i32(r.get::<i16, _>(4) as i32).name(),
             granted_at: r.get(5),
             builtin: r.get(6),
+            actions: crate::actions::of_grant(&r.get::<String, _>(7)),
         })
         .collect())
 }
@@ -161,6 +164,20 @@ pub async fn set_grant(
     principal_type: &str,
     principal_id: Uuid,
     level: Option<Level>,
+) -> Result<()> {
+    set_grant_with(k, c, rid, principal_type, principal_id, level, None).await
+}
+
+/// Like [`set_grant`], with the actions of the share (`Some`: they replace the ones stored, empty clears them;
+/// `None`: the ones stored stay as they are, and a new share has none).
+pub async fn set_grant_with(
+    k: &Kernel,
+    c: &Caller,
+    rid: Uuid,
+    principal_type: &str,
+    principal_id: Uuid,
+    level: Option<Level>,
+    actions: Option<&[String]>,
 ) -> Result<()> {
     // `all`: every member of the tenant, that is the built-in group «All members»
     let all = if principal_type == "all" {
@@ -176,6 +193,9 @@ pub async fn set_grant(
     let m = require_level(k, c, rid, Level::Manage).await?;
     if level.is_some() {
         crate::access::require(k, c, &m.plugin_id, crate::access::SHARE).await?;
+    }
+    if let Some(a) = actions {
+        crate::actions::check(k, &m.plugin_id, &m.kind, a)?;
     }
     let tenant = c.tenant.tenant_id;
     match principal_type {
@@ -219,17 +239,32 @@ pub async fn set_grant(
             .bind(principal_id)
             .fetch_one(&k.db)
             .await?;
+            // the actions stay as they are when the caller gives none
+            let stored: String = match actions {
+                Some(a) => crate::actions::join(a),
+                None => mosaikit_db::query_scalar(
+                    "select actions from core.grants where resource_id = $1 and principal_type = $2 and principal_id = $3",
+                )
+                .bind(rid)
+                .bind(principal_type)
+                .bind(principal_id)
+                .fetch_optional(&k.db)
+                .await?
+                .unwrap_or_default(),
+            };
             mosaikit_db::query(
-                "insert into core.grants (resource_id, principal_type, principal_id, level, granted_by)
-                 values ($1, $2, $3, $4, $5)
+                "insert into core.grants (resource_id, principal_type, principal_id, level, granted_by, actions)
+                 values ($1, $2, $3, $4, $5, $6)
                  on conflict (resource_id, principal_type, principal_id)
-                 do update set level = excluded.level, granted_by = excluded.granted_by, granted_at = now()",
+                 do update set level = excluded.level, granted_by = excluded.granted_by, granted_at = now(),
+                               actions = excluded.actions",
             )
             .bind(rid)
             .bind(principal_type)
             .bind(principal_id)
             .bind(l as i16)
             .bind(c.user.user_id)
+            .bind(stored)
             .execute(&k.db)
             .await?;
             if new {
@@ -252,7 +287,7 @@ pub async fn set_grant(
         Some(&m.plugin_id),
         Some(rid),
         if level.is_some() { "share" } else { "unshare" },
-        json!({ "principal_type": principal_type, "principal_id": principal_id, "level": level.map(Level::name) }),
+        json!({ "principal_type": principal_type, "principal_id": principal_id, "level": level.map(Level::name), "actions": actions }),
     )
     .await;
     Ok(())

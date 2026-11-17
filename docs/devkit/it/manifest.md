@@ -131,6 +131,7 @@ entrare in conflitto.
 |---|---|
 | `entry` | la pagina della UI, relativa a `ui/dist`; predefinita `index.html` |
 | `public_view` | visualizzatore facoltativo per i link pubblici, relativo a `ui/dist` |
+| `share_page` | pagina facoltativa che sostituisce la finestra di condivisione della shell per le risorse di questo plugin: `<posto>` del plugin, oppure `<id plugin>/<posto>` di un altro. Il pulsante Condividi la apre con `?resource=<id>` dopo il posto; l'API dei permessi e `msk.pickPrincipals` restano disponibili. Una distribuzione può impostarla per un'app ufficiale con `[[plugin_labels]] share_page` |
 
 Entrambe sono percorsi relativi sicuri (niente `..`, niente percorsi assoluti, niente `\`, niente `:`, niente nomi che
 Windows riserva).

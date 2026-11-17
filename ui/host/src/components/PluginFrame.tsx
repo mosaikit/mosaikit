@@ -4,7 +4,7 @@ import { channelName, checkPluginApi, errorReply, execute, OpError, routeOp, saf
 import type { PluginView, Session, TenantContext } from '../types.ts'
 import { appUrl, enc } from '../api.ts'
 import { useUi } from '../ui-context.ts'
-import { sharePre } from './sharepre.ts'
+import { pickOptions, sharePre } from './sharepre.ts'
 import { pageTextsFor, t } from '../app/i18n.ts'
 import { timed } from '../app/devlog.ts'
 import { NAV_RESELECT, resetBand, sanitizeBand, setBand } from '../app/contextband.ts'
@@ -185,6 +185,10 @@ export default function PluginFrame({ plugin, session, ctx, reloadKey, ui: shell
           case 'share':
             await ui.share(uuid(m.args?.id), sharePre(m.args))
             reply({ ok: null })
+            return
+          // the picker of people and groups: what the person chooses comes back (nothing when they cancel)
+          case 'principals.pick':
+            reply({ ok: await ui.pickPrincipals(pickOptions(m.args)) })
             return
           // the band of the shell for a resource on the full page: validated, plain text only; the callbacks come back as events
           case 'band.set':

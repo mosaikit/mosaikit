@@ -115,7 +115,7 @@ export function safePage(page: string): string {
 }
 
 /** Operations handled locally by the host (they do not become REST calls). */
-export const LOCAL_OPS = new Set(['hello', 'share', 'toast', 'confirm', 'band.set', 'band.reset'])
+export const LOCAL_OPS = new Set(['hello', 'share', 'toast', 'confirm', 'band.set', 'band.reset', 'principals.pick'])
 
 /** Translates an operation of the plugin into a REST call. */
 /** A whole number of at least zero (a size, an offset). */

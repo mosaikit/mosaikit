@@ -616,6 +616,18 @@ export interface SharePrincipal {
   name?: string
 }
 
+/** What `msk.pickPrincipals` asks the picker of the host. */
+export interface PickPrincipalsOptions {
+  /** what may be chosen (default `both`) */
+  kind?: 'user' | 'group' | 'both'
+  /** people and groups already there: they are not offered */
+  exclude?: { type: 'user' | 'group' | 'all'; id: string }[]
+  /** `false`: one choice only (default true) */
+  multiple?: boolean
+  /** title of the dialog (at most 80 characters) */
+  title?: string
+}
+
 /** What the share dialog starts with: who to share with, and at which level (default `read`). */
 export interface SharePreselect {
   principals: SharePrincipal[]
