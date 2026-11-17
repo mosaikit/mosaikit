@@ -663,6 +663,89 @@ async fn a_reader_writes_only_the_rows_that_are_theirs_where_the_table_says_so(b
     assert_eq!(sqlstate(&e).as_deref(), Some("42501"), "{e}");
 }
 
+both!(a_holder_of_an_action_writes_the_table_that_names_it);
+async fn a_holder_of_an_action_writes_the_table_that_names_it(b: B) {
+    let w = world(b).await;
+    // a table written by writers of the resource, and by the holders of the action `edit_metadata`
+    let mut tx = w.db.begin_app().await.unwrap();
+    w.ps.thaw(&mut tx).await.unwrap();
+    w.ps.run_as_plugin(
+        &mut tx,
+        &["create table sheets (resource_id uuid not null, tenant_id uuid not null default core.ctx_tenant(), body text)".into()],
+    )
+    .await
+    .unwrap();
+    let ps =
+        w.db.plugin_schema(PLUGIN, SCHEMA)
+            .with_action_tables(vec![("sheets".into(), vec!["edit_metadata".into()])]);
+    ps.freeze(&mut tx).await.unwrap();
+    tx.commit().await.unwrap();
+    query("update core.plugins set manifest = $2 where id = $1")
+        .bind(PLUGIN)
+        .bind(serde_json::json!({ "tables": [{ "name": "sheets", "write_actions": ["edit_metadata"] }] }))
+        .execute(&w.db)
+        .await
+        .unwrap();
+    w.db.forget_plugin_pool(PLUGIN).await;
+
+    let rid = note(&w, w.alice, w.tenant_a, "alice's layer", None).await;
+    grant(&w, rid, w.bob, 1).await;
+    let ins = |who: Uuid| {
+        let w = &w;
+        async move {
+            let mut tx = w.db.begin_plugin(PLUGIN, &Ctx::user(who, w.tenant_a)).await.unwrap();
+            let r = query("insert into sheets (resource_id, body) values ($1, 'x')")
+                .bind(rid)
+                .execute(&mut *tx)
+                .await;
+            if r.is_ok() {
+                tx.commit().await.unwrap();
+            }
+            r.map(|_| ())
+        }
+    };
+    // a reader without the action is refused
+    let e = ins(w.bob).await.unwrap_err();
+    assert_eq!(sqlstate(&e).as_deref(), Some("42501"), "{e}");
+    // an action the table does not name does not help
+    query("update core.grants set actions = 'download' where resource_id = $1 and principal_id = $2")
+        .bind(rid)
+        .bind(w.bob)
+        .execute(&w.db)
+        .await
+        .unwrap();
+    let e = ins(w.bob).await.unwrap_err();
+    assert_eq!(sqlstate(&e).as_deref(), Some("42501"), "{e}");
+    // the action does
+    query("update core.grants set actions = 'download,edit_metadata' where resource_id = $1 and principal_id = $2")
+        .bind(rid)
+        .bind(w.bob)
+        .execute(&w.db)
+        .await
+        .unwrap();
+    ins(w.bob).await.unwrap();
+    // and a change of the row
+    let mut tx = w.db.begin_plugin(PLUGIN, &Ctx::user(w.bob, w.tenant_a)).await.unwrap();
+    let upd = query("update sheets set body = 'y' where resource_id = $1")
+        .bind(rid)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    assert_eq!(upd.rows_affected(), 1);
+    drop(tx);
+    // a person who does not see the resource (carol is in another tenant) gets nothing from the action
+    query("insert into core.grants (resource_id, principal_type, principal_id, level, actions) values ($1, 'user', $2, 1, 'edit_metadata')")
+        .bind(rid)
+        .bind(w.carol)
+        .execute(&w.db)
+        .await
+        .unwrap();
+    let e = ins(w.carol).await.unwrap_err();
+    assert_eq!(sqlstate(&e).as_deref(), Some("42501"), "{e}");
+    // the owner writes as before
+    ins(w.alice).await.unwrap();
+}
+
 both!(a_visitor_of_a_link_inserts_only_where_the_table_says_so);
 async fn a_visitor_of_a_link_inserts_only_where_the_table_says_so(b: B) {
     let w = world(b).await;

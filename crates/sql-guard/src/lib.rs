@@ -61,7 +61,7 @@ impl Checked {
 /// Objects of the `core` schema the plugins may read.
 const CORE_RELATIONS: &[&str] = &["visible_resources"];
 /// Functions of the `core` schema the plugins may call.
-const CORE_FUNCTIONS: &[&str] = &["can_access", "level_of", "ctx_user", "ctx_tenant"];
+const CORE_FUNCTIONS: &[&str] = &["can_access", "can_action", "level_of", "ctx_user", "ctx_tenant"];
 /// Forbidden functions (besides all the `pg_*` ones).
 const DENIED_FUNCTIONS: &[&str] = &[
     "set_config",

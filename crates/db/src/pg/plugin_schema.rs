@@ -24,6 +24,8 @@ pub struct PgPluginSchema {
     pub reader_tables: Vec<(String, String)>,
     /// the reader tables where a visitor of a public link (no user) may also insert
     pub visitor_tables: Vec<String>,
+    /// `(table, actions)`: holders of one of these actions of a share on the resource also write the rows
+    pub action_tables: Vec<(String, Vec<String>)>,
 }
 
 /// `core` functions the roles of the plugins may run.
@@ -35,6 +37,7 @@ const CORE_GRANTS: &[&str] = &[
     "core.ctx_plugin()",
     "core.level_of(uuid)",
     "core.can_access(uuid, int)",
+    "core.can_action(uuid, text)",
     "core.ctx_levels()",
     "core.create_resource(text, text, uuid, jsonb)",
     "core.update_resource(uuid, text, jsonb, bigint)",
@@ -293,6 +296,17 @@ impl PgPluginSchema {
                             )
                         }
                         None => "core.can_access(resource_id, 2)".to_string(),
+                    };
+                    // the holders of an action of a share the table names write too (`write_actions`)
+                    let allowed = match self.action_tables.iter().find(|(n, _)| n == name) {
+                        Some((_, acts)) => {
+                            let any: Vec<String> = acts
+                                .iter()
+                                .map(|a| format!("core.can_action(resource_id, '{}')", a.replace("'", "''")))
+                                .collect();
+                            format!("({allowed} or {})", any.join(" or "))
+                        }
+                        None => allowed,
                     };
                     // a visitor of a public link (no user, level 1 on the item of the link) may insert, never change
                     let insert_allowed = if self.visitor_tables.iter().any(|n| n == name) {
