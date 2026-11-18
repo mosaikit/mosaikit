@@ -311,6 +311,10 @@ pub async fn read(k: &Kernel, c: &Caller, plugin_id: &str, id: Uuid) -> Result<(
     if e.is_dir {
         return Err(Error::bad("it is a folder: use the zip"));
     }
+    // a share can limit the download (`[[resources]] actions = ["download"]` of the plugin)
+    if !crate::actions::permitted(k, c, &p.id, "file", id, "download").await? {
+        return Err(Error::forbidden("the share does not allow the download"));
+    }
     let data = k.blobs.read_file(c.tenant.tenant_id, id)?;
     Ok((e, data))
 }
@@ -561,6 +565,10 @@ pub async fn delete(k: &Kernel, c: &Caller, plugin_id: &str, id: Uuid) -> Result
 pub async fn zip_folder(k: &Kernel, c: &Caller, plugin_id: &str, id: Uuid) -> Result<(String, Vec<u8>)> {
     let p = plugin(k, c, plugin_id, crate::access::USE).await?;
     let tenant = c.tenant.tenant_id;
+    // before the transaction: the check reads with its own (one connection on SQLite)
+    if !crate::actions::permitted(k, c, &p.id, "folder", id, "download").await? {
+        return Err(Error::forbidden("the share does not allow the download"));
+    }
     let mut tx = k.db.begin_plugin(&p.id, &c.ctx()).await?;
     let root = get_entry(&mut tx, id).await?;
     if !root.is_dir {

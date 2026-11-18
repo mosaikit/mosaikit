@@ -105,7 +105,7 @@ CRUD, the search, sharing, trash and the `crud.*` calls of the UI.
 | `due_field` | string | a `date` field: the kernel copies it, and the Home of a person lists what is due soon |
 | `done_field` | string | a `bool` field: a done item is no longer due |
 | `actions` | array of names | actions a share of this resource type can carry besides read / write / manage (`download`, `run`...): lower case letters, digits and `_`, at most 32, not `see`/`read`/`write`/`manage`. Set per person or group on the share (`PUT /resources/{id}/grants` with `actions`); manage implies all of them. Ask with `ctx.can_on(id, "download")` or `resources().list_with_action(...)` |
-| `fields` | array, required | at least one |
+| `fields` | array, required | at least one; none is allowed only with `actions` (a kind the kernel keeps itself, like the files of the Documents app: no table is created) |
 
 ### Fields
 
