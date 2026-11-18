@@ -17,6 +17,7 @@ import { useApi, useConfirm } from './core.ts'
 import { fmtDay, t } from './i18n.ts'
 import type { SharePre } from '../ui-context.ts'
 import { levelHint, levelName } from './levels.ts'
+import { shown, useDirectory } from './directory.ts'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
@@ -47,30 +48,6 @@ function LevelSelect({ value, onChange, label }: { value: Level; onChange: (l: L
       </SelectContent>
     </Select>
   )
-}
-
-/** People and groups of the tenant matching the search. */
-/** The name and detail of a person or group in the dialog: «All members» has its own, translated. */
-export function shown(p: { name: string; detail: string; builtin?: 'all' }): { name: string; detail: string } {
-  return p.builtin ? { name: t('All members'), detail: t('Every member of the organization') } : { name: p.name, detail: p.detail }
-}
-
-export function useDirectory(slug: string, q: string) {
-  const [found, setFound] = useState<Principal[]>([])
-  useEffect(() => {
-    const s = q.trim()
-    if (!s) {
-      setFound([])
-      return
-    }
-    const h = setTimeout(() => {
-      api<Principal[]>('GET', `/api/t/${enc(slug)}/directory?q=${enc(s)}`)
-        .then(setFound)
-        .catch(() => setFound([]))
-    }, 200)
-    return () => clearTimeout(h)
-  }, [q, slug])
-  return found
 }
 
 export default function ShareDialog({ ctx, resourceId, onClose, preselect }: { ctx: TenantContext; resourceId: string | null; onClose: () => void; preselect?: SharePre }) {
