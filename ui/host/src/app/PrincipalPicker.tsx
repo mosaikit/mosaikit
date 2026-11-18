@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { t } from './i18n.ts'
-import { shown, useDirectory } from './ShareDialog.tsx'
+import { shown, useDirectory } from './directory.ts'
 import type { PickOptions, PickedPrincipal } from '../ui-context.ts'
 
 const keyOf = (p: { kind: string; id: string }) => `${p.kind}:${p.id}`
