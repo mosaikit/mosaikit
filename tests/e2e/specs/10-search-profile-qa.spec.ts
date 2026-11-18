@@ -161,7 +161,7 @@ test.describe.serial('10-search-profile-qa', () => {
     await page.reload()
     await page.getByRole('button', { name: 'Aiuto', exact: true }).click()
     await page.getByRole('menuitem', { name: /Novità della versione/ }).click()
-    await expect(page.getByRole('dialog', { name: /Novità della versione/ })).toContainText('area File')
+    await expect(page.getByRole('dialog', { name: /Novità della versione/ })).toContainText('Le novità di questa versione')
     await page.keyboard.press('Escape')
     await page.getByRole('button', { name: 'Aiuto', exact: true }).click()
     await page.getByRole('menuitem', { name: 'Guida di Mosaikit' }).click()
