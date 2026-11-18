@@ -90,6 +90,22 @@ pub fn pack_plugin(name: &str) -> Vec<u8> {
     mosaikit_mskp::pack(&files, Some(&test_key())).expect("pack")
 }
 
+/// Signed package of an official plugin whose manifest the test changes first (the text of `plugin.toml`).
+pub fn pack_plugin_with(name: &str, change: impl FnOnce(&mut String)) -> Vec<u8> {
+    let dir = plugins_root().join(name);
+    wait_for_ui_build(&dir);
+    let wasm = if dir.join("Cargo.toml").is_file() {
+        Some(build_wasm_plugins().join(format!("{}.wasm", name.replace('-', "_"))))
+    } else {
+        None
+    };
+    let mut files = mosaikit_mskp::collect_plugin_dir(&dir, wasm.as_deref()).expect("files of the plugin");
+    let mut toml = String::from_utf8(files["plugin.toml"].clone()).expect("plugin.toml is text");
+    change(&mut toml);
+    files.insert("plugin.toml".into(), toml.into_bytes());
+    mosaikit_mskp::pack(&files, Some(&test_key())).expect("pack")
+}
+
 /// Compiles to WASM the given crates of a plugin workspace (e.g. the ones of a
 /// distribution); returns the folder with the `.wasm` files.
 pub fn build_wasm_in(workspace: &Path, crates: &[&str]) -> PathBuf {

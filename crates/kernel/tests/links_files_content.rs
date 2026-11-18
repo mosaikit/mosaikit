@@ -450,7 +450,31 @@ async fn upload_in_pieces() {
 /// list of actions: the shares made without one (and the people who write) keep downloading.
 #[tokio::test]
 async fn a_share_can_limit_the_download() {
-    let (t, _g, anna, bruno) = setup().await;
+    // the manifest of Files declares the action (a copy that does, whatever the checkout of the plugins has)
+    let t = start().await;
+    let pkg = mosaikit_kernel::testing::pack_plugin_with("files", |toml| {
+        if !toml.contains("[[resources]]") {
+            toml.push_str(
+                "
+[[resources]]
+name = \"file\"
+actions = [\"download\"]
+",
+            );
+            toml.push_str(
+                "
+[[resources]]
+name = \"folder\"
+actions = [\"download\"]
+",
+            );
+        }
+    });
+    t.install_package(&pkg).await.unwrap();
+    let g = t.tenant("alfa").await;
+    let anna = t.member(&g, "anna").await;
+    let bruno = t.member(&g, "bruno").await;
+    let (anna, bruno) = (t.home(&anna).await, t.home(&bruno).await);
     let project = files::mkdir(&t, &anna, FILES, None, "Project").await.unwrap();
     let doc = files::upload(&t, &anna, FILES, Some(project.id), "report.txt", b"hello", false).await.unwrap();
 
