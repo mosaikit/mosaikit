@@ -56,6 +56,7 @@ dell'host ed è accettato solo da essa. Una chiamata che non riceve risposta in 
 | `msk.setShare(id, { principal, level, actions? })`, `msk.removeShare(id, principal)` | condividono un elemento o cambiano/tolgono una condivisione, con le regole della finestra (gestire l'elemento, permesso `share`, azioni dichiarate); le persone sono avvisate. `principal` è un `SharePrincipal` (`{ type: 'all' }` per tutti i membri) |
 | `msk.pickPrincipals({ kind?, exclude?, multiple?, title? })` | il selettore dell'host: la persona cerca tra persone e gruppi dell'organizzazione e sceglie; restituisce `SharePrincipal[]` (vuoto se annulla) |
 | `msk.notify({ title, body?, at?, resource? })` | una notifica; restituisce quante persone l'hanno ricevuta. Sperimentale |
+| `msk.notifications.markRead({ resource?, at?, plugin? })` | segna come lette le notifiche della persona su un elemento o un luogo (si spengono il pallino dell'app e la campanella); restituisce quante. Il proprio plugin sempre, un altro con `[permissions] notify_done`. Serve `resource` oppure `at` |
 | `msk.toast(text, error?)`, `msk.confirm(text)` | un avviso; la finestra di conferma dell'host |
 | `msk.extensions(resource)` | `list`, `values(ids)`, `set(id, ext, values)`, `action(id, ext, key)`, `mountTab(el, id, ext, tab)` |
 | `msk.tabClient()` | in una pagina scheda: `item()`, `values()`, `set(values)`, `action(key)`, `resize(h)`, `autoResize(el?)` |

@@ -46,6 +46,7 @@ export type {
   ListResult,
   Listing,
   Notify,
+  NotificationRef,
   PublicResource,
   Rect,
   ResourceMeta,

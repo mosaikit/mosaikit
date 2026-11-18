@@ -60,6 +60,17 @@ describe('routeOp', () => {
     expect(() => routeOp('alfa', 'p.x', 'share.set', { id: rid, principal: { type: 'user', id: uid }, level: 'read', actions: [1] })).toThrow()
   })
 
+  it('routes the marking of notifications as read with the identifiers checked', () => {
+    const rid = '11111111-2222-3333-4444-555555555555'
+    expect(routeOp('alfa', 'p.x', 'notifications.markRead', { resource: rid, at: 'review/1', plugin: 'p.y', tenant: 'beta' })).toEqual({
+      method: 'POST',
+      url: '/api/t/alfa/p/p.x/notify/done',
+      json: { resource: rid, at: 'review/1', plugin: 'p.y' },
+    })
+    expect(routeOp('alfa', 'p.x', 'notifications.markRead', { at: 'review/1' }).json).toEqual({ at: 'review/1' })
+    expect(() => routeOp('alfa', 'p.x', 'notifications.markRead', { resource: 'x' })).toThrow()
+  })
+
   it('routes the directory search with checked arguments only', () => {
     const c = routeOp('alfa', 'p.x', 'directory.search', { kind: 'user', q: 'an', limit: 500, tenant: 'beta', plugin: 'p.evil' })
     expect(c).toEqual({ method: 'POST', url: '/api/t/alfa/p/p.x/directory/search', json: { kind: 'user', q: 'an', limit: 50 } })

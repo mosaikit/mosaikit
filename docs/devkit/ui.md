@@ -58,6 +58,7 @@ the origin of the host and is accepted only from it. A call that gets no answer 
 | `msk.setShare(id, { principal, level, actions? })`, `msk.removeShare(id, principal)` | share an item or change/remove a share, with the rules of the dialog (manage the item, `share` permission, declared actions); people are notified. `principal` is a `SharePrincipal` (`{ type: 'all' }` for every member) |
 | `msk.pickPrincipals({ kind?, exclude?, multiple?, title? })` | the picker of the host: the person searches the people and groups of the tenant and chooses; returns `SharePrincipal[]` (empty on cancel) |
 | `msk.notify({ title, body?, at?, resource? })` | a notification; returns how many people got it. Experimental |
+| `msk.notifications.markRead({ resource?, at?, plugin? })` | marks as read the person's notifications about an item or a place (the dot of the app and the bell go off); returns how many. Own plugin always, another one with `[permissions] notify_done`. One of `resource` or `at` is required |
 | `msk.toast(text, error?)`, `msk.confirm(text)` | a toast; the confirmation dialog of the host |
 | `msk.extensions(resource)` | `list`, `values(ids)`, `set(id, ext, values)`, `action(id, ext, key)`, `mountTab(el, id, ext, tab)` |
 | `msk.tabClient()` | in a tab page: `item()`, `values()`, `set(values)`, `action(key)`, `resize(h)`, `autoResize(el?)` |

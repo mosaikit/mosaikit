@@ -2,7 +2,7 @@
 
 use mosaikit_kernel::acl::{set_grant, Level};
 use mosaikit_kernel::mail::{self, EmailChange, EmailSettings, Security};
-use mosaikit_kernel::notify::{self, Filter, NoteKind, PluginNote, PrefsChange};
+use mosaikit_kernel::notify::{self, Filter, NoteKind, NoteRef, PluginNote, PrefsChange};
 use mosaikit_kernel::tenancy::{invite, respond_invitation};
 use mosaikit_kernel::testing::{start, FakeSmtp, TestKernel};
 use mosaikit_kernel::{crud, Caller, Kind, Role, SessionUser};
@@ -413,4 +413,53 @@ async fn retention() {
         .unwrap();
     assert_eq!(notify::purge(&t).await.unwrap(), 1);
     assert!(all(&t, &bruno).await.items.is_empty());
+}
+
+/// A page marks as read the notifications of the person about an item or a place (`msk.notifications.markRead`).
+#[tokio::test]
+async fn a_plugin_marks_its_notifications_as_read() {
+    let t = start().await;
+    t.install("notes").await;
+    let g = t.tenant("alfa").await;
+    let anna = t.member(&g, "anna").await;
+    let bruno = t.member(&g, "bruno").await;
+    let (ca, cb) = (t.home(&anna).await, t.home(&bruno).await);
+    let rid = note(&t, &ca, "Review me").await;
+    let other = note(&t, &ca, "Another").await;
+    set_grant(&t, &ca, rid, "user", bruno.user_id, Some(Level::Write)).await.unwrap();
+    set_grant(&t, &ca, other, "user", bruno.user_id, Some(Level::Write)).await.unwrap();
+    let on = |title: &str, r: Uuid, at: &str| PluginNote {
+        title: title.into(),
+        body: String::new(),
+        at: Some(at.into()),
+        resource: Some(r),
+    };
+    // anna is told twice about the first item and once about the second
+    notify::from_plugin(&t, &cb, NOTES, &on("Publication requested", rid, "review/a")).await.unwrap();
+    notify::from_plugin(&t, &cb, NOTES, &on("Publication requested again", rid, "review/b")).await.unwrap();
+    notify::from_plugin(&t, &cb, NOTES, &on("Other item", other, "review/c")).await.unwrap();
+    assert_eq!(notify::unread_count(&t, &anna).await.unwrap(), 3);
+
+    // by item: both of the first, not the second; the sender's own are not touched
+    let by_item = NoteRef { resource: Some(rid), ..Default::default() };
+    assert_eq!(notify::done_from_plugin(&t, &ca, NOTES, &by_item).await.unwrap(), 2);
+    assert_eq!(notify::unread_count(&t, &anna).await.unwrap(), 1);
+    // already read: nothing more
+    assert_eq!(notify::done_from_plugin(&t, &ca, NOTES, &by_item).await.unwrap(), 0);
+    // by place
+    let by_place = NoteRef { at: Some("review/c".into()), ..Default::default() };
+    assert_eq!(notify::done_from_plugin(&t, &ca, NOTES, &by_place).await.unwrap(), 1);
+    assert_eq!(notify::unread_count(&t, &anna).await.unwrap(), 0);
+
+    // somebody else's notifications are not touched, and one of the two is required
+    notify::from_plugin(&t, &cb, NOTES, &on("Again", rid, "review/a")).await.unwrap();
+    assert_eq!(notify::done_from_plugin(&t, &cb, NOTES, &by_item).await.unwrap(), 0);
+    assert_eq!(notify::unread_count(&t, &anna).await.unwrap(), 1);
+    assert_eq!(
+        notify::done_from_plugin(&t, &ca, NOTES, &NoteRef::default()).await.unwrap_err().kind,
+        Kind::BadRequest
+    );
+    // another plugin's notifications need `[permissions] notify_done`
+    let foreign = NoteRef { plugin: Some("com.mosaikit.tasks".into()), resource: Some(rid), at: None };
+    assert_eq!(notify::done_from_plugin(&t, &ca, NOTES, &foreign).await.unwrap_err().kind, Kind::Forbidden);
 }

@@ -4,6 +4,10 @@ Cosa cambia da una versione di Mosaikit alla successiva. La shell mostra la sezi
 Aiuto › Novità (un titolo `## <versione>` per versione, voci `- `, gruppi `### `). Questo file è la
 versione italiana di [CHANGELOG.md](CHANGELOG.md): tenerli allineati.
 
+## 1.1.2
+
+- Plugin: una pagina o la logica può segnare come lette le notifiche della persona che riguardano un elemento o un luogo, così il pallino rosso si spegne quando il lavoro è fatto altrove: `msk.notifications.markRead({ resource?, at?, plugin? })` e `ctx.notify_done(&NoticeRef::resource(id).at(luogo))`. Le notifiche del proprio plugin sono sempre ammesse; quelle di un altro plugin richiedono `[permissions] notify_done = ["id.del.plugin"]`. Serve `resource` oppure `at`; si toccano solo le notifiche della persona stessa.
+
 ## 1.1.1
 
 - File: una condivisione di un file o di una cartella può limitare lo **scarico**. L'app Documenti dichiara `actions = ["download"]` per `file` e `folder`; il kernel lo controlla quando serve il contenuto o lo zip. Limita solo una condivisione fatta con una lista di azioni: quelle fatte prima, e quelle semplici, continuano a scaricare; chi ha la scrittura, e il proprietario, scaricano sempre.

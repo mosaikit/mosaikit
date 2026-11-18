@@ -377,6 +377,17 @@ export interface ResourceMeta {
   is_owner: boolean
 }
 
+/** Which notifications of the person a page has done with (`msk.notifications.markRead`): one of `resource`
+ *  or `at` is required. */
+export interface NotificationRef {
+  /** the plugin that sent them (default: this one; another one must be in `[permissions] notify_done`) */
+  plugin?: string
+  /** notifications about this item */
+  resource?: string
+  /** notifications that open this place of the plugin */
+  at?: string
+}
+
 /** A notification of the plugin (`msk.notify`). */
 export interface Notify {
   /** plain text, at most 160 characters */

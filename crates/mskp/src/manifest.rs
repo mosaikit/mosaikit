@@ -841,6 +841,11 @@ pub struct Permissions {
     /// people who see one of its items.
     #[serde(default)]
     pub notify: bool,
+    /// Plugins whose notifications to the caller this plugin may mark as read (`ctx.notify_done`,
+    /// `msk.notifications.markRead` with `plugin`): its own are always allowed. For a plugin whose page
+    /// finishes what another one asked ("publication requested" answered in the catalog).
+    #[serde(default)]
+    pub notify_done: Vec<String>,
     /// The logic may read the Files area with the permissions of the caller (host operations
     /// `files.list`, `files.describe`, `files.read`). Sensitive: the Administrator sees it when the
     /// plugin is installed. Default: false. Not `files`, which is the file API of a plugin that owns
@@ -1164,6 +1169,14 @@ impl Manifest {
         for c in &self.permissions.calls {
             if !is_plugin_id(c) || c == &self.id {
                 return bad(format!("permissions.calls: invalid id '{c}'"));
+            }
+        }
+        if self.permissions.notify_done.len() > 8 {
+            return bad("permissions.notify_done: at most 8 plugins".into());
+        }
+        for c in &self.permissions.notify_done {
+            if !is_plugin_id(c) || c == &self.id {
+                return bad(format!("permissions.notify_done: invalid id '{c}'"));
             }
         }
         if self.permissions.resources_read.len() > 16 {

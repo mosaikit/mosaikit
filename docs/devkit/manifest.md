@@ -147,6 +147,7 @@ Everything is off by default. The Administrator sees what a plugin asks for when
 | `web` | bool | the UI may call `msk.web.probe(url)` and embed any web site (`frame-src https: http:`) |
 | `calls` | array of plugin ids | plugins whose commands the logic calls with `plugin.call`; not itself |
 | `notify` | bool | the logic may send notifications (`ctx.notify`) |
+| `notify_done` | array of plugin ids | other plugins whose notifications to the person this plugin may mark as read (`ctx.notify_done`, `msk.notifications.markRead` with `plugin`); its own are always allowed. At most 8 |
 | `files_read` | bool | the logic reads the Files area as the caller; the UI may list it and ask for the address of a file or folder (`source` on the files calls). **Sensitive** |
 | `files_write` | bool | the UI creates folders, uploads files and unpacks zip archives in the Files area as the caller (`source` on the files calls). **Sensitive** |
 | `script_eval` | bool | the CSP of the UI allows `'unsafe-eval'` and `'wasm-unsafe-eval'`. **Sensitive** |
