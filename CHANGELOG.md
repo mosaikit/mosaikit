@@ -5,6 +5,11 @@ in Help › What is new (one `## <version>` heading per version, `- ` items, `##
 language of the person: this file in English, [CHANGELOG.it.md](CHANGELOG.it.md) in Italian (keep them
 in step).
 
+## 1.1.1
+
+- Files: a share of a file or a folder can limit the **download**. The Documents app declares `actions = ["download"]` for `file` and `folder`; the kernel checks it when the content or the zip is served. Only a share made with a list of actions limits: the shares made before, and the plain ones, keep downloading; whoever has write, and the owner, always download. The grants API tells which with `actions` as before.
+- Plugins: a `[[resources]]` with no fields and with `actions` names a kind the kernel keeps itself (no table is created), so that its shares can carry actions.
+
 ## 1.1.0
 
 - Plugins: a share can carry **actions** besides the level. `[[resources]] actions = ["download", "run"]` declares them per resource type; the grants API (`PUT /resources/{id}/grants`) takes `actions` next to `level` and lists them; `resource.shares` returns them; manage implies all. The logic asks `ctx.can_on(id, "download")`, and `resources().list_with_action(plugin, "download", ...)` / `resources.list` with `with_action` keeps the items the caller may act on. A grant on a folder reaches what is inside, like the level. A plugin that declares nothing sees no change.

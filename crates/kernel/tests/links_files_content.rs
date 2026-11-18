@@ -2,7 +2,7 @@
 
 use std::io::Write;
 
-use mosaikit_kernel::acl::{set_grant, Level};
+use mosaikit_kernel::acl::{set_grant, set_grant_with, Level};
 use mosaikit_kernel::tenancy::set_settings;
 use mosaikit_kernel::testing::{start, TestKernel};
 use mosaikit_kernel::{content, crud, files, links, uploads, Caller, Kind};
@@ -444,4 +444,52 @@ async fn upload_in_pieces() {
         uploads::begin(&t, &anna, FILES, None, &format!("open{i}"), 5, false).await.unwrap();
     }
     assert_eq!(begin("one-more", 5, false).await.unwrap_err().kind, Kind::TooMany);
+}
+
+/// The download of a file or a folder follows the action `download` of the share, but only for a share made with a
+/// list of actions: the shares made without one (and the people who write) keep downloading.
+#[tokio::test]
+async fn a_share_can_limit_the_download() {
+    let (t, _g, anna, bruno) = setup().await;
+    let project = files::mkdir(&t, &anna, FILES, None, "Project").await.unwrap();
+    let doc = files::upload(&t, &anna, FILES, Some(project.id), "report.txt", b"hello", false).await.unwrap();
+
+    // a share without the list of actions: bruno downloads, as before
+    set_grant(&t, &anna, project.id, "user", bruno.user.user_id, Some(Level::Read)).await.unwrap();
+    assert_eq!(files::read(&t, &bruno, FILES, doc.id).await.unwrap().1, b"hello");
+    assert!(files::zip_folder(&t, &bruno, FILES, project.id).await.is_ok());
+
+    // the same share with a list that has no download: the content and the zip are refused, the listing is not
+    let none: Vec<String> = vec![];
+    set_grant_with(&t, &anna, project.id, "user", bruno.user.user_id, Some(Level::Read), Some(&none))
+        .await
+        .unwrap();
+    assert_eq!(files::read(&t, &bruno, FILES, doc.id).await.unwrap_err().kind, Kind::Forbidden);
+    assert_eq!(files::zip_folder(&t, &bruno, FILES, project.id).await.unwrap_err().kind, Kind::Forbidden);
+    assert_eq!(files::list(&t, &bruno, FILES, Some(project.id)).await.unwrap().entries.len(), 1);
+
+    // with `download` in the list he downloads again; changing only the level keeps the list
+    let dl = vec!["download".to_string()];
+    set_grant_with(&t, &anna, project.id, "user", bruno.user.user_id, Some(Level::Read), Some(&dl))
+        .await
+        .unwrap();
+    assert_eq!(files::read(&t, &bruno, FILES, doc.id).await.unwrap().1, b"hello");
+    set_grant(&t, &anna, project.id, "user", bruno.user.user_id, Some(Level::Read)).await.unwrap();
+    assert_eq!(files::read(&t, &bruno, FILES, doc.id).await.unwrap().1, b"hello");
+
+    // write includes the download, whatever the list; the owner always downloads
+    set_grant_with(&t, &anna, project.id, "user", bruno.user.user_id, Some(Level::Write), Some(&none))
+        .await
+        .unwrap();
+    assert_eq!(files::read(&t, &bruno, FILES, doc.id).await.unwrap().1, b"hello");
+    assert_eq!(files::read(&t, &anna, FILES, doc.id).await.unwrap().1, b"hello");
+    // an action the plugin does not declare is refused
+    let bad = vec!["run".to_string()];
+    assert_eq!(
+        set_grant_with(&t, &anna, project.id, "user", bruno.user.user_id, Some(Level::Read), Some(&bad))
+            .await
+            .unwrap_err()
+            .kind,
+        Kind::BadRequest
+    );
 }

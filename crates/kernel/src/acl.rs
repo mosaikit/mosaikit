@@ -239,25 +239,27 @@ pub async fn set_grant_with(
             .bind(principal_id)
             .fetch_one(&k.db)
             .await?;
-            // the actions stay as they are when the caller gives none
-            let stored: String = match actions {
-                Some(a) => crate::actions::join(a),
-                None => mosaikit_db::query_scalar(
-                    "select actions from core.grants where resource_id = $1 and principal_type = $2 and principal_id = $3",
+            // the actions stay as they are when the caller gives none; a list (even empty) marks the grant as
+            // one that limits the actions (`actions_set`)
+            let (stored, set): (String, bool) = match actions {
+                Some(a) => (crate::actions::join(a), true),
+                None => mosaikit_db::query(
+                    "select actions, actions_set from core.grants where resource_id = $1 and principal_type = $2 and principal_id = $3",
                 )
                 .bind(rid)
                 .bind(principal_type)
                 .bind(principal_id)
                 .fetch_optional(&k.db)
                 .await?
+                .map(|r| (r.get::<String, _>(0), r.get::<bool, _>(1)))
                 .unwrap_or_default(),
             };
             mosaikit_db::query(
-                "insert into core.grants (resource_id, principal_type, principal_id, level, granted_by, actions)
-                 values ($1, $2, $3, $4, $5, $6)
+                "insert into core.grants (resource_id, principal_type, principal_id, level, granted_by, actions, actions_set)
+                 values ($1, $2, $3, $4, $5, $6, $7)
                  on conflict (resource_id, principal_type, principal_id)
                  do update set level = excluded.level, granted_by = excluded.granted_by, granted_at = now(),
-                               actions = excluded.actions",
+                               actions = excluded.actions, actions_set = excluded.actions_set",
             )
             .bind(rid)
             .bind(principal_type)
@@ -265,6 +267,7 @@ pub async fn set_grant_with(
             .bind(l as i16)
             .bind(c.user.user_id)
             .bind(stored)
+            .bind(set)
             .execute(&k.db)
             .await?;
             if new {

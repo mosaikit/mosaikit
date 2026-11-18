@@ -228,6 +228,10 @@ pub async fn apply_schema(
     // tables generated from the manifest (generic CRUD)
     let mut auto = Vec::new();
     for r in &m.resources {
+        // a resource with no fields has no table: the kernel keeps its items (only its actions are declared)
+        if r.fields.is_empty() {
+            continue;
+        }
         let cols: BTreeMap<String, String> = ps.columns(tx, &r.name).await?.into_iter().collect();
         if cols.is_empty() {
             let fields: Vec<String> =

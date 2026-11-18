@@ -724,6 +724,7 @@ pub struct ResourceDecl {
     /// lower case names, set per person or group on the share. Manage implies all of them.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub actions: Vec<String>,
+    #[serde(default)]
     pub fields: Vec<FieldDecl>,
 }
 
@@ -1098,7 +1099,9 @@ impl Manifest {
             if !names.insert(r.name.as_str()) {
                 return bad(format!("duplicate resource '{}'", r.name));
             }
-            if r.fields.is_empty() {
+            // a resource without fields only names a kind the kernel keeps itself (the files of the Files app) so that
+            // its shares can carry actions
+            if r.fields.is_empty() && r.actions.is_empty() {
                 return bad(format!("the resource '{}' has no fields", r.name));
             }
             let mut keys = std::collections::HashSet::new();

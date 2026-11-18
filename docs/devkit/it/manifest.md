@@ -106,7 +106,7 @@ condivisione, cestino e le chiamate `crud.*` della UI.
 | `title_field` | stringa | un campo della risorsa; predefinito il primo campo `text` |
 | `due_field` | stringa | un campo `date`: il kernel lo copia e la Home di una persona elenca ciò che scade presto |
 | `done_field` | stringa | un campo `bool`: un elemento fatto non scade più |
-| `fields` | array, obbligatorio | almeno uno |
+| `fields` | array, obbligatorio | almeno uno; nessuno solo con `actions` (un tipo che il kernel tiene da sé, come i file dell'app Documenti: nessuna tabella è creata) |
 
 ### Campi
 

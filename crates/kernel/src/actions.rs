@@ -114,6 +114,63 @@ pub async fn allowed_among(k: &Kernel, c: &Caller, ids: &[Uuid], action: &str) -
     Ok(out)
 }
 
+/// The caller may do `action`, which the kernel enforces itself (the download of a file, `files.rs`). It has no
+/// effect when the plugin does not declare the action for the kind: those items are as open as before. Whoever
+/// writes the item may, and so may a person with a grant that lists the action; a grant made without a list of
+/// actions (`actions_set` false, like every share made before the actions) does not limit, and the same holds for
+/// access that comes from no grant at all (link, ownership of a parent).
+pub async fn permitted(
+    k: &Kernel,
+    c: &Caller,
+    plugin: &str,
+    kind: &str,
+    rid: Uuid,
+    action: &str,
+) -> Result<bool> {
+    if !declared(k, plugin, kind).iter().any(|a| a == action) {
+        return Ok(true);
+    }
+    let mut tx = k.db.begin(&c.ctx()).await?;
+    let row = mosaikit_db::query("select ancestors, core.level_of(id) from core.resources where id = $1")
+        .bind(rid)
+        .fetch_optional(&mut *tx)
+        .await?;
+    tx.commit().await?;
+    // what the caller does not see is for the caller of this function to refuse (not found), not to answer here
+    let Some(row) = row else { return Ok(true) };
+    let level = Level::from_i32(row.get(1));
+    if level >= Level::Write || level == Level::None {
+        return Ok(true);
+    }
+    let mut chain: Vec<Uuid> = row.get(0);
+    chain.push(rid);
+    let groups: HashSet<Uuid> =
+        mosaikit_db::query_scalar::<Uuid>("select group_id from core.group_members where user_id = $1")
+            .bind(c.user.user_id)
+            .fetch_all(&k.db)
+            .await?
+            .into_iter()
+            .collect();
+    let mut mine = false;
+    for g in mosaikit_db::query(
+        "select principal_type, principal_id, actions, actions_set from core.grants where resource_id = any($1)",
+    )
+    .bind(&chain)
+    .fetch_all(&k.db)
+    .await?
+    {
+        let (kind, who, acts, set): (String, Uuid, String, bool) = (g.get(0), g.get(1), g.get(2), g.get(3));
+        if !(if kind == "user" { who == c.user.user_id } else { groups.contains(&who) }) {
+            continue;
+        }
+        mine = true;
+        if !set || parse(&acts).iter().any(|a| a == action) {
+            return Ok(true);
+        }
+    }
+    Ok(!mine)
+}
+
 /// Checks the names of a grant: well formed, and declared by the plugin for the kind of the resource.
 pub fn check(k: &Kernel, plugin: &str, kind: &str, names: &[String]) -> Result<()> {
     if names.is_empty() {

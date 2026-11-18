@@ -4,6 +4,11 @@ Cosa cambia da una versione di Mosaikit alla successiva. La shell mostra la sezi
 Aiuto › Novità (un titolo `## <versione>` per versione, voci `- `, gruppi `### `). Questo file è la
 versione italiana di [CHANGELOG.md](CHANGELOG.md): tenerli allineati.
 
+## 1.1.1
+
+- File: una condivisione di un file o di una cartella può limitare lo **scarico**. L'app Documenti dichiara `actions = ["download"]` per `file` e `folder`; il kernel lo controlla quando serve il contenuto o lo zip. Limita solo una condivisione fatta con una lista di azioni: quelle fatte prima, e quelle semplici, continuano a scaricare; chi ha la scrittura, e il proprietario, scaricano sempre.
+- Plugin: una `[[resources]]` senza campi e con `actions` nomina un tipo che il kernel tiene da sé (nessuna tabella è creata), così le sue condivisioni possono portare delle azioni.
+
 ## 1.1.0
 
 - Plugin: una condivisione può portare delle **azioni** oltre al livello. `[[resources]] actions = ["download", "run"]` le dichiara per tipo di risorsa; l'API dei permessi (`PUT /resources/{id}/grants`) accetta `actions` accanto a `level` e le elenca; `resource.shares` le restituisce; la gestione le comprende tutte. La logica chiede `ctx.can_on(id, "download")`, e `resources().list_with_action(plugin, "download", ...)` / `resources.list` con `with_action` tiene gli elementi su cui chi chiama può agire. Un permesso su una cartella raggiunge ciò che contiene, come il livello. Un plugin che non dichiara nulla non vede cambiamenti.
