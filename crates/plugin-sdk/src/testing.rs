@@ -487,7 +487,7 @@ pub(crate) fn mock_call(msg: &[u8]) -> Option<Vec<u8>> {
                     None => json!({ "err": format!("MockHost: no command {} of {}", key.1, key.0) }),
                 }
             }
-            None if op == "notify" => json!({ "ok": null }),
+            None if op == "notify" || op == "notify.done" => json!({ "ok": null }),
             None => json!({ "err": format!("MockHost: no answer for {op}") }),
         }
     });

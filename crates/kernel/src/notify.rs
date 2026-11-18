@@ -747,12 +747,79 @@ pub(crate) fn check_note(k: &Kernel, c: &Caller, plugin: &str, n: &PluginNote) -
 /// Sends the notifications that the logic of a plugin asked for during an operation, once it has
 /// committed. Best effort: a refusal (the caller cannot write the item, it is not of the plugin) is
 /// logged and the others go on.
+/// `msk.notifications.markRead`: the same as `done` for the page of a plugin, with the plugins its manifest names.
+pub async fn done_from_plugin(k: &Kernel, c: &Caller, plugin: &str, r: &NoteRef) -> Result<i64> {
+    let (p, _) = crate::access::plugin_for(k, c, plugin).await?;
+    done(k, c, &p.id, &p.manifest.permissions.notify_done, r).await
+}
+
+pub(crate) async fn flush_done(
+    k: &Kernel,
+    c: &Caller,
+    plugin: &str,
+    allowed: &[String],
+    done_refs: Vec<NoteRef>,
+) {
+    for r in done_refs {
+        if let Err(e) = done(k, c, plugin, allowed, &r).await {
+            tracing::warn!(target: "plugin", plugin, "notification not marked as read: {}", e.message);
+        }
+    }
+}
+
 pub(crate) async fn flush(k: &Kernel, c: &Caller, plugin: &str, notes: Vec<PluginNote>) {
     for n in notes {
         if let Err(e) = deliver(k, c, plugin, &n).await {
             tracing::warn!(target: "plugin", plugin, "notification not sent: {}", e.message);
         }
     }
+}
+
+/// Which notifications of a plugin the caller has done with (`msk.notifications.markRead`, `ctx.notify_done`).
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct NoteRef {
+    /// the plugin that sent them (default: the one that asks)
+    #[serde(default)]
+    pub plugin: Option<String>,
+    /// notifications about this item
+    #[serde(default)]
+    pub resource: Option<Uuid>,
+    /// notifications that open this place of the plugin
+    #[serde(default)]
+    pub at: Option<String>,
+}
+
+/// Marks as read the unread notifications of the caller that `r` describes: sent by the plugin, in this tenant,
+/// about the item and/or opening the place. At least one of the two is required, so that a plugin cannot
+/// clear everything. `own` is the plugin that asks: another one is allowed only when it is in `allowed`.
+pub async fn done(k: &Kernel, c: &Caller, own: &str, allowed: &[String], r: &NoteRef) -> Result<i64> {
+    let source = r.plugin.clone().unwrap_or_else(|| own.to_string());
+    if source != own && !allowed.contains(&source) {
+        return Err(Error::forbidden(format!("plugin not declared in permissions.notify_done: {source}")));
+    }
+    let at = r.at.as_deref().map(str::trim).filter(|a| !a.is_empty());
+    if r.resource.is_none() && at.is_none() {
+        return Err(Error::bad("name the item (resource) or the place (at) of the notifications"));
+    }
+    let link = at.map(|a| plugin_link(&c.tenant.slug, &source, Some(a)));
+    let n = mosaikit_db::query(
+        "update core.notifications set read_at = $1
+         where user_id = $2 and tenant_id = $3 and source = $4 and read_at is null
+           and ($5::uuid is null or resource_id = $5) and ($6::text is null or link = $6)",
+    )
+    .bind(Utc::now())
+    .bind(c.user.user_id)
+    .bind(c.tenant.tenant_id)
+    .bind(&source)
+    .bind(r.resource)
+    .bind(link)
+    .execute(&k.db)
+    .await?
+    .rows_affected() as i64;
+    if n > 0 {
+        tell(k, c.user.user_id, "count", None).await;
+    }
+    Ok(n)
 }
 
 /// Sends the notification of a plugin. Safe by design: the plugin names no recipient. Without an item it

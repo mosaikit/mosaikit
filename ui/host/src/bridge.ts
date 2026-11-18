@@ -341,6 +341,14 @@ export function routeOp(tenant: string, plugin: string, op: string, rawArgs: unk
       if (rid) n.resource = rid
       return { method: 'POST', url: `${base}/notify`, json: n }
     }
+    case 'notifications.markRead': {
+      const n: Args = {}
+      const rid = optUuid(a.resource, 'resource')
+      if (rid) n.resource = rid
+      if (a.at !== undefined && a.at !== null && a.at !== '') n.at = str(a.at, 'place', 200)
+      if (a.plugin !== undefined && a.plugin !== null && a.plugin !== '') n.plugin = str(a.plugin, 'plugin', 120)
+      return { method: 'POST', url: `${base}/notify/done`, json: n }
+    }
     // the extensions of the plugin of the iframe: fields and actions on its own items (the kernel
     // checks the permissions of each item)
     case 'ext.list':

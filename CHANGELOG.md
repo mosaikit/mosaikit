@@ -5,6 +5,10 @@ in Help › What is new (one `## <version>` heading per version, `- ` items, `##
 language of the person: this file in English, [CHANGELOG.it.md](CHANGELOG.it.md) in Italian (keep them
 in step).
 
+## 1.1.2
+
+- Plugins: a page or the logic can mark as read the notifications of the person that concern an item or a place, so that the red dot goes off when the work is done elsewhere: `msk.notifications.markRead({ resource?, at?, plugin? })` and `ctx.notify_done(&NoticeRef::resource(id).at(place))`. Their own plugin's notifications are always allowed; another plugin's need `[permissions] notify_done = ["plugin.id"]`. One of `resource` or `at` is required; only the person's own notifications are touched.
+
 ## 1.1.1
 
 - Files: a share of a file or a folder can limit the **download**. The Documents app declares `actions = ["download"]` for `file` and `folder`; the kernel checks it when the content or the zip is served. Only a share made with a list of actions limits: the shares made before, and the plain ones, keep downloading; whoever has write, and the owner, always download. The grants API tells which with `actions` as before.

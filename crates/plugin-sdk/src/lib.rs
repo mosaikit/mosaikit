@@ -35,7 +35,7 @@ pub use serde_json::{self, json, Map, Value};
 pub use values::Values;
 
 pub mod prelude {
-    pub use crate::{json, Ctx, Error, Group, Hook, Notice, Result, Value, Values};
+    pub use crate::{json, Ctx, Error, Group, Hook, Notice, NoticeRef, Result, Value, Values};
 }
 
 /// Error returned to the kernel: it rolls back the transaction of the operation.
@@ -169,6 +169,34 @@ pub struct Group {
     pub all_members: bool,
 }
 
+/// Which notifications of the caller a plugin has done with (`ctx.notify_done`).
+#[derive(Debug, Clone, Default, serde::Serialize)]
+pub struct NoticeRef {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub plugin: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resource: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub at: Option<String>,
+}
+
+impl NoticeRef {
+    /// The notifications about an item.
+    pub fn resource(id: &str) -> NoticeRef {
+        NoticeRef { resource: Some(id.into()), ..NoticeRef::default() }
+    }
+    /// ... that open this place.
+    pub fn at(mut self, at: &str) -> NoticeRef {
+        self.at = Some(at.into());
+        self
+    }
+    /// ... sent by another plugin (declared in `[permissions] notify_done`).
+    pub fn plugin(mut self, id: &str) -> NoticeRef {
+        self.plugin = Some(id.into());
+        self
+    }
+}
+
 /// A notification of the logic (`ctx.notify`). The plugin never names the recipients: with `resource`
 /// they are the people who can see that item of the plugin (the caller needs the write level on it, the
 /// caller is left out); without it, the caller alone.
@@ -263,6 +291,13 @@ impl Ctx {
     /// fail the operation: it is logged.
     pub fn notify(&self, n: &Notice) -> Result<()> {
         host::call("notify", serde_json::to_value(n)?)?;
+        Ok(())
+    }
+    /// The notifications of the caller about an item (`resource`) or a place (`at`) are done with: they are
+    /// marked as read when the operation commits (the red dot goes off). The plugin's own are always allowed;
+    /// another plugin's (`plugin`) must be in `[permissions] notify_done`. One of `resource` or `at` is needed.
+    pub fn notify_done(&self, r: &NoticeRef) -> Result<()> {
+        host::call("notify.done", serde_json::to_value(r)?)?;
         Ok(())
     }
     /// Command of another plugin (declared in `permissions.calls`), with the

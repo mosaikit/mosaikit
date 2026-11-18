@@ -150,6 +150,7 @@ Tutto è spento per impostazione predefinita. L'Administrator vede ciò che un p
 | `web` | bool | la UI può chiamare `msk.web.probe(url)` e incorporare qualsiasi sito web (`frame-src https: http:`) |
 | `calls` | array di id di plugin | plugin di cui la logica chiama i comandi con `plugin.call`; non se stesso |
 | `notify` | bool | la logica può inviare notifiche (`ctx.notify`) |
+| `notify_done` | array di id di plugin | altri plugin di cui questo può segnare come lette le notifiche alla persona (`ctx.notify_done`, `msk.notifications.markRead` con `plugin`); le proprie sono sempre ammesse. Al massimo 8 |
 | `files_read` | bool | la logica legge l'area File come il chiamante; la UI può elencarla e chiedere l'indirizzo di un file o di una cartella (`source` sulle chiamate files). **Sensibile** |
 | `files_write` | bool | la UI crea cartelle, carica file ed estrae archivi zip nell'area File come il chiamante (`source` sulle chiamate files). **Sensibile** |
 | `script_eval` | bool | la CSP della UI consente `'unsafe-eval'` e `'wasm-unsafe-eval'`. **Sensibile** |

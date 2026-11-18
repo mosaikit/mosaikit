@@ -73,6 +73,7 @@ pub fn router() -> Router<AppState> {
         .route("/api/me/notifications/delete", post(my_delete_notifications))
         .route("/api/me/notifications/prefs", get(my_note_prefs).put(my_set_note_prefs))
         .route("/api/t/{t}/p/{plugin}/notify", post(plugin_notify))
+        .route("/api/t/{t}/p/{plugin}/notify/done", post(plugin_notify_done))
         .route("/api/t/{t}/p/{plugin}/web/probe", post(plugin_web_probe))
         .route("/api/t/{t}/p/{plugin}/directory/search", post(plugin_directory_search))
         .route("/api/t/{t}/p/{plugin}/embed/url", post(plugin_embed_url))
@@ -662,6 +663,16 @@ async fn plugin_notify(
     Json(r): Json<notify::PluginNote>,
 ) -> ApiResult<Json<Value>> {
     Ok(Json(json!({ "sent": notify::from_plugin(&s.k, &c, &p.plugin, &r).await? })))
+}
+
+/// `msk.notifications.markRead`: the notifications of the person about an item or a place are done with.
+async fn plugin_notify_done(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Path(p): Path<PluginPath>,
+    Json(r): Json<notify::NoteRef>,
+) -> ApiResult<Json<Value>> {
+    Ok(Json(json!({ "marked": notify::done_from_plugin(&s.k, &c, &p.plugin, &r).await? })))
 }
 
 /// `msk.directory.search`: the people or groups of the tenant for a plugin that declares `directory`

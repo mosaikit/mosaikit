@@ -47,6 +47,8 @@ pub(crate) struct KernelHost {
     address_services: Vec<String>,
     /// `[permissions] notify`: the plugin may notify
     notify: bool,
+    /// `[permissions] notify_done`: other plugins whose notifications the logic may mark as read
+    notify_done: Vec<String>,
     /// `[permissions] files_read`: the logic may read the Files area as the caller
     files_read: bool,
     /// `[permissions] resources_read`: the plugins whose resources the logic may list as the caller
@@ -64,12 +66,19 @@ pub(crate) struct KernelHost {
 #[derive(Default)]
 pub(crate) struct Deferred {
     pub(crate) notes: Vec<crate::notify::PluginNote>,
+    /// notifications of the caller the logic has done with (`notify.done`), with the plugins it may touch
+    pub(crate) done: Vec<crate::notify::NoteRef>,
+    pub(crate) done_allowed: Vec<String>,
     pub(crate) tickets: Vec<crate::run_tickets::Prepared>,
 }
 
 impl Deferred {
     pub(crate) fn extend(&mut self, other: Deferred) {
         self.notes.extend(other.notes);
+        self.done.extend(other.done);
+        if !other.done_allowed.is_empty() {
+            self.done_allowed = other.done_allowed;
+        }
         self.tickets.extend(other.tickets);
     }
 
@@ -82,6 +91,7 @@ impl Deferred {
             }
         }
         crate::notify::flush(k, c, plugin, self.notes).await;
+        crate::notify::flush_done(k, c, plugin, &self.done_allowed, self.done).await;
     }
 }
 
@@ -296,6 +306,23 @@ impl KernelHost {
         let k = self.kernel.clone().ok_or("kernel not available")?;
         crate::notify::check_note(&k, &self.user()?, &self.plugin_id, &n).map_err(|e| e.message)?;
         self.deferred.notes.push(n);
+        Ok(Value::Null)
+    }
+
+    /// The notifications of the caller about an item or a place are done with: marked as read when the
+    /// operation commits. Own plugin always; another one when `[permissions] notify_done` names it.
+    fn notify_done(&mut self, req: &Value) -> std::result::Result<Value, String> {
+        let r: crate::notify::NoteRef =
+            serde_json::from_value(req.clone()).map_err(|e| format!("invalid reference: {e}"))?;
+        let source = r.plugin.clone().unwrap_or_else(|| self.plugin_id.clone());
+        if source != self.plugin_id && !self.notify_done.contains(&source) {
+            return Err(format!("plugin not declared in permissions.notify_done: {source}"));
+        }
+        if r.resource.is_none() && r.at.as_deref().map(str::trim).unwrap_or("").is_empty() {
+            return Err("name the item (resource) or the place (at) of the notifications".into());
+        }
+        self.deferred.done.push(r);
+        self.deferred.done_allowed = self.notify_done.clone();
         Ok(Value::Null)
     }
 }
@@ -626,6 +653,7 @@ impl Host for KernelHost {
             "plugin.call" => self.plugin_call(req),
             "key.get" => self.key(req),
             "notify" => self.notify(req),
+            "notify.done" => self.notify_done(req),
             other => Err(format!("unknown host operation: {other}")),
         }
     }
@@ -693,6 +721,7 @@ fn new_host(
             .map(|s| s.id.clone())
             .collect(),
         notify: p.manifest.permissions.notify,
+        notify_done: p.manifest.permissions.notify_done.clone(),
         files_read: p.manifest.permissions.files_read,
         resources_read: p.manifest.permissions.resources_read.clone(),
         contributions: p.manifest.permissions.contributions.clone(),
