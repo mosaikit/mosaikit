@@ -341,6 +341,14 @@ export function routeOp(tenant: string, plugin: string, op: string, rawArgs: unk
       if (rid) n.resource = rid
       return { method: 'POST', url: `${base}/notify`, json: n }
     }
+    case 'settings.get':
+      return { method: 'GET', url: `${base}/settings` }
+    case 'settings.set': {
+      const n: Args = {}
+      if (a.values !== undefined && a.values !== null) n.values = obj(a.values)
+      if (a.secrets !== undefined && a.secrets !== null) n.secrets = obj(a.secrets)
+      return { method: 'PUT', url: `${base}/settings`, json: n }
+    }
     case 'notifications.markRead': {
       const n: Args = {}
       const rid = optUuid(a.resource, 'resource')

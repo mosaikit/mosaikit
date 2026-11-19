@@ -47,6 +47,8 @@ export type {
   Listing,
   Notify,
   NotificationRef,
+  SettingsChange,
+  SettingsView,
   PublicResource,
   Rect,
   ResourceMeta,

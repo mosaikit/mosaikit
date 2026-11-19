@@ -130,6 +130,8 @@ Adding a field to a resource of an installed plugin adds a column on update; the
 | `entry` | the page of the UI, relative to `ui/dist`; default `index.html` |
 | `public_view` | optional viewer for public links, relative to `ui/dist` |
 | `share_page` | optional page that replaces the share dialog of the shell for the resources of this plugin: `<place>` of the plugin, or `<plugin id>/<place>` of another one. The Share button opens that page with `?resource=<id>` after the place; the grants API and `msk.pickPrincipals` stay available to it. A distribution may set it for an official app with `[[plugin_labels]] share_page` |
+| `settings_page` | optional `<place>` of the plugin: the shell shows that page as a section of the Tenant Manager's settings, in a frame with the same API as the other pages. The page reads and writes the tenant settings with `msk.settings.get()` and `msk.settings.set()`. Needs `[requires] mosaikit = ">=1.2"` |
+| `settings_edit` | key of a `[[user_permissions]]`: its holders may use the settings of the tenant of this plugin (the `scope = "tenant"` keys and the page) besides the Tenant Managers. In the shell the section is shown in the Manager's settings |
 
 Both are safe relative paths (no `..`, no absolute path, no `\`, no `:`, no names Windows reserves).
 
@@ -245,6 +247,8 @@ Settings the Administrator sets for the platform (Plugins › Configuration). Ex
 | `options` | required for `choice` |
 | `default` | must fit the kind; not allowed for `secret` |
 | `public` | bool, default false: the page of a public link may read it (`msk.publicConfig()`). **A `secret` cannot be public**: the manifest is refused |
+| `scope` | `"platform"` (default: the Administrator, in Plugins > Configuration) or `"tenant"`: each tenant chooses its own value, the Tenant Manager changes it in the settings of the tenant. The logic reads the value of the tenant that runs the command in `ctx.config`. A tenant setting cannot be `public`. Needs `[requires] mosaikit = ">=1.2"` |
+| `edit` | only with `scope = "tenant"`: key of a `[[user_permissions]]` whose holders may change the setting besides the Tenant Managers |
 
 ## `[[public_commands]]`
 

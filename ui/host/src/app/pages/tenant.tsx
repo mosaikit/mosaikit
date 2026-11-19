@@ -30,6 +30,7 @@ import { resolveSharePage } from '../sharepage.ts'
 import { useNoteList, useUnread } from '../notes.ts'
 import { NoteRow } from '../notifications.tsx'
 import { effectiveMode, useTheme } from '../theme.ts'
+import { ConfigForm } from './plugins.tsx'
 import AppIcon from '../AppIcon.tsx'
 import { ImportDialog, InviteManyDialog } from '../BulkPeople.tsx'
 import { TenantTheme } from '../ThemeSettings.tsx'
@@ -1593,11 +1594,34 @@ function UsageActivity({ slug }: { slug: string }) {
 
 /* ── Tenant settings ─────────────────────────────────────────────────── */
 
-export function TenantSettingsPage({ slug, section }: { slug: string; section?: string }) {
+/** The section of a plugin in the settings of the tenant: its own settings (`[[config]] scope = "tenant"`) and the
+ *  page it offers (`[ui] settings_page`), in a frame with the same API as its other pages. */
+function PluginSettings({ session, slug, p }: { session: Session; slug: string; p: TenantContext['plugins'][number] }) {
+  return (
+    <div className="grid gap-6">
+      {p.tenant_settings && (
+        <ConfigForm
+          cacheKey={['tenant-settings', slug, p.id]}
+          path={`/api/t/${enc(slug)}/p/${enc(p.id)}/settings`}
+          title={p.label}
+          sub={t('For this tenant. Secrets are encrypted and never shown again.')}
+        />
+      )}
+      {p.settings_page && (
+        <div className="relative flex h-[75vh] min-h-96 flex-col overflow-hidden rounded-lg border">
+          <PluginPage session={session} slug={slug} id={p.id} at={p.settings_page} />
+        </div>
+      )}
+    </div>
+  )
+}
+
+export function TenantSettingsPage({ session, slug, section }: { session: Session; slug: string; section?: string }) {
   const ctx = useTenantCtx(slug)
   if (ctx.isLoading) return <Loading />
   if (ctx.data?.tenant.role !== 'tenant_manager') return <Empty title={t('Reserved to Tenant Managers')} />
   const level = { kind: 'tenant', slug } as const
+  const apps = ctx.data.plugins.filter((p) => p.tenant_settings || p.settings_page)
   const sections = [
     {
       id: 'sharing',
@@ -1621,6 +1645,13 @@ export function TenantSettingsPage({ slug, section }: { slug: string; section?: 
       icon: <Lock />,
       group: t('Platform'),
     },
+    // what the apps of the tenant offer: their settings and their pages
+    ...apps.map((p, i) => ({
+      id: `app-${p.id}`,
+      label: p.label,
+      icon: <AppIcon id={p.id} name={p.icon_name} />,
+      ...(i === 0 ? { group: t('Apps') } : {}),
+    })),
   ]
   const tabs = [
     { id: 'identity', label: t('Identity and texts') },
@@ -1649,6 +1680,7 @@ export function TenantSettingsPage({ slug, section }: { slug: string; section?: 
         {cur === 'embedding' && <EmbeddingPanel level={level} />}
         {cur === 'notifications' && <NotificationsPanel level={level} />}
         {cur === 'platform' && <ManagedPanel slug={slug} />}
+        {apps.map((p) => cur === `app-${p.id}` && <PluginSettings key={p.id} session={session} slug={slug} p={p} />)}
         {cur === 'appearance' && tab && (
           <div className="grid gap-6">
             <Tabs tabs={tabs} current={tab} href={(id) => to.tenant(slug, 'settings', id)} />

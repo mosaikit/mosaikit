@@ -156,6 +156,10 @@ export interface PluginView {
   nav?: NavEntry[]
   /** page that replaces the share dialog for the resources of the app: `<place>` or `<plugin id>/<place>` (recent servers) */
   share_page?: string
+  /** page of the app shown as a section of the Tenant Manager's settings: a `<place>` of the app (recent servers) */
+  settings_page?: string
+  /** the app has settings of the tenant (`[[config]] scope = "tenant"`) (recent servers) */
+  tenant_settings?: boolean
   /** the kinds of resource of the app, with the actions a share can carry (recent servers) */
   resources?: { name: string; label?: string; actions?: string[] }[]
 }

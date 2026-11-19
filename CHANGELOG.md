@@ -5,6 +5,12 @@ in Help › What is new (one `## <version>` heading per version, `- ` items, `##
 language of the person: this file in English, [CHANGELOG.it.md](CHANGELOG.it.md) in Italian (keep them
 in step).
 
+## 1.2.0
+
+- Plugins: settings of the tenant. `[[config]] scope = "tenant"` (default `"platform"`, as before) makes a setting that each tenant chooses for itself, with the same kinds, secret included; `edit = "<key of [[user_permissions]]>"` lets the holders of that permission change it besides the Tenant Managers. The shell draws the settings of each app as a section of the Tenant Manager's settings (Apps); a secret is never given back to a page. The logic reads the value of the tenant that runs the command in `ctx.config` (`ctx.setting`). Values are kept in `core.plugin_settings` (migration 0030, SQLite 0028); a key that leaves the manifest is ignored but kept, and the default applies where a stored value no longer fits the kind. Every change is written to the Log with the keys, never a secret.
+- Plugins: `[ui] settings_page = "<place>"` shows a page of the plugin as a section of the Tenant Manager's settings, in a frame with the same API as its other pages; `settings_edit = "<key of [[user_permissions]]>"` names the permission of its holders. The page reads and writes the settings with `msk.settings.get()` and `msk.settings.set({ values?, secrets? })`.
+- The settings of the tenant are sensitive: the Administrator sees them in «What it asks» and in the requirements of the plugin at install. The settings of the platform page of Plugins > Configuration lists only `scope = "platform"` keys.
+
 ## 1.1.2
 
 - Plugins: a page or the logic can mark as read the notifications of the person that concern an item or a place, so that the red dot goes off when the work is done elsewhere: `msk.notifications.markRead({ resource?, at?, plugin? })` and `ctx.notify_done(&NoticeRef::resource(id).at(place))`. Their own plugin's notifications are always allowed; another plugin's need `[permissions] notify_done = ["plugin.id"]`. One of `resource` or `at` is required; only the person's own notifications are touched.

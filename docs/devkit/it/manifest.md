@@ -132,6 +132,8 @@ entrare in conflitto.
 | `entry` | la pagina della UI, relativa a `ui/dist`; predefinita `index.html` |
 | `public_view` | visualizzatore facoltativo per i link pubblici, relativo a `ui/dist` |
 | `share_page` | pagina facoltativa che sostituisce la finestra di condivisione della shell per le risorse di questo plugin: `<posto>` del plugin, oppure `<id plugin>/<posto>` di un altro. Il pulsante Condividi la apre con `?resource=<id>` dopo il posto; l'API dei permessi e `msk.pickPrincipals` restano disponibili. Una distribuzione può impostarla per un'app ufficiale con `[[plugin_labels]] share_page` |
+| `settings_page` | `<posto>` facoltativo del plugin: la shell mostra quella pagina come sezione delle impostazioni del Tenant Manager, in un frame con la stessa API delle altre pagine. La pagina legge e scrive le impostazioni del tenant con `msk.settings.get()` e `msk.settings.set()`. Richiede `[requires] mosaikit = ">=1.2"` |
+| `settings_edit` | chiave di un `[[user_permissions]]`: chi ce l'ha può usare le impostazioni del tenant di questo plugin (le chiavi `scope = "tenant"` e la pagina) oltre ai Tenant Manager. Nella shell la sezione compare nelle impostazioni del Manager |
 
 Entrambe sono percorsi relativi sicuri (niente `..`, niente percorsi assoluti, niente `\`, niente `:`, niente nomi che
 Windows riserva).
@@ -229,6 +231,8 @@ Impostazioni che l'Administrator fissa per la piattaforma (Plugin › Configuraz
 | `options` | obbligatorie per `choice` |
 | `default` | deve adattarsi al tipo; non ammesso per `secret` |
 | `public` | bool, predefinito false: la pagina di un link pubblico può leggerla (`msk.publicConfig()`). **Un `secret` non può essere pubblico**: il manifesto viene rifiutato |
+| `scope` | `"platform"` (predefinito: l'Administrator, in Plugin > Configurazione) oppure `"tenant"`: ogni tenant sceglie il proprio valore, il Tenant Manager lo cambia nelle impostazioni del tenant. La logica legge il valore del tenant che esegue il comando in `ctx.config`. Un'impostazione di tenant non può essere `public`. Richiede `[requires] mosaikit = ">=1.2"` |
+| `edit` | solo con `scope = "tenant"`: chiave di un `[[user_permissions]]` i cui titolari possono cambiare l'impostazione oltre ai Tenant Manager |
 
 ## `[[public_commands]]`
 

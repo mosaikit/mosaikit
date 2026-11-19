@@ -678,7 +678,14 @@ pub(crate) async fn run(
 ) -> Result<(Value, Tx)> {
     // what the caller may do in the plugin: the logic enforces the permissions it declares
     let perms = crate::access::effective(k, c, &p.id).await?;
-    let config = crate::plugins::config::for_logic(k, &p.id).await?;
+    let mut config = crate::plugins::config::for_logic(k, &p.id).await?;
+    // the settings of the tenant that runs the command (`[[config]] scope = "tenant"`), by key
+    let own = crate::plugins::config::tenant_for_logic(k, &p.id, c.tenant.tenant_id).await?;
+    if !own.is_empty() {
+        if let Some(m) = config.as_object_mut() {
+            m.extend(own);
+        }
+    }
     if let Some(ctx) = msg.get_mut("ctx").filter(|v| v.is_object()) {
         ctx["perms"] = json!(perms);
         // the groups of the caller in the tenant
