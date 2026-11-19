@@ -2,7 +2,7 @@ import { Bridge, BridgeError } from './bridge.ts'
 import { API_VERSION, checkHostApi } from './version.ts'
 import { translate, type Vars } from './text.ts'
 import { setBusy, withBusy } from './busy.ts'
-import type { RealtimeEvent, RealtimeMessage, RealtimePerson, RealtimeStatus, BandApi, BandState, DirectoryApi, EmbedsApi, Schedule, SchedulesApi, DirectorySearch, ExtensionView, FileEntry, Hello, HostEventName, ListResult, Listing, Notify, NotificationRef, PublicResource, Rect, ResourceMeta, Row, SiteInfo, TabInfo, Unzipped, UploadProgress, FolderSuggestion, FileInfo, FileTicket, UiContext, Values, WebProbe, SharePreselect, SharePrincipal, PickPrincipalsOptions, ShareList } from './protocol.ts'
+import type { RealtimeEvent, RealtimeMessage, RealtimePerson, RealtimeStatus, BandApi, BandState, DirectoryApi, EmbedsApi, Schedule, SchedulesApi, DirectorySearch, ExtensionView, FileEntry, Hello, HostEventName, ListResult, Listing, Notify, NotificationRef, SettingsChange, SettingsView, PublicResource, Rect, ResourceMeta, Row, SiteInfo, TabInfo, Unzipped, UploadProgress, FolderSuggestion, FileInfo, FileTicket, UiContext, Values, WebProbe, SharePreselect, SharePrincipal, PickPrincipalsOptions, ShareList } from './protocol.ts'
 
 /** The extensions of the plugin on a resource (fields and actions other plugins add to its items). */
 export interface ExtensionsClient {
@@ -391,6 +391,14 @@ export class Msk {
   async notify(n: Notify): Promise<number> {
     const r = await this.bridge.call<{ sent: number }>('notify', { ...n })
     return r.sent
+  }
+
+  /** The settings of the tenant the plugin declares (`[[config]] scope = "tenant"`), for the page of the section the
+   *  shell shows in the settings of the tenant (`[ui] settings_page`): the ones the person may change. Refused to
+   *  who may change none. */
+  settings = {
+    get: (): Promise<SettingsView> => this.bridge.call<SettingsView>('settings.get', {}),
+    set: (change: SettingsChange): Promise<SettingsView> => this.bridge.call<SettingsView>('settings.set', { ...change }),
   }
 
   /** The person's notifications that concern an item or a place are done with: they are marked as read (the

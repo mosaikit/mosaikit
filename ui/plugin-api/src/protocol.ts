@@ -377,6 +377,21 @@ export interface ResourceMeta {
   is_owner: boolean
 }
 
+/** The settings of the tenant that the person may change (`[[config]] scope = "tenant"`): what the manifest declares
+ *  (`decls`), the values (the default where none is chosen) and the secrets that have a value. A secret is never given
+ *  back. */
+export interface SettingsView {
+  decls: { key: string; label: string; description?: string; kind: 'text' | 'number' | 'bool' | 'choice' | 'secret'; options?: string[] }[]
+  values: Record<string, unknown>
+  secrets: string[]
+}
+
+/** A change of the settings of the tenant: a value `null` goes back to the default; a secret `null` is removed. */
+export interface SettingsChange {
+  values?: Record<string, unknown>
+  secrets?: Record<string, string | null>
+}
+
 /** Which notifications of the person a page has done with (`msk.notifications.markRead`): one of `resource`
  *  or `at` is required. */
 export interface NotificationRef {

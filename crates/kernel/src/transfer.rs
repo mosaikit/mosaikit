@@ -53,6 +53,7 @@ const CORE: &[(&str, &str)] = &[
     ("group_members", "group_id in (select id from core.groups where tenant_id = $1)"),
     ("plugin_grants", "tenant_id = $1"),
     ("tenant_plugins", "tenant_id = $1"),
+    ("plugin_settings", "tenant_id = $1"),
     ("user_prefs", "tenant_id = $1"),
     ("invitations", "tenant_id = $1"),
     ("resources", "tenant_id = $1"),

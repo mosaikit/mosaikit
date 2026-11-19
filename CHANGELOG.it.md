@@ -4,6 +4,12 @@ Cosa cambia da una versione di Mosaikit alla successiva. La shell mostra la sezi
 Aiuto › Novità (un titolo `## <versione>` per versione, voci `- `, gruppi `### `). Questo file è la
 versione italiana di [CHANGELOG.md](CHANGELOG.md): tenerli allineati.
 
+## 1.2.0
+
+- Plugin: impostazioni del tenant. `[[config]] scope = "tenant"` (predefinito `"platform"`, come prima) è un'impostazione che ogni tenant sceglie per sé, con gli stessi tipi, segreto compreso; `edit = "<chiave di [[user_permissions]]>"` fa cambiare l'impostazione anche a chi ha quel permesso, oltre ai Tenant Manager. La shell mostra le impostazioni di ogni app come una sezione delle impostazioni del Tenant Manager (App); un segreto non torna mai a una pagina. La logica legge il valore del tenant che esegue il comando in `ctx.config` (`ctx.setting`). I valori stanno in `core.plugin_settings` (migrazione 0030, SQLite 0028); una chiave che esce dal manifesto è ignorata ma conservata, e si usa il valore predefinito dove un valore salvato non è più valido per il tipo. Ogni modifica va nel Log con le chiavi, mai un segreto.
+- Plugin: `[ui] settings_page = "<posto>"` mostra una pagina del plugin come sezione delle impostazioni del Tenant Manager, in un frame con la stessa API delle altre pagine; `settings_edit = "<chiave di [[user_permissions]]>"` indica il permesso di chi può usarla. La pagina legge e scrive le impostazioni con `msk.settings.get()` e `msk.settings.set({ values?, secrets? })`.
+- Le impostazioni del tenant sono sensibili: l'Administrator le vede in «Cosa chiede» e nei requisiti del plugin all'installazione. La pagina Plugin > Configurazione elenca solo le chiavi `scope = "platform"`.
+
 ## 1.1.2
 
 - Plugin: una pagina o la logica può segnare come lette le notifiche della persona che riguardano un elemento o un luogo, così il pallino rosso si spegne quando il lavoro è fatto altrove: `msk.notifications.markRead({ resource?, at?, plugin? })` e `ctx.notify_done(&NoticeRef::resource(id).at(luogo))`. Le notifiche del proprio plugin sono sempre ammesse; quelle di un altro plugin richiedono `[permissions] notify_done = ["id.del.plugin"]`. Serve `resource` oppure `at`; si toccano solo le notifiche della persona stessa.

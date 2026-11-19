@@ -74,6 +74,7 @@ pub fn router() -> Router<AppState> {
         .route("/api/me/notifications/prefs", get(my_note_prefs).put(my_set_note_prefs))
         .route("/api/t/{t}/p/{plugin}/notify", post(plugin_notify))
         .route("/api/t/{t}/p/{plugin}/notify/done", post(plugin_notify_done))
+        .route("/api/t/{t}/p/{plugin}/settings", get(plugin_settings).put(plugin_set_settings))
         .route("/api/t/{t}/p/{plugin}/web/probe", post(plugin_web_probe))
         .route("/api/t/{t}/p/{plugin}/directory/search", post(plugin_directory_search))
         .route("/api/t/{t}/p/{plugin}/embed/url", post(plugin_embed_url))
@@ -673,6 +674,27 @@ async fn plugin_notify_done(
     Json(r): Json<notify::NoteRef>,
 ) -> ApiResult<Json<Value>> {
     Ok(Json(json!({ "marked": notify::done_from_plugin(&s.k, &c, &p.plugin, &r).await? })))
+}
+
+/// `msk.settings.get`: the settings of the tenant that the caller may change (`[[config]] scope = "tenant"`).
+async fn plugin_settings(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Path(p): Path<PluginPath>,
+    h: HeaderMap,
+) -> ApiResult<Json<Value>> {
+    let lang = request_lang(&h);
+    Ok(Json(json!(mosaikit_kernel::plugins::config::tenant_config(&s.k, &c, &p.plugin, &lang).await?)))
+}
+
+/// `msk.settings.set`: changes them; the Log gets the keys, never a secret.
+async fn plugin_set_settings(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Path(p): Path<PluginPath>,
+    Json(r): Json<mosaikit_kernel::plugins::config::ConfigChange>,
+) -> ApiResult<Json<Value>> {
+    Ok(Json(json!(mosaikit_kernel::plugins::config::set_tenant_config(&s.k, &c, &p.plugin, &r).await?)))
 }
 
 /// `msk.directory.search`: the people or groups of the tenant for a plugin that declares `directory`

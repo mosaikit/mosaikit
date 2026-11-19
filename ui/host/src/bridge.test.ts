@@ -71,6 +71,16 @@ describe('routeOp', () => {
     expect(() => routeOp('alfa', 'p.x', 'notifications.markRead', { resource: 'x' })).toThrow()
   })
 
+  it('routes the settings of the tenant', () => {
+    expect(routeOp('alfa', 'p.x', 'settings.get', {})).toEqual({ method: 'GET', url: '/api/t/alfa/p/p.x/settings' })
+    expect(routeOp('alfa', 'p.x', 'settings.set', { values: { title: 'A' }, secrets: { feed: null }, tenant: 'beta' })).toEqual({
+      method: 'PUT',
+      url: '/api/t/alfa/p/p.x/settings',
+      json: { values: { title: 'A' }, secrets: { feed: null } },
+    })
+    expect(() => routeOp('alfa', 'p.x', 'settings.set', { values: 'x' })).toThrow()
+  })
+
   it('routes the directory search with checked arguments only', () => {
     const c = routeOp('alfa', 'p.x', 'directory.search', { kind: 'user', q: 'an', limit: 500, tenant: 'beta', plugin: 'p.evil' })
     expect(c).toEqual({ method: 'POST', url: '/api/t/alfa/p/p.x/directory/search', json: { kind: 'user', q: 'an', limit: 50 } })

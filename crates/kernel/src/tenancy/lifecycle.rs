@@ -192,6 +192,11 @@ pub(crate) async fn purge_tenant(k: &Kernel, id: Uuid) -> Result<()> {
         .execute(&mut tx)
         .await?;
     tx.commit().await?;
+    // the secrets that its Managers gave to plugins (`[[config]] scope = "tenant"`)
+    mosaikit_db::query("delete from core.secrets where name like $1")
+        .bind(format!("plugin:%:t:{id}:%"))
+        .execute(&k.db)
+        .await?;
     for dir in [k.blobs.root().join(id.to_string()), k.blobs.root().join("identity").join(id.to_string())] {
         if dir.is_dir() {
             let _ = std::fs::remove_dir_all(dir);

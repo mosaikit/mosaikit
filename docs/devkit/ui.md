@@ -59,6 +59,7 @@ the origin of the host and is accepted only from it. A call that gets no answer 
 | `msk.pickPrincipals({ kind?, exclude?, multiple?, title? })` | the picker of the host: the person searches the people and groups of the tenant and chooses; returns `SharePrincipal[]` (empty on cancel) |
 | `msk.notify({ title, body?, at?, resource? })` | a notification; returns how many people got it. Experimental |
 | `msk.notifications.markRead({ resource?, at?, plugin? })` | marks as read the person's notifications about an item or a place (the dot of the app and the bell go off); returns how many. Own plugin always, another one with `[permissions] notify_done`. One of `resource` or `at` is required |
+| `msk.settings.get()` / `msk.settings.set({ values?, secrets? })` | the tenant settings of the plugin (`[[config]] scope = "tenant"`) that the person may change: `{ decls, values, secrets }`; a secret is only said to be set, never returned. In `set`, a value `null` goes back to the default and a secret `null` is removed. Refused to who may change none. For the page of `[ui] settings_page` |
 | `msk.toast(text, error?)`, `msk.confirm(text)` | a toast; the confirmation dialog of the host |
 | `msk.extensions(resource)` | `list`, `values(ids)`, `set(id, ext, values)`, `action(id, ext, key)`, `mountTab(el, id, ext, tab)` |
 | `msk.tabClient()` | in a tab page: `item()`, `values()`, `set(values)`, `action(key)`, `resize(h)`, `autoResize(el?)` |

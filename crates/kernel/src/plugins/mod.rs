@@ -116,6 +116,8 @@ impl Plugins {
                     entry: "index.html".into(),
                     public_view: None,
                     share_page: None,
+                    settings_page: None,
+                    settings_edit: None,
                 });
                 ui.share_page = Some(sp.clone());
             }
@@ -348,6 +350,12 @@ pub struct PluginView {
     /// distribution sets): `<place>` of the plugin or `<plugin id>/<place>`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub share_page: Option<String>,
+    /// page shown as a section of the Tenant Manager's settings (`[ui] settings_page`), a `<place>` of the plugin
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub settings_page: Option<String>,
+    /// the plugin has settings of the tenant (`[[config]] scope = "tenant"`): the shell draws a section for them
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub tenant_settings: bool,
 }
 
 impl PluginView {
@@ -378,6 +386,8 @@ impl PluginView {
             resources: m.resources.clone(),
             nav: m.nav.clone(),
             share_page: m.ui.as_ref().and_then(|u| u.share_page.clone()),
+            settings_page: m.ui.as_ref().and_then(|u| u.settings_page.clone()),
+            tenant_settings: m.config.iter().any(|d| d.scope == mosaikit_mskp::ConfigScope::Tenant),
         }
     }
 }
@@ -472,7 +482,7 @@ pub fn admin_views_in(k: &Kernel, admin: &SessionUser, lang: &str) -> Result<Vec
             api: p.manifest.api(),
             extends_min: p.manifest.extends.as_ref().map(|e| e.min_version.clone()),
             extension: p.manifest.localized(lang).extension,
-            has_config: !p.manifest.config.is_empty(),
+            has_config: p.manifest.config.iter().any(|d| d.scope == mosaikit_mskp::ConfigScope::Platform),
             author: p.manifest.author.clone(),
             license: p.manifest.license.clone(),
             homepage: p.manifest.homepage.clone(),

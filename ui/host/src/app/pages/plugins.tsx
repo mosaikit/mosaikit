@@ -604,6 +604,13 @@ function PluginAsks({ p, base }: { p: AdminPlugin; base?: string }) {
             <AskRow label={t('Calls what other plugins contribute')}>
               {perm.contributions?.length ? <b className="text-destructive">{t('yes (sensitive: {list}, with the permissions of the caller)', { list: perm.contributions.join(', ') })}</b> : none}
             </AskRow>
+            <AskRow label={t('Settings of the tenant')}>
+              {p.tenant_settings || p.settings_page ? (
+                <b className="text-destructive">{t('yes (sensitive: Tenant Managers change them in the settings of the tenant, and the logic receives them, secrets included)')}</b>
+              ) : (
+                none
+              )}
+            </AskRow>
             <AskRow label={t('Commands open to public links')}>
               {p.public_commands?.length ? (
                 <span>
@@ -817,12 +824,18 @@ function ConfigInput({ d, value, onChange }: { d: ConfigDecl; value: unknown; on
 
 /** Configuration: the settings the plugin declares, chosen by the Administrator for the whole platform. */
 function PluginConfiguration({ id }: { id: string }) {
-  const q = useApi<PluginConfig>(['plugin-config', id], `/api/admin/plugins/${enc(id)}/config`)
+  return <ConfigForm cacheKey={['plugin-config', id]} path={`/api/admin/plugins/${enc(id)}/config`} title={t('Configuration')} sub={t('For the whole platform. Secrets are encrypted and never shown again.')} />
+}
+
+/** The form of the settings of a plugin: a read and a write on the same address. For the Administrator (the whole
+ *  platform) and for the Tenant Manager (`/api/t/<tenant>/p/<plugin>/settings`, the settings of the tenant). */
+export function ConfigForm({ cacheKey, path, title, sub }: { cacheKey: string[]; path: string; title: string; sub: string }) {
+  const q = useApi<PluginConfig>(cacheKey, path)
   const [values, setValues] = useState<Record<string, unknown> | null>(null)
   const [secrets, setSecrets] = useState<Record<string, string | null>>({})
-  const save = useAction((body: { values: Record<string, unknown>; secrets: Record<string, string | null> }) => api('PUT', `/api/admin/plugins/${enc(id)}/config`, body), {
+  const save = useAction((body: { values: Record<string, unknown>; secrets: Record<string, string | null> }) => api('PUT', path, body), {
     ok: t('Settings saved'),
-    invalidate: [['plugin-config', id]],
+    invalidate: [cacheKey],
   })
   if (q.isLoading) return <Loading />
   if (q.error) return <ErrorBox error={q.error} />
@@ -833,8 +846,8 @@ function PluginConfiguration({ id }: { id: string }) {
     <div className="grid gap-4">
       <Card>
         <CardHeader>
-          <CardTitle>{t('Configuration')}</CardTitle>
-          <CardDescription>{t('For the whole platform. Secrets are encrypted and never shown again.')}</CardDescription>
+          <CardTitle>{title}</CardTitle>
+          <CardDescription>{sub}</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-5">
           {c.decls.map((d) => (

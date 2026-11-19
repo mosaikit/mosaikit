@@ -390,6 +390,29 @@ pub struct ConfigDecl {
     /// (refused when the manifest is read). Default: false. Needs `[requires] mosaikit >= 1.0`.
     #[serde(default, skip_serializing_if = "is_false")]
     pub public: bool,
+    /// Whose setting it is: `platform` (default, the Administrator in Plugins > Configuration) or `tenant` (the Tenant
+    /// Manager, in the settings of the tenant; each tenant has its own value). Needs `[requires] mosaikit >= 1.2`.
+    #[serde(default, skip_serializing_if = "ConfigScope::is_platform")]
+    pub scope: ConfigScope,
+    /// With `scope = "tenant"`: the key of a `[[user_permissions]]` whose holders may change the setting besides the
+    /// Tenant Managers.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub edit: Option<String>,
+}
+
+/// Whose setting a `[[config]]` is.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum ConfigScope {
+    #[default]
+    Platform,
+    Tenant,
+}
+
+impl ConfigScope {
+    fn is_platform(&self) -> bool {
+        *self == ConfigScope::Platform
+    }
 }
 
 fn is_false(b: &bool) -> bool {
@@ -804,6 +827,15 @@ pub struct UiDecl {
     /// API stay: the page uses them (`msk.pickPrincipals`, `PUT /resources/{id}/grants`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub share_page: Option<String>,
+    /// Page of the plugin (`<place>`) that the shell shows as a section of the Tenant Manager's settings, in a frame
+    /// with the same API as the other pages. Shown only to who may edit (Tenant Managers, and the holders of
+    /// `settings_edit` where the page is reached). Needs `[requires] mosaikit >= 1.2`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub settings_page: Option<String>,
+    /// Key of a `[[user_permissions]]` that lets its holders use the settings of the tenant of this plugin
+    /// (`settings_page` and the `scope = "tenant"` settings) besides the Tenant Managers.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub settings_edit: Option<String>,
 }
 
 fn default_entry() -> String {
@@ -1628,9 +1660,37 @@ impl Manifest {
             if c.public && c.kind == ConfigKind::Secret {
                 return Err(format!("the secret config '{}' cannot be public", c.key));
             }
+            if c.scope == ConfigScope::Tenant && c.public {
+                return Err(format!("the tenant config '{}' cannot be public", c.key));
+            }
+            if let Some(e) = &c.edit {
+                if c.scope != ConfigScope::Tenant {
+                    return Err(format!("the config '{}' has `edit` but is not `scope = \"tenant\"`", c.key));
+                }
+                if !self.user_permissions.iter().any(|p| &p.key == e) {
+                    return Err(format!(
+                        "the config '{}' names the permission '{e}', which is not declared",
+                        c.key
+                    ));
+                }
+            }
             if let Some(d) = &c.default {
                 if c.kind == ConfigKind::Secret || c.check(d).is_none() {
                     return Err(format!("the default of the config '{}' does not fit its kind", c.key));
+                }
+            }
+        }
+        if let Some(ui) = &self.ui {
+            if let Some(pg) = &ui.settings_page {
+                if pg.trim().is_empty() || pg.len() > 200 || pg.chars().any(char::is_control) {
+                    return Err("ui.settings_page is not a valid place".into());
+                }
+            }
+            if let Some(e) = &ui.settings_edit {
+                if !self.user_permissions.iter().any(|p| &p.key == e) {
+                    return Err(format!(
+                        "ui.settings_edit names the permission '{e}', which is not declared"
+                    ));
                 }
             }
         }
@@ -2726,6 +2786,78 @@ write = true
         assert!(Manifest::from_toml(&reader_only).is_err());
         let other = format!("{NOTES}\n[[tables]]\nname = \"t\"\ninsert_for = \"everybody\"\n");
         assert!(Manifest::from_toml(&other).unwrap_err().to_string().contains("reader"));
+    }
+
+    #[test]
+    fn settings_of_the_tenant() {
+        let cfg = |extra: &str| {
+            format!(
+                "{NOTES}
+{extra}"
+            )
+        };
+        let ok = cfg("[[user_permissions]]
+key = \"curate\"
+label = \"C\"
+[[config]]
+key = \"title\"
+label = \"T\"
+kind = \"text\"
+scope = \"tenant\"
+edit = \"curate\"
+[[config]]
+key = \"feed\"
+label = \"F\"
+kind = \"secret\"
+scope = \"tenant\"
+[[config]]
+key = \"lvl\"
+label = \"L\"
+kind = \"text\"
+[ui]
+settings_page = \"settings\"
+settings_edit = \"curate\"
+");
+        let m = Manifest::from_toml(&ok).unwrap();
+        assert_eq!(m.config[0].scope, ConfigScope::Tenant);
+        assert_eq!(m.config[2].scope, ConfigScope::Platform);
+        assert_eq!(m.ui.as_ref().unwrap().settings_page.as_deref(), Some("settings"));
+        // the platform scope says nothing in the JSON; the tenant one does
+        let json = serde_json::to_string(&m).unwrap();
+        assert_eq!(json.matches("\"scope\":\"tenant\"").count(), 2);
+        assert!(!json.contains("\"platform\""));
+        assert_eq!(serde_json::from_str::<Manifest>(&json).unwrap(), m);
+        // `edit` needs the tenant scope and a declared permission; a tenant setting is never public
+        let platform = cfg("[[user_permissions]]
+key = \"curate\"
+label = \"C\"
+[[config]]
+key = \"a\"
+label = \"A\"
+kind = \"text\"
+edit = \"curate\"
+");
+        assert!(Manifest::from_toml(&platform).is_err());
+        let unknown = cfg("[[config]]
+key = \"a\"
+label = \"A\"
+kind = \"text\"
+scope = \"tenant\"
+edit = \"nope\"
+");
+        assert!(Manifest::from_toml(&unknown).is_err());
+        let public = cfg("[[config]]
+key = \"a\"
+label = \"A\"
+kind = \"text\"
+scope = \"tenant\"
+public = true
+");
+        assert!(Manifest::from_toml(&public).is_err());
+        let page = cfg("[ui]
+settings_edit = \"nope\"
+");
+        assert!(Manifest::from_toml(&page).is_err());
     }
 
     #[test]
