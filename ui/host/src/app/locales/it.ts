@@ -1095,7 +1095,6 @@ export const IT: Record<string, string> = {
   'Folders from zip archives': 'Cartelle da archivi zip',
   'Network addresses': 'Indirizzi di rete',
   'Embeds pages of': 'Incorpora pagine di',
-  'Apps': 'App',
   'For this tenant. Secrets are encrypted and never shown again.': 'Per questo tenant. I segreti sono cifrati e non vengono più mostrati.',
   'yes (sensitive: Tenant Managers change them in the settings of the tenant, and the logic receives them, secrets included)': 'sì (sensibile: i Tenant Manager le cambiano nelle impostazioni del tenant e la logica le riceve, segreti compresi)',
   'Settings of the tenant': 'Impostazioni del tenant',
