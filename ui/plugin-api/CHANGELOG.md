@@ -5,6 +5,8 @@ version and is removed in the next.
 
 ## Unreleased
 
+- `popover` and `menu` open above their anchor when there is no room below (a button at the bottom of the page, like the composer of a chat). Visual only.
+
 - `Notify.to` (`msk.notify({ resource, to })`): limits the notification of an item to some of the people who see it (user ids, at most 200; the intersection, never more people). Needs `resource`. A host that does not know it notifies all of them. Additive.
 
 - `msk.share(id, { principals: [{ type: 'all' }] })`: `type: 'all'` (no `id` needed) stands for every member of the tenant, the built-in group «All members»; the dialog suggests it and shares in one step. Additive.
