@@ -6,6 +6,8 @@ version and is removed in the next.
 ## Unreleased
 
 - `msk.publicLink.get(id)`, `create(id, { expires_in_days?, password? })`, `revoke(id)` (type `PublicLinkState`): the public link of an item, for a page that replaces the share dialog. The rules of the dialog (manage the item, `share` permission, policy of the tenant, rate limit); the address is given once by `create`. Not in public links or runs. Additive; needs a Mosaikit with `[requires] mosaikit = ">=1.3"`.
+- `popover` and `menu` open above their anchor when there is no room below (a button at the bottom of the page, like the composer of a chat). Visual only.
+
 - `Notify.to` (`msk.notify({ resource, to })`): limits the notification of an item to some of the people who see it (user ids, at most 200; the intersection, never more people). Needs `resource`. A host that does not know it notifies all of them. Additive.
 
 - `msk.share(id, { principals: [{ type: 'all' }] })`: `type: 'all'` (no `id` needed) stands for every member of the tenant, the built-in group «All members»; the dialog suggests it and shares in one step. Additive.

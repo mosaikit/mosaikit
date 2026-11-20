@@ -29,6 +29,7 @@ async function newChat(f: FrameLocator, names: string[], group = '') {
   }
   if (group) await f.getByRole('textbox', { name: 'Group name (optional)' }).fill(group)
   await f.getByRole('button', { name: 'Start chat' }).click()
+  await expect(f.getByRole('dialog')).toBeHidden()
 }
 
 test.describe.serial('Chat', () => {
@@ -65,12 +66,12 @@ test.describe.serial('Chat', () => {
     // CHT-12: a message with formatting, and the other person sees it at once with an unread badge
     await login(b, 'Alfa', 'chatcarla', PASSWORD)
     const fb = await openChat(b)
-    await say(fa, 'hello **world** @Carla Chat')
+    await say(fa, 'hello **world** @Carla Chat please')
     await expect(bubble(fa, 'hello').locator('strong', { hasText: 'world' })).toBeVisible()
     await expect(bubble(fa, 'hello').locator('.cm-mention')).toHaveText('@Carla Chat')
     const row = fb.locator('.cl-row').first()
     await expect(row.locator('.cl-badge')).toHaveText(/1|@/)
-    await expect(row).toContainText('hello world @Carla Chat')
+    await expect(row).toContainText('hello world @Carla Chat please')
 
     // CHT-13: opening it shows the message, clears the badge and the sender sees «Seen»
     await row.click()
@@ -148,7 +149,8 @@ test.describe.serial('Chat', () => {
     await newChat(fa, ['Carla Chat', 'Dario Chat'], 'Launch team')
     await expect(fa.getByRole('heading', { name: 'Launch team', level: 2 })).toBeVisible()
     await say(fa, 'welcome all')
-    await expect(fb.locator('.cl-row', { hasText: 'Launch team' })).toContainText('welcome all')
+    // a new chat reaches the list of the others within the refresh of the list (15 seconds)
+    await expect(fb.locator('.cl-row', { hasText: 'Launch team' })).toContainText('welcome all', { timeout: 45_000 })
     await fb.locator('.cl-row', { hasText: 'Launch team' }).click()
     await expect(bubble(fb, 'welcome all')).toBeVisible()
     await expect(fb.getByText('3 people')).toBeVisible()
@@ -159,7 +161,7 @@ test.describe.serial('Chat', () => {
     await fb.getByRole('menuitem', { name: 'Leave' }).click()
     await fb.getByRole('dialog').getByRole('button', { name: 'Leave' }).click()
     await expect(fb.locator('.cl-row', { hasText: 'Launch team' })).toHaveCount(0)
-    await expect(fa.getByText(/left the chat/)).toBeVisible()
+    await expect(fa.getByText(/left the chat/)).toBeVisible({ timeout: 45_000 })
 
     // CHT-20: the channels of Chat 1.x are still there under Channels
     await fa.getByRole('button', { name: /Channels/ }).click()
