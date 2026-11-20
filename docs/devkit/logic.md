@@ -126,7 +126,7 @@ ctx.notify(&Notice::new("Due today").body("Site visit").at("notes/1").resource(&
 
 `title` is required (cut to 160 characters), `body` optional (600). The plugin never names recipients: without
 `resource` the notification goes to the caller alone; with the id of an item of the same plugin and tenant on which the
-caller has the write level, it goes to the people who can see the item, the caller excluded. `at` is a place inside the
+caller has the write level, it goes to the people who can see the item, the caller excluded. `Notice::to(&[user ids])` (at most 200, needs `resource`) keeps only some of them: the intersection, never more people (a kernel older than this field notifies all of them). `at` is a place inside the
 plugin (letters, digits and `/_-.=&?%:`, up to 200): the link is always `#/t/<tenant>/p/<plugin>/<at>`. Limit: 30 a
 minute for each person and plugin. A wrong shape or the limit fail the call at once; recipients are resolved and the
 notification sent after the operation commits, so a rolled back operation notifies nobody.

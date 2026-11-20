@@ -5,6 +5,8 @@ version and is removed in the next.
 
 ## Unreleased
 
+- `Notice::to(&[user ids])`: limits the notification of an item (`resource`) to some of the people who see it, never more than without it. Additive.
+
 - Actions of a share: `[[resources]] actions = [...]` in the manifest; `Ctx::can_on(id, action)` (host operation `resource.can`), `Resources::list_with_action(...)`, `Resources::set_share(...)` / `remove_share(...)` (host operations `resource.share_set`, `resource.share_remove`), `Resources::shares` returns `actions` per share, `testing::MockHost::with_resource_actions`. A manifest that uses them needs `[requires] mosaikit = ">=1.1"`. Additive.
 
 - The rows of `crud` lists and records carry `visibility` (`private`, `shared`, `organization`, `public`), like `resources.list`. Additive.
