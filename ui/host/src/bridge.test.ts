@@ -171,6 +171,10 @@ describe('routeOp', () => {
     const n = routeOp('alfa', 'com.mosaikit.notes', 'notify', { title: 'Due today', body: 'Plan', at: 'notes/1', resource: ID, to: 'everybody' })
     expect(n).toEqual({ method: 'POST', url: '/api/t/alfa/p/com.mosaikit.notes/notify', json: { title: 'Due today', body: 'Plan', at: 'notes/1', resource: ID } })
     expect(routeOp('alfa', 'p.x', 'notify', { title: 'Hi' }).json).toEqual({ title: 'Hi' })
+    // `to` limits the people of an item (a list of ids); a text is not a list and is dropped, and it needs an item
+    expect(routeOp('alfa', 'p.x', 'notify', { title: 'Hi', resource: ID, to: [ID] }).json).toEqual({ title: 'Hi', resource: ID, to: [ID] })
+    expect(() => routeOp('alfa', 'p.x', 'notify', { title: 'Hi', to: [ID] })).toThrow(OpError)
+    expect(() => routeOp('alfa', 'p.x', 'notify', { title: 'Hi', resource: ID, to: ['nope'] })).toThrow(OpError)
     expect(() => routeOp('alfa', 'p.x', 'notify', {})).toThrow(OpError)
     expect(() => routeOp('alfa', 'p.x', 'notify', { title: 'x'.repeat(161) })).toThrow(OpError)
     expect(() => routeOp('alfa', 'p.x', 'notify', { title: 'Hi', resource: 'not-an-id' })).toThrow(OpError)

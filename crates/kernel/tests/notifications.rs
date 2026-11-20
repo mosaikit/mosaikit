@@ -148,7 +148,13 @@ async fn filters_and_pages() {
             &t,
             &ca,
             NOTES,
-            &PluginNote { title: format!("Reminder {i}"), body: "due".into(), at: None, resource: None },
+            &PluginNote {
+                title: format!("Reminder {i}"),
+                body: "due".into(),
+                at: None,
+                resource: None,
+                to: None,
+            },
         )
         .await
         .unwrap();
@@ -199,6 +205,7 @@ async fn plugins_notify_only_who_may_see() {
             body: String::new(),
             at: Some("notes/1".into()),
             resource: None,
+            to: None,
         },
     )
     .await
@@ -209,8 +216,13 @@ async fn plugins_notify_only_who_may_see() {
     assert_eq!(b.items[0].link, "#/t/alfa/p/com.mosaikit.notes/notes%2F1");
 
     // with an item: Bruno cannot write on it yet
-    let on =
-        |title: &str| PluginNote { title: title.into(), body: "look".into(), at: None, resource: Some(rid) };
+    let on = |title: &str| PluginNote {
+        title: title.into(),
+        body: "look".into(),
+        at: None,
+        resource: Some(rid),
+        to: None,
+    };
     assert_eq!(notify::from_plugin(&t, &cb, NOTES, &on("Look")).await.unwrap_err().kind, Kind::NotFound);
     set_grant(&t, &ca, rid, "user", bruno.user_id, Some(Level::Write)).await.unwrap();
     // the owner and the readers but the sender; Carla sees nothing and gets nothing
@@ -223,10 +235,15 @@ async fn plugins_notify_only_who_may_see() {
         Kind::NotFound
     );
     // bad places and titles
-    let bad =
-        PluginNote { title: "x".into(), body: String::new(), at: Some("<script>".into()), resource: None };
+    let bad = PluginNote {
+        title: "x".into(),
+        body: String::new(),
+        at: Some("<script>".into()),
+        resource: None,
+        to: None,
+    };
     assert_eq!(notify::from_plugin(&t, &cb, NOTES, &bad).await.unwrap_err().kind, Kind::BadRequest);
-    let empty = PluginNote { title: "  ".into(), body: String::new(), at: None, resource: None };
+    let empty = PluginNote { title: "  ".into(), body: String::new(), at: None, resource: None, to: None };
     assert_eq!(notify::from_plugin(&t, &cb, NOTES, &empty).await.unwrap_err().kind, Kind::BadRequest);
     // at most 30 a minute per person and plugin
     let mut refused = false;
@@ -235,7 +252,7 @@ async fn plugins_notify_only_who_may_see() {
             &t,
             &cb,
             NOTES,
-            &PluginNote { title: format!("n{i}"), body: String::new(), at: None, resource: None },
+            &PluginNote { title: format!("n{i}"), body: String::new(), at: None, resource: None, to: None },
         )
         .await;
         if let Err(e) = r {
@@ -245,6 +262,50 @@ async fn plugins_notify_only_who_may_see() {
         }
     }
     assert!(refused);
+}
+
+#[tokio::test]
+async fn a_notification_can_be_limited_to_some_of_the_people_who_see_the_item() {
+    let t = start().await;
+    t.install("notes").await;
+    let g = t.tenant("alfa").await;
+    let anna = t.member(&g, "anna").await;
+    let bruno = t.member(&g, "bruno").await;
+    let carla = t.member(&g, "carla").await;
+    let (ca, cb) = (t.home(&anna).await, t.home(&bruno).await);
+    let rid = note(&t, &ca, "Plan").await;
+    set_grant(&t, &ca, rid, "user", bruno.user_id, Some(Level::Write)).await.unwrap();
+    set_grant(&t, &ca, rid, "user", carla.user_id, Some(Level::Read)).await.unwrap();
+    let to = |ids: Vec<Uuid>| PluginNote {
+        title: "Mention".into(),
+        body: String::new(),
+        at: None,
+        resource: Some(rid),
+        to: Some(ids),
+    };
+    // only Carla, though Anna sees the item too
+    assert_eq!(notify::from_plugin(&t, &cb, NOTES, &to(vec![carla.user_id])).await.unwrap(), 1);
+    assert!(all(&t, &carla).await.items.iter().any(|x| x.title == "Mention"));
+    assert!(all(&t, &anna).await.items.is_empty());
+    // a person who does not see the item is never added, and the sender is never told
+    let outsider = t.member(&g, "dario").await;
+    set_grant(&t, &ca, rid, "user", carla.user_id, None).await.unwrap();
+    assert_eq!(
+        notify::from_plugin(&t, &cb, NOTES, &to(vec![outsider.user_id, bruno.user_id])).await.unwrap(),
+        0
+    );
+    // an empty list is nobody; `to` without an item is refused; too many names too
+    assert_eq!(notify::from_plugin(&t, &cb, NOTES, &to(vec![])).await.unwrap(), 0);
+    let without_item = PluginNote {
+        title: "x".into(),
+        body: String::new(),
+        at: None,
+        resource: None,
+        to: Some(vec![anna.user_id]),
+    };
+    assert_eq!(notify::from_plugin(&t, &cb, NOTES, &without_item).await.unwrap_err().kind, Kind::BadRequest);
+    let many = to((0..201).map(|_| Uuid::new_v4()).collect());
+    assert_eq!(notify::from_plugin(&t, &cb, NOTES, &many).await.unwrap_err().kind, Kind::BadRequest);
 }
 
 #[tokio::test]
@@ -286,7 +347,7 @@ async fn preferences_and_immediate_emails() {
         &t,
         &cb,
         NOTES,
-        &PluginNote { title: "Quiet".into(), body: String::new(), at: None, resource: None },
+        &PluginNote { title: "Quiet".into(), body: String::new(), at: None, resource: None, to: None },
     )
     .await
     .unwrap();
@@ -433,6 +494,7 @@ async fn a_plugin_marks_its_notifications_as_read() {
         body: String::new(),
         at: Some(at.into()),
         resource: Some(r),
+        to: None,
     };
     // anna is told twice about the first item and once about the second
     notify::from_plugin(&t, &cb, NOTES, &on("Publication requested", rid, "review/a")).await.unwrap();

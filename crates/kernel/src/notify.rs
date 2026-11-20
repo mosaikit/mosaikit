@@ -709,7 +709,13 @@ pub struct PluginNote {
     /// none: only to the person using the plugin
     #[serde(default)]
     pub resource: Option<Uuid>,
+    /// with `resource`: only these people, among the ones who can see the item (never more than without it); at most 200
+    #[serde(default)]
+    pub to: Option<Vec<Uuid>>,
 }
+
+/// Most people a notification can be limited to.
+const MAX_TO: usize = 200;
 
 /// How many notifications a plugin may send in a minute in the name of one person.
 const PLUGIN_RATE: usize = 30;
@@ -729,6 +735,14 @@ pub(crate) fn check_note(k: &Kernel, c: &Caller, plugin: &str, n: &PluginNote) -
     if let Some(at) = &n.at {
         if !valid_at(at) {
             return Err(Error::bad("invalid place of the notification"));
+        }
+    }
+    if let Some(to) = &n.to {
+        if n.resource.is_none() {
+            return Err(Error::bad("`to` needs the item (resource) of the notification"));
+        }
+        if to.len() > MAX_TO {
+            return Err(Error::bad("a notification can be limited to at most 200 people"));
         }
     }
     let mut rate = k.notify_rate.lock().expect("rate");
@@ -841,7 +855,11 @@ async fn deliver(k: &Kernel, c: &Caller, plugin: &str, n: &PluginNote) -> Result
             if m.plugin_id != p.id {
                 return Err(Error::not_found("resource not found"));
             }
-            readers(k, c.tenant.tenant_id, rid, c.user.user_id).await?
+            let mut users = readers(k, c.tenant.tenant_id, rid, c.user.user_id).await?;
+            if let Some(to) = &n.to {
+                users.retain(|u| to.contains(u));
+            }
+            users
         }
     };
     let link = plugin_link(&c.tenant.slug, &p.id, n.at.as_deref());
