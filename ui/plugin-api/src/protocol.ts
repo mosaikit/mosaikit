@@ -415,6 +415,9 @@ export interface Notify {
   /** an item of the plugin, on which the person can write: the notification goes to the people who can
    *  see it (not to the sender). Without it, only to the person using the plugin. */
   resource?: string
+  /** with `resource`: only these people (user ids, at most 200) among the ones who see the item; never more people than
+   *  without it. A host or kernel that does not know the field notifies all of them. */
+  to?: string[]
 }
 
 /** What `msk.directory.search` asks: people or groups of the tenant whose name contains `q`. */

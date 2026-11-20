@@ -1084,19 +1084,34 @@ A plugin that declares `[permissions] realtime` opens live channels on its resou
 
 ## Chat
 
-Channels on the left, a live conversation on the right: a message is saved in the channel (the history) and arrives at once for everyone who has the channel open. Twin in `tests/e2e/specs/21-chat.spec.ts` (two sessions of one person stand for two people; the access rules are in `crates/kernel/tests/realtime.rs`).
+Chat 2.0 (CHT-10 and up) is the replica of the Chat section of Microsoft Teams (plugins-plan §8). CHT-01..09 below are the checks of the channels of Chat 1.x, reached from «Channels» under the list of chats. Channels on the left, a live conversation on the right: a message is saved in the channel (the history) and arrives at once for everyone who has the channel open. Twin in `tests/e2e/specs/21-chat.spec.ts` (two sessions of one person stand for two people; the access rules are in `crates/kernel/tests/realtime.rs`).
 
 | Id | Check | Expected | Twin |
 |---|---|---|---|
-| CHT-01 | In **Chat** press **＋**, name a channel and a topic, **Create** | The channel is listed and open, with its name and topic in the header; the composer is ready | Playwright |
-| CHT-02 | Open the channel in a second window (another person who has it shared, or the same person) and write «hello **world**» in the first | The message shows in both at once with «world» in bold; the second window did not reload | Playwright |
-| CHT-03 | Reply to a message from its buttons; edit your own message | The reply shows the quote of the original on both sides; the edited message shows «edited» on both | Playwright |
-| CHT-04 | React with 👍 from the menu, press the pill again | The count shows on both sides, and goes away when taken back | Playwright |
-| CHT-05 | Delete your message and confirm | It disappears on both sides; with the **manage** level a person can delete any message | Playwright |
+| CHT-01 | In **Chat** press **＋**, name a channel and a topic, **Create** | The channel is listed and open, with its name and topic in the header; the composer is ready | Manual |
+| CHT-02 | Open the channel in a second window (another person who has it shared, or the same person) and write «hello **world**» in the first | The message shows in both at once with «world» in bold; the second window did not reload | Manual |
+| CHT-03 | Reply to a message from its buttons; edit your own message | The reply shows the quote of the original on both sides; the edited message shows «edited» on both | Manual |
+| CHT-04 | React with 👍 from the menu, press the pill again | The count shows on both sides, and goes away when taken back | Manual |
+| CHT-05 | Delete your message and confirm | It disappears on both sides; with the **manage** level a person can delete any message | Manual |
 | CHT-06 | Share the channel read only with a colleague and open it as them | They read and see the live messages, the composer is disabled with a hint; with **write** they can talk | Manual |
 | CHT-07 | Start typing in one window | The other shows «<name> is typing…» for a few seconds; who is online shows in the header | Manual (needs two people) |
 | CHT-08 | Cut the network of one window for a minute and restore it | A banner says the connection was lost, then the messages sent meanwhile appear after reconnecting | Manual |
 | CHT-09 | At 390 px wide | The list and the conversation are shown one at a time, with a back button | Manual |
+| CHT-10 | Open **Chat** as a person with no chats | The illustrated empty state «No chats yet» with the **New chat** button | Playwright |
+| CHT-11 | **New chat**, type a colleague's name in **To**, choose her, **Start chat** | The chat opens with her name in the header; asking for the same person again opens the same chat | Playwright |
+| CHT-12 | Write «hello **world** @Name» | A bubble on the right with «world» in bold and the name marked; the other person sees it at once in her list with a badge and the preview | Playwright |
+| CHT-13 | The other person opens the chat | The message shows, the badge goes, the sender sees «Seen» under the message; a divider «New messages» marked what was new | Playwright |
+| CHT-14 | Reply with a quote, react with 👍, edit, delete | The quote shows on both sides; the pill shows the count and who reacted; «edited»; «This message was deleted» | Playwright |
+| CHT-15 | Send a message as Urgent, pin it, open the Pinned and Files tabs | The bubble has the urgent mark; the Pinned tab lists it; Files shows the empty state | Playwright |
+| CHT-16 | From the menu of a chat in the list: Pin, Mute, Mark as unread, Hide; the filters Unread, Chats, Meetings and the search box | Pinned chats go to the Pinned section; a muted one has a grey badge; a hidden chat comes back with a new message | Playwright (pin, filter) / manual |
+| CHT-17 | Press **Video call** | A call card shows in the chat of both, the call opens in a small window with Jitsi (camera and microphone asked), **Leave the call** ends it and the card says «Call ended · N min» with who took part | Playwright (card and frame) / manual (media) |
+| CHT-18 | **New chat** with two people and a group name | A group chat: the list shows the name and a mosaic, the header «3 people»; the other people get it in their list | Playwright |
+| CHT-19 | In a group: Add people with «Do not include the history», then remove someone, then leave | The newcomer sees only new messages; system lines say who was added, removed or left; after leaving the chat is gone from the list | Playwright (leave) / manual |
+| CHT-20 | Press **Channels** under the list | The channels of Chat 1.x open with their data unchanged | Playwright |
+| CHT-21 | Attach a file from the device and one from Documents, send | The message shows the file cards; the other person opens them; the Files tab lists them; they are read-only for the chat people | Manual |
+| CHT-22 | Type @ in a group | A list of the people (and «everyone») appears; arrows and Enter choose; the person mentioned gets a notification even if she muted the chat | Manual |
+| CHT-23 | Cut the network of one window for a minute and restore it | A banner says the connection was lost; messages sent meanwhile appear after reconnecting | Manual |
+| CHT-24 | At 390 px wide, in light and dark | The list and the chat are shown one at a time with a back button; no horizontal scroll; the contrast is fine | Manual |
 
 ## Meet
 

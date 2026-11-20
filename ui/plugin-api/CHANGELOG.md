@@ -5,6 +5,10 @@ version and is removed in the next.
 
 ## Unreleased
 
+- `popover` and `menu` open above their anchor when there is no room below (a button at the bottom of the page, like the composer of a chat). Visual only.
+
+- `Notify.to` (`msk.notify({ resource, to })`): limits the notification of an item to some of the people who see it (user ids, at most 200; the intersection, never more people). Needs `resource`. A host that does not know it notifies all of them. Additive.
+
 - `msk.share(id, { principals: [{ type: 'all' }] })`: `type: 'all'` (no `id` needed) stands for every member of the tenant, the built-in group «All members»; the dialog suggests it and shares in one step. Additive.
 
 - `msk.busy(on)` and `msk.loading(work)` (kit `busy.ts`, style `.msk-busy`): the standard loading spinner of a plugin page, the same in every plugin. It appears only if the work lasts a little (150 ms), never blocks the page, is counted (two `busy(true)` need two `busy(false)`) and goes off by itself at an unhandled error of the page, so a plugin that forgets `busy(false)` is never stuck. `mountCrud` uses it for its first load. The host shows its own spinner only until the plugin says `hello`. Additive.

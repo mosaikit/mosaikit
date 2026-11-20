@@ -210,6 +210,9 @@ pub struct Notice {
     /// id of an item of the plugin
     #[serde(skip_serializing_if = "Option::is_none")]
     pub resource: Option<String>,
+    /// with `resource`: only these people (user ids), among the ones who can see the item
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub to: Option<Vec<String>>,
 }
 
 impl Notice {
@@ -227,6 +230,12 @@ impl Notice {
     /// Notify the people who can see this item instead of the caller.
     pub fn resource(mut self, id: &str) -> Notice {
         self.resource = Some(id.into());
+        self
+    }
+    /// Limits the notification of an item to some of the people who see it (the intersection, never more people;
+    /// needs `resource`; at most 200). A kernel that does not know the field notifies all of them.
+    pub fn to(mut self, users: &[String]) -> Notice {
+        self.to = Some(users.to_vec());
         self
     }
 }

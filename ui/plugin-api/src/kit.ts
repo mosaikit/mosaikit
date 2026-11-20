@@ -106,6 +106,9 @@ export function popover(anchor: HTMLElement, content: HTMLElement, opts: { onClo
   el.style.left = `${Math.max(8, Math.min(r.left, window.innerWidth - 240))}px`
   el.style.top = `${r.bottom + 6}px`
   document.body.append(el)
+  // no room below (a button at the bottom of the page): open above the anchor
+  const room = el.offsetHeight
+  if (room && r.bottom + 6 + room > window.innerHeight && r.top - 6 - room >= 0) el.style.top = `${r.top - 6 - room}px`
   const close = () => {
     document.removeEventListener('pointerdown', outside, true)
     document.removeEventListener('keydown', key, true)
@@ -159,6 +162,10 @@ export function menu(anchor: HTMLElement, items: MenuItem[]): { close: () => voi
     else if (ev.key === 'Home') go(0, 1)
     else if (ev.key === 'End') go(n - 1, -1)
   })
+  // the entries are in: open above the anchor when there is no room below
+  const r = anchor.getBoundingClientRect()
+  const room = pop.el.offsetHeight
+  if (room && r.bottom + 6 + room > window.innerHeight && r.top - 6 - room >= 0) pop.el.style.top = `${r.top - 6 - room}px`
   buttons.find((b) => !b.disabled)?.focus()
   return { close: pop.close }
 }
