@@ -339,6 +339,10 @@ export function routeOp(tenant: string, plugin: string, op: string, rawArgs: unk
       if (a.at !== undefined && a.at !== null && a.at !== '') n.at = str(a.at, 'place', 200)
       const rid = optUuid(a.resource, 'resource')
       if (rid) n.resource = rid
+      if (Array.isArray(a.to) && a.to.length) {
+        if (!rid) throw new OpError('`to` needs the resource of the notification')
+        n.to = a.to.slice(0, 200).map((u) => uuid(u))
+      }
       return { method: 'POST', url: `${base}/notify`, json: n }
     }
     case 'settings.get':
