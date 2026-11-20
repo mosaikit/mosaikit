@@ -201,3 +201,79 @@ The distributions (Geoportal first) run on the same kernel and must not break.
 - Each plugin: version bump, migration with data conversion, KPI, `details`, real screenshots in `media/`, and **its card on the Mosaikit site** (thumbnail and carousel; languages with the flag).
 - Targeted tests while working; full e2e, `cargo xtask ci` and a regenerated `tests/results/test-results.md` once before merging; manual checks (`docs/manual-tests.md`) with their Playwright twin for every feature.
 - One commit at the end of every phase after the checks pass; never push (except the GitHub publication and the site update when the maintainer asks); own xtask worktree; temporary files under `C:\tmp\mosaikit`, removed when done.
+
+## 8. Chat 2.0: a replica of the Chat section of Microsoft Teams
+
+Decision of the maintainer (2026-11-20): the Chat plugin becomes a faithful replica of the **Chat** section of Microsoft Teams (one-to-one and group chats; not the Teams / Channels section). The Chat view is the primary UI of the plugin. The channels of Chat 1.x stay reachable under a secondary entry «Channels» of the plugin, untouched: no data is migrated, converted or deleted (the new data lives in new resource kinds and tables). The rules of §3b, §4, §4b and §7.3 apply.
+
+### 8.1 What Teams Chat does and what we replicate
+
+| Area | Teams Chat | Mosaikit Chat 2.0 |
+|---|---|---|
+| Chat list | Left list: Recent, a Pinned section, bold name and badge when unread, preview of the last message with a «You:» prefix, time, presence dot (1:1), avatar or group mosaic, search box, filters (Unread, Chats, Meetings), per-chat menu: mute, pin, mark as unread, hide, leave | Same. The «Meetings» filter keeps the chats whose last event is a call. The filters are a segmented control; the search box filters the list by name or participant and, with Enter, searches the texts of the messages |
+| New chat | «New chat»: a «To:» field with a people picker, a group name for more than one person, first message | Same. People come from `permissions.directory` (typeahead); without that right (`permission_denied`) the host picker `msk.pickPrincipals` is used. A chat with one person opens the existing 1:1 chat |
+| Group management | Add people with «include all history / from a date / no history», remove people, rename, leave | Same. The choice is stored as `history_from` of the member and applied by the commands that read messages: a courtesy of the UI, not a security boundary (the platform ACL has no row-level history cut-off; stated in the details of the plugin) |
+| Header | Name, participant avatars, tabs Chat / Files / Photos / more | Name, avatars (click: people panel), tabs **Chat**, **Files** (the files attached in this chat), **Pinned** (pinned messages). Photos: skipped, it duplicates Files |
+| Messages | Day separators, grouped consecutive messages, bubbles (own right, others left), «edited», delete («This message was deleted»), reply with quote, reactions (like, heart, laugh, surprised, sad, angry) with who reacted, forward, importance Important / Urgent, mentions, rich text, emoji picker, attachments, link previews, pin | Same, except forward (ruled out by the task) and link previews (only a chip with the host name of the first link, nothing is fetched). Message search per chat and global |
+| Presence | Presence dot, typing indicator, read receipts («Seen») | Dot Available / Away (page visible or hidden for more than 5 minutes) on the live channel, typing, «Seen» per person from `last_read_at` of the members, live. Busy / Do not disturb / manual status: skipped (an account-wide Teams status, not a chat feature) |
+| Calls | Call and Video buttons in the header start a group meeting; the call shows in the chat: «X started a call», Join, duration at the end, who joined | Same (8.5): Audio and Video buttons, a call message with Join, participants who joined, duration. Engine hook for LiveKit |
+| Notifications | Activity feed and banner for new messages and @mentions; a muted chat only notifies on mentions | `ctx.notify` from the commands: one notice to the mentioned people (also when they muted the chat), one to the other people who did not mute it. Needs the additive field `to` (8.6) |
+| Sharing | A chat is private to its participants | A chat is a platform resource shared with each participant at `manage` level (peers, as in Teams where any member adds people). The sharing dialog is not offered: people are managed inside the chat |
+| Skipped | Teams / Channels, Meet now outside a chat, forward, Photos tab, loop components, GIFs and stickers, scheduling a message, translation, praise, switch of read receipts, federation with outside people, retention policies | |
+
+### 8.2 Data model
+
+New resource kinds: `chats` (name, kind `direct|group`, pair, last_at, last_preview, last_author, message_count, created_by) and `chat_messages`, children of a chat (text, author_id, reply_to, edited, deleted, importance `normal|important|urgent`, mentions, attachments, kind `message|system|call`, meta, pinned, pinned_by). The old kinds `channels` and `messages` are untouched.
+
+Tables (migration `001_chats.sql`, PostgreSQL and SQLite; every table has `resource_id` and `tenant_id`; RLS is the generated one):
+
+- `chat_members(resource_id, tenant_id, user_id, user_name, joined_at, history_from, left_at, last_read_at, unread, mentions, marked_unread, pinned_at, muted, hidden, PK(resource_id, user_id))`: the participants and the per-person settings of each chat.
+- `chat_reactions(resource_id = the message, tenant_id, user_id, user_name, emoji, PK(resource_id, user_id, emoji))`.
+- `chat_call_joins(resource_id = the call message, tenant_id, user_id, user_name, joined_at, left_at, PK(resource_id, user_id, joined_at))`.
+- view `kpi_chat_activity` (chats, group chats, direct chats, messages).
+
+Why the participants are ACL shares at `manage`: it is the only way for every member to add people and rename, as in Teams, with the sharing, notification and trash rules of the platform for free. The cost: through the raw API a participant could change the per-person row of another participant. The author rules of the messages are therefore enforced by the hooks (`chat_messages.before_update`: only the author changes the text, the others only the pin fields; `after_delete`: only the author) and by the commands. Trust model: the participants of one chat are peers. Leaving a chat removes the share (the owner keeps technical access and the chat is hidden from them).
+
+### 8.3 Commands (WASM logic)
+
+`chats.overview`, `chats.open_direct`, `chats.create_group`, `chats.members`, `chats.add_members`, `chats.remove_member`, `chats.leave`, `chats.rename`, `chats.settings` (pin, mute, hide, mark unread), `chats.send` (creates the message as a child of the chat, updates preview and counters, shows the chat again to people who hid it, notifies), `chats.messages` (a page with reactions and receipts), `chats.message`, `chats.delete_message`, `chats.react`, `chats.pin_message`, `chats.mark_read`, `chats.search`, `chats.call_start`, `chats.call_join`, `chats.call_leave`, `chats.files`, `chats.widget_chats` (Dashboard widget; the one of the channels stays). Commands validate with the functions the hooks use, and have native tests with `MockHost`.
+
+### 8.4 Real-time
+
+One channel per chat (`msk.realtime.open`, name `chat`): hints `{t: 'msg'|'edit'|'del'|'react'|'read'|'pin'|'call'|'members', id}` (the clients read again from the data: nothing sent can pose as someone else) and presence state `{typing, status}`. The platform allows 20 channels per person: the page keeps the current chat plus the 12 most recent in a «hot set», so the list updates badges live; the others are read again when the page gets the focus and every minute.
+
+### 8.5 Calls and the engine hook
+
+`chats.call_start(chat, audio_only)` creates a `call` message with `meta {engine, room, audio_only, started_at}`; the room is `mosaikit-<chat id>-<random secret of the call>` (the secret exists only in the message, which only the participants see). The UI opens the call in a panel of the page with the engine named by `meta.engine`, through a small registry (`engines.ts`: `jitsi` today; `{ id, label, embedUrl(room, person, opts) }`). Joining writes a `chat_call_joins` row; leaving sets `left_at`; when nobody is left the message gets `ended_at` and the chat shows the duration. Permissions: `frame_src = ["https://meet.jit.si"]`, `media = true`.
+
+**LiveKit spike (decision).** LiveKit (Apache-2.0 SFU; its `livekit-client` SDK is Apache-2.0 too) scales better than the public Jitsi instance (simulcast, no third-party service) but costs operations: a LiveKit server with TURN and TLS, an API key and secret, and a short-lived JWT (HS256, claims `video.room`, `video.roomJoin`) minted for each participant. Fit with Mosaikit: the minting is a command (`chats.call_token`) that needs HMAC-SHA256 in the WASM logic (pure Rust `hmac` and `sha2`) and the key and secret as `[[config]]` secrets read with `ctx.setting` (never sent to the UI); the browser connects by `wss://` to the LiveKit server, which the page CSP allows through `permissions.network` (`connect-src`). No kernel change is expected; the spike has to confirm that the `network` origins also cover `wss:`. Decision: **Jitsi stays the default and the only engine implemented**; the registry and `meta.engine` are the hook; LiveKit is a follow-up of about 5 days (command, config, UI engine, documentation, a server in the Docker kit).
+
+### 8.6 Kernel (additive, opt-in)
+
+`ctx.notify` and `msk.notify` cannot name recipients, so a mention cannot reach only the mentioned people and a muted chat cannot be left out. Change (§4b): an optional field `to` (a list of user ids, at most 200) on a notification that has `resource`: the recipients become the **intersection** of the people who see the item and `to`. It never widens the audience, and without it nothing changes. SDK `Notice::to`, plugin API `Notify.to`, entries in both CHANGELOGs, a kernel test. A kernel that does not know `to` ignores it and would notify every participant, so the plugin raises `[requires] mosaikit` to the version that ships the field (the kernel version is bumped by the maintainer at release; until then the plugin keeps `>=1.0, <2` and the behaviour degrades to «all participants», which is acceptable and said here).
+
+### 8.7 Permissions of the plugin
+
+`hooks`, `realtime`, `notify`, `directory`, `frame_src`, `media`, `files_read` and `files_write` (attachments from Documents and from the device go to the Files area of Documents, in a folder «Chat»), `resources_read = ["com.mosaikit.files"]` (so that the page can share those files with the participants). The sensitive ones are explained in `details`. Without `directory` the people picker falls back to the host picker; without the files rights the attach button is hidden.
+
+### 8.8 Migration
+
+Additive: the migration creates the new tables and the KPI view; the manifest adds two resource kinds. Channels, their messages, shares and the Dashboard widget `busy-channels` stay as they are. `[[nav]]` has two entries: **Chats** (place `chats`, the default) and **Channels** (place `channels`, the old page with the same code, reached through `msk.at`). Version 0.3.1 becomes 0.4.0 (minor).
+
+### 8.9 Tests
+
+- Rust (`MockHost`): validation of messages, hooks (author rules), the 1:1 pair key, history rules, mention extraction, preview text, unread counters, notification shapes, call lifecycle.
+- Vitest: the pure logic (`logic.ts`: list order, filters, grouping into bubbles, read receipts, mentions, Markdown helpers) and a DOM test of the composer toolbar.
+- Manual checks `CHT-10..` in `docs/manual-tests.md` and the Playwright twin `tests/e2e/specs/21-chat.spec.ts` (two people of one tenant), targeted runs only.
+- Kernel: a test of `to` in `crates/kernel/tests/notifications.rs`; `lang_es_coverage` (adopted) must stay green.
+
+### 8.10 Phases
+
+| # | Phase | Content |
+|---|---|---|
+| C0 | Design | this section |
+| C1 | Kernel | notification field `to` (additive), SDK and API, tests |
+| C2 | Data and logic | manifest, migration, hooks, commands, native tests |
+| C3 | UI core | chat list, new chat, conversation, send, real-time, unread, the Channels entry |
+| C4 | UI features | composer toolbar, mentions, reactions, reply, importance, pins, search, files, calls, people panel |
+| C5 | Texts, docs, tests | en/it/es and the language plugins, CARD, details, manual checks, e2e twin, version, widget |
