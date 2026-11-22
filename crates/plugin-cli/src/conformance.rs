@@ -201,7 +201,7 @@ fn permission_checks(m: &Manifest, used: &HostUse, from_source: bool, ui_uses_fi
     }
 }
 
-/// Every `.rs` file of a folder (not `target`), joined.
+/// Every `.rs` file of a folder (not `target`), joined; the unit tests of each file are left out (one file cuts at its own `#[cfg(test)]`, not at the first one of all).
 fn read_sources(dir: &Path) -> String {
     fn walk(d: &Path, out: &mut String) {
         let Ok(rd) = std::fs::read_dir(d) else { return };
@@ -211,7 +211,7 @@ fn read_sources(dir: &Path) -> String {
                 walk(&p, out);
             } else if p.extension().is_some_and(|x| x == "rs") {
                 if let Ok(t) = std::fs::read_to_string(&p) {
-                    out.push_str(&t);
+                    out.push_str(&production_source(&t));
                     out.push('\n');
                 }
             }
