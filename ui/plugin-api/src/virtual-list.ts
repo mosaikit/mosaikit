@@ -40,6 +40,7 @@ export function virtualList(opts: VirtualListOptions): VirtualList {
   const drawn = new Map<number, HTMLElement>()
   const size = opts.estimateSize
   let count = opts.count
+  let queued = false
 
   const paint = (force = false) => {
     inner.style.height = `${virt.getTotalSize()}px`
@@ -78,7 +79,14 @@ export function virtualList(opts: VirtualListOptions): VirtualList {
     scrollToFn: elementScroll,
     observeElementRect,
     observeElementOffset,
-    onChange: () => paint(),
+    // a measure arrives from the ResizeObserver after the paint: draw again once the browser has laid the rows out
+    onChange: () => {
+      paint()
+      if (!queued) {
+        queued = true
+        requestAnimationFrame(() => ((queued = false), paint()))
+      }
+    },
   })
   const cleanup = virt._didMount()
   virt._willUpdate()
