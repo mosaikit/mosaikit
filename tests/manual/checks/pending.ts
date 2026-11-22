@@ -4,6 +4,19 @@
 import type * as L from '../lib.ts'
 
 const REASON: Record<string, string> = {
+  "PKA-01": "the vitest suites of tasks and plugin-api; browser twin needs a tenant with 100+ tasks: not automated yet",
+  "PKA-02": "not automated yet (needs the timer of the undo toast)",
+  "PKA-03": "not automated yet",
+  "PKA-04": "covered by the vitest suite of contacts (rows and columns); browser twin needs 100+ contacts: not automated yet",
+  "PKA-05": "covered by the vitest suite of bookmarks (parser, rules); browser twin not automated yet",
+  "PKA-06": "covered by the vitest suite of bookmarks (round trip); browser twin not automated yet",
+  "PKA-07": "not automated yet",
+  "PKA-08": "covered by the vitest suite of snippets (grammars, escaping); screenshots in light and dark by hand",
+  "PKA-09": "covered by the vitest suite of files (app.test.ts, places.test.ts)",
+  "PKA-10": "covered by the vitest suite of files (5000 items); browser twin not automated yet",
+  "PKA-11": "covered by the vitest suite of files (g m)",
+  "PKA-12": "covered by the vitest suite of forms (templates.test.ts)",
+  "PKA-13": "browser twin needs 60+ answers: not automated yet",
   "PERF-01": "needs more than 50 rows: covered at scale by `cargo xtask perf` (docs/reports/performance.md), not run in this suite",
   "PERF-02": "needs more than 50 rows: covered at scale by `cargo xtask perf` (docs/reports/performance.md), not run in this suite",
   "PERF-03": "needs more than 50 rows: covered at scale by `cargo xtask perf` (docs/reports/performance.md), not run in this suite; the bulk selection is also in tests/e2e/specs/10-search-profile-qa.spec.ts \"QA follow-ups\"",
@@ -348,6 +361,84 @@ const checks: L.Check[] = [
     id: 'HOST-09',
     async run() {
       return { status: 'NOT VERIFIABLE', note: REASON['HOST-09'] }
+    },
+  },
+  {
+    id: 'PKA-01',
+    async run() {
+      return { status: 'NOT VERIFIABLE', note: REASON['PKA-01'] }
+    },
+  },
+  {
+    id: 'PKA-02',
+    async run() {
+      return { status: 'NOT VERIFIABLE', note: REASON['PKA-02'] }
+    },
+  },
+  {
+    id: 'PKA-03',
+    async run() {
+      return { status: 'NOT VERIFIABLE', note: REASON['PKA-03'] }
+    },
+  },
+  {
+    id: 'PKA-04',
+    async run() {
+      return { status: 'NOT VERIFIABLE', note: REASON['PKA-04'] }
+    },
+  },
+  {
+    id: 'PKA-05',
+    async run() {
+      return { status: 'NOT VERIFIABLE', note: REASON['PKA-05'] }
+    },
+  },
+  {
+    id: 'PKA-06',
+    async run() {
+      return { status: 'NOT VERIFIABLE', note: REASON['PKA-06'] }
+    },
+  },
+  {
+    id: 'PKA-07',
+    async run() {
+      return { status: 'NOT VERIFIABLE', note: REASON['PKA-07'] }
+    },
+  },
+  {
+    id: 'PKA-08',
+    async run() {
+      return { status: 'NOT VERIFIABLE', note: REASON['PKA-08'] }
+    },
+  },
+  {
+    id: 'PKA-09',
+    async run() {
+      return { status: 'NOT VERIFIABLE', note: REASON['PKA-09'] }
+    },
+  },
+  {
+    id: 'PKA-10',
+    async run() {
+      return { status: 'NOT VERIFIABLE', note: REASON['PKA-10'] }
+    },
+  },
+  {
+    id: 'PKA-11',
+    async run() {
+      return { status: 'NOT VERIFIABLE', note: REASON['PKA-11'] }
+    },
+  },
+  {
+    id: 'PKA-12',
+    async run() {
+      return { status: 'NOT VERIFIABLE', note: REASON['PKA-12'] }
+    },
+  },
+  {
+    id: 'PKA-13',
+    async run() {
+      return { status: 'NOT VERIFIABLE', note: REASON['PKA-13'] }
     },
   },
 ]
