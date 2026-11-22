@@ -9,6 +9,16 @@ version and is removed in the next.
 - `popover` and `menu` open above their anchor when there is no room below (a button at the bottom of the page, like the composer of a chat). Visual only.
 
 - `Notify.to` (`msk.notify({ resource, to })`): limits the notification of an item to some of the people who see it (user ids, at most 200; the intersection, never more people). Needs `resource`. A host that does not know it notifies all of them. Additive.
+- Kit, wave 1 of `docs/plugins-review.md` (X3, X4, X7, X8, X12, X16; additive, no kernel change; new dependencies `@floating-ui/dom` MIT, `@tanstack/virtual-core` MIT, `echarts` Apache-2.0 with `zrender` BSD-3-Clause):
+  - `shortcuts(list, opts?)`: one place for the keys of a page (`n`, `/`, `g i`, `ctrl+k`), ignored while the person types, help sheet on `?` (a kit dialog; texts in `opts.labels`). Also `keyName`.
+  - `shareChip({ names, onOpen, readonly?, copyLink?, labels? })`: avatars of who can see the item and a button to the host share dialog (`msk.share(id)`), optional copy-link.
+  - `undoToast({ text, commit, undo, ms?, undoLabel? })`: «Deleted - Undo»; the destructive call runs after the delay unless Undo is pressed; a page that is hidden commits.
+  - `toCsv`, `csvCell`, `downloadCsv`, `downloadFile`: CSV with UTF-8 mark, quoting, formula neutralising; download through the browser.
+  - `filteredEmpty(message, clearLabel, onClear)` (already there) has a dashed frame and accent link; use it for «no results for this filter», `emptyState` for a really empty page.
+  - `popover` and `menu` are placed by Floating UI (flip above the anchor when there is no room, shift inside the page, follow scroll and resize); `data-placement` on the element. Same behaviour as before for the common case.
+  - `virtualList({ count, estimateSize, render, getKey?, overscan?, gap?, label? })`: rows in view only, on TanStack Virtual; `setCount`, `scrollToIndex`, `refresh`, `visible`, `destroy`.
+  - `chart(spec, labels?)` (`line`, `bar`, `pie`, Apache ECharts, tree-shaken and loaded on the first call, about 186 KB gzip that a plugin without charts never downloads): follows the host colours and theme (optional tokens `--chart-1..8`), resizes with its box, `role="img"` with a name and a «Show data» table, no animation when `prefers-reduced-motion`.
+  - Styles: `.msk-sharechip`, `.msk-keysheet`, `.msk-vlist`, `.msk-chart`.
 
 - `msk.share(id, { principals: [{ type: 'all' }] })`: `type: 'all'` (no `id` needed) stands for every member of the tenant, the built-in group «All members»; the dialog suggests it and shares in one step. Additive.
 
