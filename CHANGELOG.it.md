@@ -4,6 +4,12 @@ Cosa cambia da una versione di Mosaikit alla successiva. La shell mostra la sezi
 Aiuto › Novità (un titolo `## <versione>` per versione, voci `- `, gruppi `### `). Questo file è la
 versione italiana di [CHANGELOG.md](CHANGELOG.md): tenerli allineati.
 
+## 1.3.0
+
+- Plugin: `msk.publicLink.get(id)`, `msk.publicLink.create(id, { expires_in_days?, password? })` e `msk.publicLink.revoke(id)`: una pagina (in particolare quella che sostituisce la finestra di condivisione, `[ui] share_page`) mostra, crea e revoca il link pubblico di un elemento. Valgono le regole della finestra: gestire l'elemento, permesso `share` del plugin, politica dell'organizzazione (link disattivati, durata massima); gli stessi eventi nel Log e la stessa notifica. L'indirizzo è dato una sola volta, da `create`. Non disponibile nei link pubblici né nei run.
+- Una persona può creare al massimo 30 link pubblici in 10 minuti (la finestra e le pagine contano insieme).
+- Kernel: `DELETE /api/t/{t}/resources/{id}/links` revoca tutti i link attivi di un elemento.
+
 ## 1.2.0
 
 - Plugin: impostazioni del tenant. `[[config]] scope = "tenant"` (predefinito `"platform"`, come prima) è un'impostazione che ogni tenant sceglie per sé, con gli stessi tipi, segreto compreso; `edit = "<chiave di [[user_permissions]]>"` fa cambiare l'impostazione anche a chi ha quel permesso, oltre ai Tenant Manager. La shell mostra le impostazioni di ogni app come una sezione delle impostazioni del Tenant Manager (App); un segreto non torna mai a una pagina. La logica legge il valore del tenant che esegue il comando in `ctx.config` (`ctx.setting`). I valori stanno in `core.plugin_settings` (migrazione 0030, SQLite 0028); una chiave che esce dal manifesto è ignorata ma conservata, e si usa il valore predefinito dove un valore salvato non è più valido per il tipo. Ogni modifica va nel Log con le chiavi, mai un segreto.

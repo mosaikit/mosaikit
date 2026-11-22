@@ -88,7 +88,10 @@ pub fn router() -> Router<AppState> {
         .route("/api/t/{t}/resources/{rid}", get(resource_meta))
         .route("/api/t/{t}/resources/{rid}/grants", get(resource_grants).put(resource_set_grant))
         .route("/api/t/{t}/resources/{rid}/owner", post(resource_owner))
-        .route("/api/t/{t}/resources/{rid}/links", get(resource_links).post(resource_link_create))
+        .route(
+            "/api/t/{t}/resources/{rid}/links",
+            get(resource_links).post(resource_link_create).delete(resource_links_revoke),
+        )
         .route("/api/t/{t}/links/{id}", delete(link_revoke))
         // operations of the plugins (always limited to the plugin of the path)
         .route("/api/t/{t}/p/{plugin}/r/{res}", get(crud_list).post(crud_create))
@@ -942,6 +945,15 @@ async fn resource_link_create(
     Json(r): Json<LinkReq>,
 ) -> ApiResult<Json<Value>> {
     Ok(Json(json!(links::create(&s.k, &c, uuid(&p.rid)?, r.days, r.password.as_deref()).await?)))
+}
+
+async fn resource_links_revoke(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Path(p): Path<RidPath>,
+) -> ApiResult<Json<Value>> {
+    let n = links::revoke_all(&s.k, &c, uuid(&p.rid)?).await?;
+    Ok(Json(json!({ "revoked": n })))
 }
 
 async fn link_revoke(

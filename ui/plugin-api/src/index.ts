@@ -48,6 +48,7 @@ export type {
   Notify,
   NotificationRef,
   SettingsChange,
+  PublicLinkState,
   SettingsView,
   PublicResource,
   Rect,
