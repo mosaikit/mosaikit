@@ -1,6 +1,7 @@
 // The shared UI kit of the plugins (docs/refactoring-ui.md §13): small framework-free components on the tokens of the
 // host. Every control has a role and a name, works with the keyboard and respects `prefers-reduced-motion`. The texts
 // the components show on their own come in `labels` (English by default): the plugin gives its translation.
+import { autoUpdate, computePosition, flip, offset, shift } from '@floating-ui/dom'
 import { h } from './dom.ts'
 import { avatar } from './items.ts'
 import type { DirectoryUser } from './protocol.ts'
@@ -102,14 +103,19 @@ export function popover(anchor: HTMLElement, content: HTMLElement, opts: { onClo
   const el = h('div', { class: 'msk-popover' })
   el.append(content)
   anchor.setAttribute('aria-expanded', 'true')
-  const r = anchor.getBoundingClientRect()
-  el.style.left = `${Math.max(8, Math.min(r.left, window.innerWidth - 240))}px`
-  el.style.top = `${r.bottom + 6}px`
   document.body.append(el)
-  // no room below (a button at the bottom of the page): open above the anchor
-  const room = el.offsetHeight
-  if (room && r.bottom + 6 + room > window.innerHeight && r.top - 6 - room >= 0) el.style.top = `${r.top - 6 - room}px`
+  // Floating UI: under the anchor, flipped above it when there is no room below, shifted to stay inside the page;
+  // `autoUpdate` follows scrolling, resizing and a content that changes size
+  const place = () =>
+    void computePosition(anchor, el, { strategy: 'fixed', placement: 'bottom-start', middleware: [offset(6), flip({ padding: 8 }), shift({ padding: 8 })] }).then(({ x, y, placement }) => {
+      el.style.left = `${x}px`
+      el.style.top = `${y}px`
+      el.dataset.placement = placement
+    })
+  place()
+  const stop = autoUpdate(anchor, el, place)
   const close = () => {
+    stop()
     document.removeEventListener('pointerdown', outside, true)
     document.removeEventListener('keydown', key, true)
     el.remove()

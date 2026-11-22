@@ -11,6 +11,20 @@ const msk = await connect() // handshake: API version, language, theme, mode, us
 mountCrud(document.getElementById('app')!, msk, 'notes', { title: 'Notes' })
 ```
 
+## Shared UI kit helpers
+
+All exported from the package root, framework-free, themed by the host tokens, usable with the keyboard, and quiet under `prefers-reduced-motion`.
+
+| Helper | Use |
+|---|---|
+| `shortcuts([{ keys: 'n', label: 'New', run }])` | page shortcuts; `?` opens the help sheet; `dispose()` on leave |
+| `shareChip({ names, onOpen: () => msk.share(id) })` | who can see this item, on a detail header |
+| `undoToast({ text, commit, undo })` | delete at once, really delete after 6 s, Undo in between |
+| `downloadCsv(name, rows, { header })`, `toCsv`, `downloadFile` | export a list |
+| `filteredEmpty(msg, 'Clear filters', clear)` | a filter that matches nothing (not the big empty state) |
+| `virtualList({ count, estimateSize, render })` | long lists; put `el` in a box with a height |
+| `chart({ type, label, categories, series })` | line, bar, pie; loads ECharts lazily; `await c.ready` |
+
 ## Versions
 
 - The package implements **plugin API 1** (`API_VERSION`). `connect()` sends it to the shell and the shell answers

@@ -353,7 +353,8 @@ dialog.msk-modal .msk-actions { position: sticky; bottom: -24px; margin: 18px -2
 .msk-md li.check.done span { color: var(--dim); text-decoration: line-through; }
 
 @media (prefers-reduced-motion: reduce) {
-  .msk-toast, .msk-popover { animation: none; }
+  .msk-toast, .msk-popover, .msk-keysheet[open] .msk-kbd, .msk-chart-status { animation: none; }
+  .msk-sharemain, .msk-sharecopy, .msk-toast .msk-link { transition: none; }
   .msk-skel-i { animation: none; }
   .msk-kcard, .msk-kcol, .msk-progress-fill { transition: none; }
 }
@@ -363,3 +364,48 @@ dialog.msk-modal .msk-actions { position: sticky; bottom: -24px; margin: 18px -2
 .msk-busy-ring { width: 28px; height: 28px; border-radius: 50%; border: 3px solid var(--line); border-top-color: var(--acc); animation: msk-spin 0.9s linear infinite; }
 @keyframes msk-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .msk-busy-ring { animation: none; border-top-color: var(--line); border-right-color: var(--acc); } }
+
+/* ===== Wave 1 kit: share chip, shortcuts sheet, undo toast, virtual list, chart (docs/refactoring-ui.md §13) ===== */
+.msk-popover[data-placement^='top'] { animation-name: msk-rise-down; }
+@keyframes msk-rise-down { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+
+.msk-sharechip { display: inline-flex; align-items: center; gap: var(--sp-1); }
+.msk-sharemain { all: unset; box-sizing: border-box; display: inline-flex; align-items: center; gap: var(--sp-2); padding: 3px 12px 3px 4px; border-radius: var(--r-pill); border: 1px solid var(--line); background: var(--panel2); color: var(--dim); font-size: 12px; font-weight: 600; line-height: 22px; transition: border-color var(--dur-1) var(--ease), background var(--dur-1) var(--ease), color var(--dur-1) var(--ease); }
+.msk-sharemain[data-count='0'] { padding-left: 12px; }
+button.msk-sharemain { cursor: pointer; }
+button.msk-sharemain:hover { border-color: var(--acc-line); background: var(--acc-soft); color: var(--fg); }
+button.msk-sharemain:focus-visible, .msk-sharecopy:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
+.msk-sharemain .msk-avstack .msk-avatar { width: 22px; height: 22px; font-size: 9px; box-shadow: 0 0 0 2px var(--panel2); }
+.msk-sharecopy { all: unset; box-sizing: border-box; cursor: pointer; display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; color: var(--dim); transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease); }
+.msk-sharecopy:hover { background: var(--acc-soft); color: var(--fg); }
+.msk-sharecopy.done { color: var(--ok); }
+
+.msk-keysheet { width: min(520px, calc(100vw - 32px)); }
+.msk-keyhelp { display: grid; gap: var(--sp-4); max-height: min(60vh, 480px); overflow: auto; padding-right: var(--sp-1); }
+.msk-keyhelp h4 { margin: 0 0 var(--sp-2); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--dim); }
+.msk-keylist { display: grid; grid-template-columns: 1fr auto; gap: 2px var(--sp-4); margin: 0; }
+.msk-keylist dt, .msk-keylist dd { margin: 0; padding: 7px 0; border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent); font-size: 13px; }
+.msk-keys { display: inline-flex; align-items: center; gap: 4px; justify-content: flex-end; }
+.msk-kbd { display: inline-grid; place-items: center; min-width: 24px; height: 24px; padding: 0 7px; border-radius: 6px; border: 1px solid var(--line); border-bottom-width: 2px; background: var(--panel2); font: 600 11px var(--font-mono); color: var(--fg); }
+.msk-keysep { font-size: 11px; color: var(--dim); padding: 0 2px; }
+.msk-keysheet[open] .msk-kbd { animation: msk-rise var(--dur-2) var(--ease) backwards; }
+
+.msk-toast .msk-link { text-decoration: none; font-weight: 700; color: var(--acc); padding: 2px 8px; border-radius: var(--r-s); transition: background var(--dur-1) var(--ease); }
+.msk-toast .msk-link:hover, .msk-toast .msk-link:focus-visible { background: var(--acc-soft); }
+.msk-emptyfiltered { border: 1px dashed var(--line); border-radius: var(--r-m); margin: var(--sp-3) 0; }
+.msk-emptyfiltered .msk-link { color: var(--acc); font-weight: 600; }
+
+.msk-vlist { position: relative; overflow: auto; overscroll-behavior: contain; contain: strict; }
+.msk-vlist-inner { position: relative; width: 100%; }
+.msk-vrow { position: absolute; top: 0; left: 0; width: 100%; will-change: transform; }
+
+.msk-chart { margin: 0; display: grid; gap: var(--sp-2); padding: var(--sp-3) var(--sp-4); border: 1px solid var(--line); border-radius: var(--r-l); background: var(--panel); box-shadow: var(--sh-1); }
+.msk-chart-canvas { width: 100%; min-height: 120px; }
+.msk-chart-status { color: var(--dim); font-size: 13px; text-align: center; padding: var(--sp-5) 0; animation: msk-rise var(--dur-2) var(--ease); }
+.msk-chart-data summary { cursor: pointer; width: max-content; font-size: 12px; font-weight: 600; color: var(--dim); border-radius: var(--r-s); padding: 2px 4px; }
+.msk-chart-data summary:hover { color: var(--fg); }
+.msk-chart-data summary:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
+.msk-chart-table { width: 100%; margin-top: var(--sp-2); border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; }
+.msk-chart-table th, .msk-chart-table td { padding: 6px 8px; text-align: right; border-bottom: 1px solid var(--line); }
+.msk-chart-table th:first-child { text-align: left; font-weight: 500; }
+.msk-chart-table thead th { color: var(--dim); font-weight: 600; }
