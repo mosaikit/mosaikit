@@ -168,6 +168,7 @@ const STANDALONE_TSCONFIG: &str = r#"{
     "skipLibCheck": true,
     "isolatedModules": true,
     "allowImportingTsExtensions": true,
+    "preserveSymlinks": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "types": ["vite/client"]
@@ -368,7 +369,10 @@ pub fn new_plugin(o: &NewOptions) -> Result<PathBuf> {
     } else {
         ",
     \"@fontsource-variable/bricolage-grotesque\": \"^5.3.0\",
-    \"@fontsource-variable/jetbrains-mono\": \"^5.3.0\""
+    \"@fontsource-variable/jetbrains-mono\": \"^5.3.0\",
+    \"@floating-ui/dom\": \"^1.8.0\",
+    \"@tanstack/virtual-core\": \"^3.19.12\",
+    \"echarts\": \"^6.1.0\""
     };
     let ui_lint_script =
         if npm_ws { "" } else { ",\n    \"lint\": \"oxlint src --deny-warnings -c ../.oxlintrc.json\"" };
