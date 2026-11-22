@@ -168,10 +168,6 @@ export function menu(anchor: HTMLElement, items: MenuItem[]): { close: () => voi
     else if (ev.key === 'Home') go(0, 1)
     else if (ev.key === 'End') go(n - 1, -1)
   })
-  // the entries are in: open above the anchor when there is no room below
-  const r = anchor.getBoundingClientRect()
-  const room = pop.el.offsetHeight
-  if (room && r.bottom + 6 + room > window.innerHeight && r.top - 6 - room >= 0) pop.el.style.top = `${r.top - 6 - room}px`
   buttons.find((b) => !b.disabled)?.focus()
   return { close: pop.close }
 }
