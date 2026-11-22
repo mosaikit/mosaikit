@@ -48,14 +48,16 @@ test.describe.serial('Approvals', () => {
     await expect(request(frame, 'APR laptop')).toBeVisible()
     await expect(frame.getByTestId('todo-badge')).toHaveText('1 to decide')
 
-    // APR-04: a rejection without a comment is refused; the request stays pending
-    await request(frame, 'APR laptop').getByRole('button', { name: 'Open', exact: true }).click()
-    const dlg = frame.getByRole('dialog')
+    // APR-04: the inbox shows the list on the left and the open request on the right; a rejection without a comment is refused and the
+    // request stays pending. «All» keeps the request in the list after the decision, «To decide» would not.
+    await frame.getByRole('button', { name: 'All' }).click()
+    await request(frame, 'APR laptop').locator('.apr-rowbtn').click()
+    const dlg = frame.getByTestId('detail')
     await expect(dlg).toContainText('A laptop for the new designer.')
     await accessible(page, 'approvals detail')
     // APR-13: an open request lets a writer change its approvers; with none left the change is refused
     await dlg.getByRole('button', { name: 'Change approvers' }).click()
-    const change = frame.getByRole('dialog').last()
+    const change = frame.getByRole('dialog')
     await expect(change).toContainText('People who already decided stay on the request.')
     await change.getByRole('button', { name: /^Remove: / }).click()
     await change.getByRole('button', { name: 'Save', exact: true }).click()
@@ -74,24 +76,33 @@ test.describe.serial('Approvals', () => {
     await expect(dlg.getByRole('button', { name: 'Reject' })).toHaveCount(0)
     await expect(dlg.getByRole('button', { name: 'Change approvers' })).toHaveCount(0)
     await expect(dlg).toContainText('Within the budget.')
-    await dlg.getByRole('button', { name: 'Close' }).click()
 
-    // the list: nothing left to decide, the decided request keeps its comment in «All»
+    // the list: nothing left to decide, the decided request keeps its state in «All»
+    await frame.getByRole('button', { name: 'To decide' }).click()
     await expect(frame.getByTestId('empty-state')).toContainText('Nothing to decide')
     await expect(frame.getByTestId('todo-badge')).toHaveCount(0)
     await frame.getByRole('button', { name: 'All' }).click()
     await expect(request(frame, 'APR laptop').locator('.msk-chip')).toHaveText('Approved')
-    await expect(request(frame, 'APR laptop')).toContainText('Within the budget.')
+    await expect(frame.getByTestId('detail')).toContainText('Within the budget.')
+
+    // APR-14: j and k walk the list, and the open request follows (the keys do nothing while a field has the focus)
+    await send(frame, 'APR keys')
+    await frame.getByRole('button', { name: 'All' }).click()
+    await request(frame, 'APR keys').locator('.apr-rowbtn').click()
+    await expect(frame.getByTestId('detail')).toContainText('APR keys')
+    await frame.locator('body').press('j')
+    await expect(frame.getByTestId('detail')).toContainText('APR laptop')
+    await frame.locator('body').press('k')
+    await expect(frame.getByTestId('detail')).toContainText('APR keys')
 
     // APR-06: a request the owner cancels shows Cancelled and leaves «To decide»
     await send(frame, 'APR trip')
     await frame.getByRole('button', { name: 'All' }).click()
-    await request(frame, 'APR trip').getByRole('button', { name: 'Open', exact: true }).click()
+    await request(frame, 'APR trip').locator('.apr-rowbtn').click()
+    await frame.getByTestId('detail').getByRole('button', { name: 'Cancel the request' }).click()
     await frame.getByRole('dialog').getByRole('button', { name: 'Cancel the request' }).click()
-    await frame.getByRole('dialog').last().getByRole('button', { name: 'Cancel the request' }).click()
-    await expect(frame.getByRole('dialog').first().locator('.msk-chip')).toHaveText('Cancelled')
-    await expect(frame.getByRole('dialog').first().getByRole('button', { name: 'Approve', exact: true })).toHaveCount(0)
-    await frame.getByRole('dialog').first().getByRole('button', { name: 'Close' }).click()
+    await expect(frame.getByTestId('detail').locator('.msk-chip')).toHaveText('Cancelled')
+    await expect(frame.getByTestId('detail').getByRole('button', { name: 'Approve', exact: true })).toHaveCount(0)
     await expect(request(frame, 'APR trip').locator('.msk-chip')).toHaveText('Cancelled')
     await frame.getByRole('button', { name: 'To decide' }).click()
     await expect(request(frame, 'APR trip')).toHaveCount(0)
