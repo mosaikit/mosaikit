@@ -37,6 +37,38 @@ async fn note(t: &TestKernel, c: &Caller, title: &str) -> Uuid {
 }
 
 #[tokio::test]
+async fn revoking_every_link_of_a_resource_and_the_creation_limit() {
+    let (t, _mgr, anna, bruno) = setup().await;
+    let rid = note(&t, &anna, "shared").await;
+    let a = links::create(&t, &anna, rid, Some(7), None).await.unwrap();
+    let b = links::create(&t, &anna, rid, None, None).await.unwrap();
+
+    // the manage level is required
+    set_grant(&t, &anna, rid, "user", bruno.user.user_id, Some(Level::Write)).await.unwrap();
+    assert_eq!(links::revoke_all(&t, &bruno, rid).await.unwrap_err().kind, Kind::Forbidden);
+
+    assert_eq!(links::revoke_all(&t, &anna, rid).await.unwrap(), 2);
+    assert!(links::resolve(&t, &token_of(&a.url)).await.is_err());
+    assert!(links::resolve(&t, &token_of(&b.url)).await.is_err());
+    assert!(links::list(&t, &anna, rid).await.unwrap().is_empty());
+    // nothing left: nothing is revoked, nothing is written to the Log
+    assert_eq!(links::revoke_all(&t, &anna, rid).await.unwrap(), 0);
+
+    // a person creates a limited number of links in the window (the two above count)
+    let mut last = None;
+    for _ in 0..40 {
+        match links::create(&t, &anna, rid, Some(1), None).await {
+            Ok(_) => {}
+            Err(e) => {
+                last = Some(e);
+                break;
+            }
+        }
+    }
+    assert_eq!(last.expect("the limit applies").kind, Kind::TooMany);
+}
+
+#[tokio::test]
 async fn public_links() {
     let (t, mgr, anna, bruno) = setup().await;
     let rid = note(&t, &anna, "public").await;

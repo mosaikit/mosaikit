@@ -2,7 +2,7 @@ import { Bridge, BridgeError } from './bridge.ts'
 import { API_VERSION, checkHostApi } from './version.ts'
 import { translate, type Vars } from './text.ts'
 import { setBusy, withBusy } from './busy.ts'
-import type { RealtimeEvent, RealtimeMessage, RealtimePerson, RealtimeStatus, BandApi, BandState, DirectoryApi, EmbedsApi, Schedule, SchedulesApi, DirectorySearch, ExtensionView, FileEntry, Hello, HostEventName, ListResult, Listing, Notify, NotificationRef, SettingsChange, SettingsView, PublicResource, Rect, ResourceMeta, Row, SiteInfo, TabInfo, Unzipped, UploadProgress, FolderSuggestion, FileInfo, FileTicket, UiContext, Values, WebProbe, SharePreselect, SharePrincipal, PickPrincipalsOptions, ShareList } from './protocol.ts'
+import type { RealtimeEvent, RealtimeMessage, RealtimePerson, RealtimeStatus, BandApi, BandState, DirectoryApi, EmbedsApi, Schedule, SchedulesApi, DirectorySearch, ExtensionView, FileEntry, Hello, HostEventName, ListResult, Listing, Notify, NotificationRef, SettingsChange, SettingsView, PublicLinkState, PublicResource, Rect, ResourceMeta, Row, SiteInfo, TabInfo, Unzipped, UploadProgress, FolderSuggestion, FileInfo, FileTicket, UiContext, Values, WebProbe, SharePreselect, SharePrincipal, PickPrincipalsOptions, ShareList } from './protocol.ts'
 
 /** The extensions of the plugin on a resource (fields and actions other plugins add to its items). */
 export interface ExtensionsClient {
@@ -391,6 +391,37 @@ export class Msk {
   async notify(n: Notify): Promise<number> {
     const r = await this.bridge.call<{ sent: number }>('notify', { ...n })
     return r.sent
+  }
+
+  /**
+   * The public link of an item (read only, with an expiry and an optional password), for a page that replaces the
+   * share dialog (`[ui] share_page`). The rules are those of the dialog: the person must manage the item, the plugin
+   * needs the `share` permission, and the tenant must allow public links (and its maximum lifetime applies). Not in
+   * public links nor in runs. Needs `[requires] mosaikit = ">=1.3"`.
+   * - `get(id)`: the active link, `{ active: true, id, expires_at?, has_password, views }`, or `{ active: false }`.
+   *   The address is not kept: it is given only by `create`.
+   * - `create(id, { expires_in_days?, password? })`: `{ id, url }`; `url` is given once. Without `expires_in_days`
+   *   the tenant's maximum applies (none if it sets none). The password has at least 6 characters.
+   * - `revoke(id)`: revokes every active link of the item.
+   */
+  publicLink = {
+    get: async (id: string): Promise<PublicLinkState> => {
+      const list = await this.bridge.call<{ id: string; expires_at?: string | null; has_password: boolean; view_count: number; active: boolean }[]>('publicLink.get', { id })
+      const l = list.find((x) => x.active)
+      if (!l) return { active: false }
+      return { active: true, id: l.id, ...(l.expires_at ? { expires_at: l.expires_at } : {}), has_password: l.has_password, views: l.view_count }
+    },
+    create: async (id: string, opts: { expires_in_days?: number; password?: string } = {}): Promise<{ id: string; url: string }> => {
+      const r = await this.bridge.call<{ id: string; url: string }>('publicLink.create', {
+        id,
+        ...(opts.expires_in_days !== undefined ? { days: opts.expires_in_days } : {}),
+        ...(opts.password ? { password: opts.password } : {}),
+      })
+      return { id: r.id, url: r.url }
+    },
+    revoke: async (id: string): Promise<void> => {
+      await this.bridge.call('publicLink.revoke', { id })
+    },
   }
 
   /** The settings of the tenant the plugin declares (`[[config]] scope = "tenant"`), for the page of the section the

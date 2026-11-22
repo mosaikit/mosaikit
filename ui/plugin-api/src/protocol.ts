@@ -386,6 +386,11 @@ export interface SettingsView {
   secrets: string[]
 }
 
+/** The public link of an item (`msk.publicLink.get`): the active one, or none. */
+export type PublicLinkState =
+  | { active: true; id: string; expires_at?: string; has_password: boolean; views: number }
+  | { active: false }
+
 /** A change of the settings of the tenant: a value `null` goes back to the default; a secret `null` is removed. */
 export interface SettingsChange {
   values?: Record<string, unknown>

@@ -341,6 +341,21 @@ export function routeOp(tenant: string, plugin: string, op: string, rawArgs: unk
       if (rid) n.resource = rid
       return { method: 'POST', url: `${base}/notify`, json: n }
     }
+    // the public link of an item (the rules of the share dialog: the kernel checks that the person manages the item,
+    // the `share` permission of the plugin, the policy of the tenant and the limits)
+    case 'publicLink.get':
+      return { method: 'GET', url: `/api/t/${enc(tenant)}/resources/${uuid(a.id, 'resource')}/links` }
+    case 'publicLink.create': {
+      const j: Args = {}
+      if (a.days !== undefined && a.days !== null) {
+        if (typeof a.days !== 'number' || !Number.isInteger(a.days) || a.days < 1 || a.days > 3650) throw new OpError('invalid expiry')
+        j.days = a.days
+      }
+      if (a.password !== undefined && a.password !== null && a.password !== '') j.password = str(a.password, 'password', 128)
+      return { method: 'POST', url: `/api/t/${enc(tenant)}/resources/${uuid(a.id, 'resource')}/links`, json: j }
+    }
+    case 'publicLink.revoke':
+      return { method: 'DELETE', url: `/api/t/${enc(tenant)}/resources/${uuid(a.id, 'resource')}/links` }
     case 'settings.get':
       return { method: 'GET', url: `${base}/settings` }
     case 'settings.set': {

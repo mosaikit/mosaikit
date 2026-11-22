@@ -5,6 +5,12 @@ in Help › What is new (one `## <version>` heading per version, `- ` items, `##
 language of the person: this file in English, [CHANGELOG.it.md](CHANGELOG.it.md) in Italian (keep them
 in step).
 
+## 1.3.0
+
+- Plugins: `msk.publicLink.get(id)`, `msk.publicLink.create(id, { expires_in_days?, password? })` and `msk.publicLink.revoke(id)`: a page (in particular the one that replaces the share dialog, `[ui] share_page`) shows, creates and revokes the public link of an item. The rules are those of the dialog: manage the item, the `share` permission of the plugin, the policy of the tenant (links turned off, maximum lifetime); the same Log events and notification. The address is given once, by `create`. Not available in public links or runs.
+- A person can create at most 30 public links in 10 minutes (the dialog and the pages count together).
+- Kernel: `DELETE /api/t/{t}/resources/{id}/links` revokes every active link of an item.
+
 ## 1.2.0
 
 - Plugins: settings of the tenant. `[[config]] scope = "tenant"` (default `"platform"`, as before) makes a setting that each tenant chooses for itself, with the same kinds, secret included; `edit = "<key of [[user_permissions]]>"` lets the holders of that permission change it besides the Tenant Managers. The shell draws the settings of each app as a section of the Tenant Manager's settings (Apps); a secret is never given back to a page. The logic reads the value of the tenant that runs the command in `ctx.config` (`ctx.setting`). Values are kept in `core.plugin_settings` (migration 0030, SQLite 0028); a key that leaves the manifest is ignored but kept, and the default applies where a stored value no longer fits the kind. Every change is written to the Log with the keys, never a secret.

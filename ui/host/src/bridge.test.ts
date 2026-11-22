@@ -71,6 +71,21 @@ describe('routeOp', () => {
     expect(() => routeOp('alfa', 'p.x', 'notifications.markRead', { resource: 'x' })).toThrow()
   })
 
+  it('routes the public link of an item', () => {
+    const id = '11111111-1111-4111-8111-111111111111'
+    expect(routeOp('alfa', 'p.x', 'publicLink.get', { id })).toEqual({ method: 'GET', url: `/api/t/alfa/resources/${id}/links` })
+    expect(routeOp('alfa', 'p.x', 'publicLink.create', { id, days: 7, password: 'secret1', tenant: 'beta' })).toEqual({
+      method: 'POST',
+      url: `/api/t/alfa/resources/${id}/links`,
+      json: { days: 7, password: 'secret1' },
+    })
+    expect(routeOp('alfa', 'p.x', 'publicLink.create', { id })).toEqual({ method: 'POST', url: `/api/t/alfa/resources/${id}/links`, json: {} })
+    expect(routeOp('alfa', 'p.x', 'publicLink.revoke', { id })).toEqual({ method: 'DELETE', url: `/api/t/alfa/resources/${id}/links` })
+    expect(() => routeOp('alfa', 'p.x', 'publicLink.create', { id, days: 0 })).toThrow()
+    expect(() => routeOp('alfa', 'p.x', 'publicLink.create', { id, days: 1.5 })).toThrow()
+    expect(() => routeOp('alfa', 'p.x', 'publicLink.get', { id: 'x' })).toThrow()
+  })
+
   it('routes the settings of the tenant', () => {
     expect(routeOp('alfa', 'p.x', 'settings.get', {})).toEqual({ method: 'GET', url: '/api/t/alfa/p/p.x/settings' })
     expect(routeOp('alfa', 'p.x', 'settings.set', { values: { title: 'A' }, secrets: { feed: null }, tenant: 'beta' })).toEqual({

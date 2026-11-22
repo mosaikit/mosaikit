@@ -8,7 +8,7 @@ use uuid::Uuid;
 use crate::acl::{require_level, Level};
 use crate::identity::{hash_password, verify_password};
 use crate::util::{random_token, sha256};
-use crate::{events, Caller, Error, Kernel, Result, TenantSettings};
+use crate::{events, Caller, Error, Kernel, Kind, Result, TenantSettings};
 
 #[derive(Debug, Clone, Serialize)]
 pub struct LinkInfo {
@@ -28,6 +28,10 @@ pub struct CreatedLink {
     /// shown only at creation: the server keeps only the hash of the token
     pub url: String,
 }
+
+/// Public links one person may create in the window (the dialog and the page that replaces it count together).
+const CREATE_PER_WINDOW: u32 = 30;
+const CREATE_WINDOW: std::time::Duration = std::time::Duration::from_secs(10 * 60);
 
 pub async fn create(
     k: &Kernel,
@@ -58,6 +62,10 @@ pub async fn create(
         Some(p) => Some(hash_password(k, p).await?),
         None => None,
     };
+    if !k.limiter.hit(&format!("linkcreate:{}", c.user.user_id), CREATE_PER_WINDOW, CREATE_WINDOW) {
+        return Err(Error::new(Kind::TooMany, "too many public links created: try again in a few minutes")
+            .with_code("link_rate_limited"));
+    }
     let token = random_token(24);
     let row = mosaikit_db::query(
         "insert into core.public_links (resource_id, token_hash, expires_at, password_hash, created_by)
@@ -143,6 +151,31 @@ pub async fn revoke(k: &Kernel, c: &Caller, link: Uuid) -> Result<()> {
     )
     .await;
     Ok(())
+}
+
+/// Revokes every active link of a resource (the person must manage it); the number revoked.
+pub async fn revoke_all(k: &Kernel, c: &Caller, rid: Uuid) -> Result<u64> {
+    let m = require_level(k, c, rid, Level::Manage).await?;
+    let n = mosaikit_db::query(
+        "update core.public_links set revoked_at = now() where resource_id = $1 and revoked_at is null",
+    )
+    .bind(rid)
+    .execute(&k.db)
+    .await?
+    .rows_affected();
+    if n > 0 {
+        events::record(
+            k,
+            Some(c.tenant.tenant_id),
+            Some(c.user.user_id),
+            Some(&m.plugin_id),
+            Some(rid),
+            "link.revoke",
+            json!({ "count": n }),
+        )
+        .await;
+    }
+    Ok(n)
 }
 
 /// Resolved public link.
