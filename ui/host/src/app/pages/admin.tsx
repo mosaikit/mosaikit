@@ -3,7 +3,7 @@
 
 import { useDeferredValue, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Bell, CircleHelp, Contrast, Frame, Gauge, HardDrive, History, KeyRound, KeySquare, Mail, MoreHorizontal, Palette, PanelLeft, Pencil, Plus, Power, RefreshCw, Search, ShieldCheck, Upload, Users, Wrench } from 'lucide-react'
+import { Bell, Building2, CircleHelp, Contrast, Frame, Gauge, HardDrive, History, KeyRound, KeySquare, Mail, MoreHorizontal, Palette, PanelLeft, Pencil, Plus, Power, Puzzle, RefreshCw, Search, ShieldCheck, Upload, Users, Wrench } from 'lucide-react'
 import { api, fmtBytes, fmtDate } from '../../api.ts'
 import { useBrand } from '../../brand.ts'
 import type { AdminUser, GlobalKpi, Member, Session, ShellBand, SystemOverview, TenantInfo } from '../../types.ts'
@@ -19,7 +19,7 @@ import { BulkBar, FilterColumn, ListPage } from '../listkit.tsx'
 import { ListTable } from '../ListTable.tsx'
 import { sortParams, type Sort } from '../tableutil.ts'
 import { TenantLogo } from '../picture.tsx'
-import { Empty, ErrorBox, FormDialog, Kpi, Loading, PageHeader, SaveBar, Sections, StatusBadge, Tabs } from '../kit.tsx'
+import { Empty, ErrorBox, FormDialog, Loading, PageHeader, SaveBar, Sections, StatusBadge, Tabs } from '../kit.tsx'
 import { go, to } from '../router.ts'
 import { bandOf } from '../prefs.ts'
 import { AppMark } from '../Shell.tsx'
@@ -32,6 +32,8 @@ import { PlatformQuotasPanel, TenantQuotasPanel } from '../Quotas.tsx'
 import { BackupPanel, ImportTenantDialog, MaintenancePanel, NewTenantWizard, OverviewOps, TenantLifecycle, TenantState } from './operations.tsx'
 import { t } from '../i18n.ts'
 import { AdminWidgets, KpiRow } from '../Overview.tsx'
+import { Hero, HeroLink, KpiCard } from '../OverviewKit.tsx'
+import { greeting } from '../overviewdata.ts'
 import { LayoutPanel, StylePanel } from '../LayoutSettings.tsx'
 import { TenantContact, TenantIdentity } from '../TenantContact.tsx'
 
@@ -49,6 +51,19 @@ export function AdminOverview({ session }: { session: Session }) {
       <PageHeader title={t('Platform overview')} sub={t('Hello {name} · Administrator', { name: session.user.display_name || session.user.username })} />
       <div className="grid gap-6 p-6 max-[620px]:p-4">
         {q.error && <ErrorBox error={q.error} />}
+        <Hero
+          id="ov-hero"
+          title={`${greeting()}, ${session.user.display_name || session.user.username}`}
+          sub={t('Here is how the platform is doing.')}
+          actions={
+            <>
+              <HeroLink href={to.admin('monitoring')}>{t('Monitoring')}</HeroLink>
+              <HeroLink href={to.admin('tenants')} ghost>
+                {t('Tenants')}
+              </HeroLink>
+            </>
+          }
+        />
         <AdminWidgets
           lead={
             <>
@@ -57,11 +72,11 @@ export function AdminOverview({ session }: { session: Session }) {
               ) : (
                 q.data && (
                   <KpiRow>
-                    <Kpi label={t('Active tenants')} value={`${q.data.active_tenants}/${q.data.tenants}`} onClick={() => go(to.admin('tenants'))} />
-                    <Kpi label={t('Active users')} value={q.data.users} hint={t('{n} in the last 30 days', { n: q.data.active_users_30d })} />
-                    <Kpi label={t('Administrators')} value={q.data.administrators} onClick={() => go(to.admin('system', 'admins'))} />
-                    <Kpi label={t('Items')} value={q.data.resources} hint={fmtBytes(q.data.bytes)} />
-                    <Kpi label={t('Active plugins')} value={`${q.data.plugins_active}/${q.data.plugins_installed}`} onClick={() => go(to.admin('plugins'))} />
+                    <KpiCard accent="indigo" icon={<Building2 />} label={t('Active tenants')} value={`${q.data.active_tenants}/${q.data.tenants}`} onClick={() => go(to.admin('tenants'))} />
+                    <KpiCard accent="violet" icon={<Users />} label={t('Active users')} value={q.data.users} hint={t('{n} in the last 30 days', { n: q.data.active_users_30d })} />
+                    <KpiCard accent="rose" icon={<ShieldCheck />} label={t('Administrators')} value={q.data.administrators} onClick={() => go(to.admin('system', 'admins'))} />
+                    <KpiCard accent="sky" icon={<HardDrive />} label={t('Items')} value={q.data.resources} hint={`${t('Storage')}: ${fmtBytes(q.data.bytes)}`} />
+                    <KpiCard accent="leaf" icon={<Puzzle />} label={t('Active plugins')} value={`${q.data.plugins_active}/${q.data.plugins_installed}`} onClick={() => go(to.admin('plugins'))} />
                   </KpiRow>
                 )
               )}

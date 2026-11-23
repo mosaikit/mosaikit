@@ -4,14 +4,14 @@
 import { useDeferredValue, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Activity, Bell, Frame, Gauge, Grid2x2, KeyRound, KeySquare, Link2, Lock, Mail, MoreHorizontal, Palette, Plus, Share2, ShieldCheck, ShieldOff, Trash2, TrendingUp, Upload, UserRound, Users } from 'lucide-react'
+import { Activity, Bell, Folder, Frame, Gauge, Grid2x2, KeyRound, KeySquare, Link2, Lock, Mail, MoreHorizontal, Palette, Plus, Share2, ShieldCheck, ShieldOff, Trash2, TrendingUp, Upload, UserRound, Users } from 'lucide-react'
 import { api, appUrl, fmtBytes, fmtDate } from '../../api.ts'
 import PluginFrame from '../../components/PluginFrame.tsx'
 import { UiContext, useUi, type PickedPrincipal, type PickOptions, type SharePre, type Ui } from '../../ui-context.ts'
 import ShareDialog from '../ShareDialog.tsx'
 import PrincipalPicker from '../PrincipalPicker.tsx'
 import { SharedByMeSection } from './history.tsx'
-import type { AccessRequest, Group, HomeItem, Invitation, LinkInfo, Member, Overview, Profile, ResetLink, ResourceRow, Revoked, Session, TenantContext, TenantKpi, TenantSettings } from '../../types.ts'
+import type { AccessRequest, Group, HomeItem, ResourceStat, Invitation, LinkInfo, Member, Overview, Profile, ResetLink, ResourceRow, Revoked, Session, TenantContext, TenantKpi, TenantSettings } from '../../types.ts'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -36,6 +36,9 @@ import { ImportDialog, InviteManyDialog } from '../BulkPeople.tsx'
 import { TenantTheme } from '../ThemeSettings.tsx'
 import { useTenantSignIn } from '../signin.ts'
 import { LinkDialog, ProfilesSection, RequestsTable } from './people.tsx'
+import { AppShortcuts, Hero, HeroLink, KpiCard, WeekStrip } from '../OverviewKit.tsx'
+import { greeting, perDay } from '../overviewdata.ts'
+import { HBars } from '../Charts.tsx'
 import { ActivityWidget, KpiRow, NotesWidget, TrendWidget, WaitingWidget, Widget, WidgetGrid } from '../Overview.tsx'
 import { describe } from '../logtext.ts'
 import { BulkBar, FilterColumn, ListPage, type FacetGroup } from '../listkit.tsx'
@@ -55,16 +58,10 @@ const ROLE: Record<string, string> = {
 
 /* ── Overview ────────────────────────────────────────────────────────── */
 
-/** Good morning, afternoon or evening, by the hour of the person. */
-function greeting(): string {
-  const h = new Date().getHours()
-  return h < 12 ? t('Good morning') : h < 18 ? t('Good afternoon') : t('Good evening')
-}
-
 /** The Home as in the mockup: what to pick up again, what is due soon, what is for you (notifications). */
 function HomeLists({ slug, pickUp, due, notifications = true }: { slug: string; pickUp: HomeItem[]; due: HomeItem[]; notifications?: boolean }) {
   const notes = useNoteList({ limit: 4 })
-  const [today] = useState(() => new Date().toISOString().slice(0, 10))
+  const [now] = useState(() => new Date())
   const item = (x: HomeItem, when: ReactNode) => (
     <li key={x.resource_id}>
       <a href={to.item(slug, x.resource_id)} className="flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm hover:bg-accent">
@@ -93,17 +90,7 @@ function HomeLists({ slug, pickUp, due, notifications = true }: { slug: string; 
         undefined,
         true,
       )}
-      {box(
-        'home-due',
-        t('Due soon'),
-        due.length ? (
-          <ul className="grid gap-0.5">
-            {due.map((x) => item(x, x.at.slice(0, 10) < today ? <span className="font-medium text-destructive">{t('late, {date}', { date: fmtDay(x.at) })}</span> : fmtDay(x.at)))}
-          </ul>
-        ) : (
-          <p className="text-sm text-muted-foreground">{t('Nothing due in the next 7 days.')}</p>
-        ),
-      )}
+      {box('home-due', t('My week'), <WeekStrip slug={slug} due={due} now={now} />)}
       {notifications &&
         box(
           'home-for-you',
@@ -129,44 +116,92 @@ export function TenantHome({ session, slug }: { session: Session; slug: string }
   const ctx = useTenantCtx(slug)
   const o = useApi<Overview>(['overview', slug], `/api/t/${enc(slug)}/overview`)
   const unread = useUnread().data ?? 0
+  const [now] = useState(() => new Date())
   if (ctx.isLoading || o.isLoading) return <Loading />
   if (ctx.error) return <ErrorBox error={ctx.error} />
   const c = ctx.data!
   const d = o.data
   const me = totals(d?.me.resources ?? [])
+  // the role comes from the context of the kernel: the Tenant Manager sees the tenant first, the User their own week
   const manager = c.tenant.role === 'tenant_manager'
   const days = d?.tenant?.activity ?? []
+  const apps = c.plugins.filter(isApp)
+  const mine: Record<string, number> = {}
+  for (const r of d?.me.resources ?? []) mine[r.plugin_id] = (mine[r.plugin_id] ?? 0) + r.count - (r.trash_count ?? 0)
+  const name = session.user.display_name || session.user.username
   const personal = (
     <>
       {d && (
         <KpiRow>
-          <Kpi label={t('Your items')} value={me.count} hint={[fmtBytes(me.bytes), trashHint(me.trashCount, 'items')].filter(Boolean).join(' · ')} />
-          <Kpi label={t('Unread notifications')} value={unread} hint={t('the latest below')} onClick={() => go(to.tenant(slug, 'notifications'))} />
-          <Kpi label={t('Shared by me')} value={d.me.shared_by_me} />
-          <Kpi label={t('Shared with me')} value={d.me.shared_with_me} hint={`${t('My active public links')}: ${d.me.public_links} · ${t('{n} views', { n: d.me.link_views })}`} />
+          <KpiCard
+            accent="indigo"
+            icon={<Folder />}
+            label={t('Your items')}
+            value={me.count}
+            hint={[fmtBytes(me.bytes), trashHint(me.trashCount, 'items')].filter(Boolean).join(' · ')}
+            values={perDay(d.me.activity.map((e) => e.ts), now)}
+            trend={t('your activity, last 7 days')}
+          />
+          <KpiCard accent="sun" icon={<Bell />} label={t('Unread notifications')} value={unread} hint={t('the latest below')} onClick={() => go(to.tenant(slug, 'notifications'))} />
+          <KpiCard accent="leaf" icon={<Share2 />} label={t('Shared by me')} value={d.me.shared_by_me} />
+          <KpiCard accent="sky" icon={<Users />} label={t('Shared with me')} value={d.me.shared_with_me} hint={`${t('My active public links')}: ${d.me.public_links} · ${t('{n} views', { n: d.me.link_views })}`} />
         </KpiRow>
       )}
       {d && <HomeLists slug={slug} pickUp={d.me.pick_up ?? []} due={d.me.due ?? []} notifications={!manager} />}
-      {d && d.me.activity.length > 0 && (
+      {d && (
         <Widget id="ov-mine" title={t('My recent activity')} span={!manager}>
-          <ul className="grid grid-cols-[minmax(0,1fr)] gap-0.5">
-            {d.me.activity.slice(0, 5).map((e, i) => (
-              <li key={i} className="flex items-baseline justify-between gap-3 py-0.5 text-sm">
-                <span className="min-w-0 truncate">{[describe(e), e.title && plainText(e.title)].filter(Boolean).join(' · ')}</span>
-                <span className="shrink-0 text-xs text-muted-foreground">{fmtDate(e.ts)}</span>
-              </li>
-            ))}
-          </ul>
+          {d.me.activity.length > 0 ? (
+            <ul className="grid grid-cols-[minmax(0,1fr)] gap-0.5">
+              {d.me.activity.slice(0, 5).map((e, i) => (
+                <li key={i} className="flex items-baseline justify-between gap-3 py-0.5 text-sm">
+                  <span className="min-w-0 truncate">{[describe(e), e.title && plainText(e.title)].filter(Boolean).join(' · ')}</span>
+                  <span className="shrink-0 text-xs text-muted-foreground">{fmtDate(e.ts)}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <Empty compact art="documents" title={t('No activity yet')}>
+              {t('What you create or change shows here.')}
+            </Empty>
+          )}
+        </Widget>
+      )}
+      {apps.length > 0 && !manager && (
+        <Widget id="ov-apps" title={t('Your apps')} full>
+          <AppShortcuts slug={slug} apps={apps} counts={mine} />
         </Widget>
       )}
       <SharedByMeSection slug={slug} full={manager} />
     </>
   )
+  const first = apps[0]
   return (
     <>
-      <PageHeader title={manager ? t('Tenant overview') : t('Overview')} sub={`${greeting()}, ${session.user.display_name || session.user.username} · ${t('{role} in {tenant}', { role: c.tenant.role === 'tenant_manager' ? t(ROLE.tenant_manager) : t('User'), tenant: c.tenant.name })}`} />
+      <PageHeader title={manager ? t('Tenant overview') : t('Overview')} sub={t('{role} in {tenant}', { role: manager ? t(ROLE.tenant_manager) : t('User'), tenant: c.tenant.name })} />
       <div className="grid gap-4 p-6 max-[620px]:p-4">
-        {!c.plugins.some(isApp) && (
+        <Hero
+          id="ov-hero"
+          title={`${greeting()}, ${name}`}
+          sub={manager ? t('Here is how {tenant} is doing.', { tenant: c.tenant.name }) : t('Here is your week in {tenant}.', { tenant: c.tenant.name })}
+          actions={
+            manager ? (
+              <>
+                <HeroLink href={to.tenant(slug, 'manage', 'pending')}>{t('Waiting for you')}</HeroLink>
+                <HeroLink href={to.tenant(slug, 'usage')} ghost>
+                  {t('Usage')}
+                </HeroLink>
+              </>
+            ) : (
+              <>
+                {first && <HeroLink href={to.plugin(slug, first.id)}>{t('Open {name}', { name: first.label })}</HeroLink>}
+                <HeroLink href={to.tenant(slug, 'notifications')} ghost>
+                  {t('All notifications')}
+                </HeroLink>
+              </>
+            )
+          }
+        />
+        {!apps.length && (
           <Empty compact art="apps" title={t('No active apps')}>
             {t('An Administrator installs and turns them on.')}
           </Empty>
@@ -175,10 +210,10 @@ export function TenantHome({ session, slug }: { session: Session; slug: string }
           {manager && d?.tenant && (
             <>
               <KpiRow>
-                <Kpi label={t('Members')} value={d.tenant.members} hint={t('{count} guests', { count: d.tenant.guests })} onClick={() => go(to.tenant(slug, 'manage'))} />
-                <Kpi label={t('Active users (30 days)')} value={d.tenant.active_users_30d} />
-                <Kpi label={t('Items')} value={d.tenant.resources.reduce((s, r) => s + r.count, 0)} />
-                <Kpi label={t('Shares')} value={d.tenant.shares} hint={t('{count} public links', { count: d.tenant.public_links })} onClick={() => go(to.tenant(slug, 'shares'))} />
+                <KpiCard accent="indigo" icon={<Users />} label={t('Members')} value={d.tenant.members} hint={`${t('{count} guests', { count: d.tenant.guests })} · ${t('{count} groups', { count: d.tenant.groups })}`} values={days.map((x) => x.users)} trend={t('active people per day')} onClick={() => go(to.tenant(slug, 'manage'))} />
+                <KpiCard accent="violet" icon={<Activity />} label={t('Active users (30 days)')} value={d.tenant.active_users_30d} />
+                <KpiCard accent="sky" icon={<Folder />} label={t('Items')} value={d.tenant.resources.reduce((s, r) => s + r.count, 0)} hint={fmtBytes(d.tenant.resources.reduce((s, r) => s + r.bytes, 0))} values={days.map((x) => x.events)} trend={t('events per day')} />
+                <KpiCard accent="leaf" icon={<Share2 />} label={t('Shares')} value={d.tenant.shares} hint={t('{count} public links', { count: d.tenant.public_links })} onClick={() => go(to.tenant(slug, 'shares'))} />
               </KpiRow>
               <WaitingWidget slug={slug} publicLinks={d.tenant.public_links} />
               <TrendWidget
@@ -191,6 +226,7 @@ export function TenantHome({ session, slug }: { session: Session; slug: string }
               />
               <ActivityWidget slug={slug} />
               <NotesWidget href={to.tenant(slug, 'notifications')} />
+              <UsageByApp resources={d.tenant.resources} />
               <div className="@xl:col-span-2 [&>section]:h-full">
                 <UsagePanel slug={slug} />
               </div>
@@ -201,6 +237,24 @@ export function TenantHome({ session, slug }: { session: Session; slug: string }
         </WidgetGrid>
       </div>
     </>
+  )
+}
+
+/** The items of the tenant per app (the trash left out), as bars. */
+function UsageByApp({ resources }: { resources: ResourceStat[] }) {
+  const by = new Map<string, { label: string; value: number }>()
+  for (const r of resources) by.set(r.plugin_id, { label: r.plugin, value: (by.get(r.plugin_id)?.value ?? 0) + r.count - (r.trash_count ?? 0) })
+  const data = [...by.values()].filter((x) => x.value > 0).sort((a, b) => b.value - a.value).slice(0, 6)
+  return (
+    <Widget id="ov-usage-apps" title={t('Usage by app')}>
+      {data.length ? (
+        <HBars data={data} label={t('Items by app')} />
+      ) : (
+        <Empty compact art="usage" title={t('No usage yet')}>
+          {t('Items show here as people create them.')}
+        </Empty>
+      )}
+    </Widget>
   )
 }
 

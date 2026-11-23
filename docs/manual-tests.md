@@ -1453,3 +1453,16 @@ The shell keeps one presence connection per tenant: people are seen as online in
 | PRS-04 | Open the same tenant in two tabs; leave one hidden for more than 2 minutes and keep working in the other | The person stays available; closing the active tab makes them away, closing both makes them offline | Cargo (`platform_presence_over_http`: tabs); vitest (hidden tab) |
 | PRS-05 | Type for 6 minutes inside a plugin page without leaving it (no input reaches the shell outside the frame) | The person does not turn away | Manual (covered by the vitest suite of plugin-api (forwardActivity)) |
 | PRS-06 | A person of another tenant is signed in | They never appear in the list of this tenant | Cargo (`platform_presence_over_http`) |
+## Overview by role
+
+The overview is drawn from the role the kernel gives the person in the tenant (or the Administrator of the platform), never from a switch in the interface. The look is the same in light and dark: hero strip, cards with a sparkline, week strip.
+
+| Id | Check | Expected | Twin |
+|---|---|---|---|
+| OVR-01 | As a User open the Overview | A hero strip with the greeting and «Here is your week in <tenant>.»; cards Your items (with a sparkline of the last 7 days), Unread notifications, Shared by me, Shared with me; «Pick up where you left off», «My week» (seven days, today marked, the number due each day, late items in red), «For you», «My recent activity», «Your apps» (shortcuts, the most used first); nothing of the tenant (no «Active people», no «Usage by app») | e2e `12-review-round1-platform.spec.ts` (R1-O-01) + `tests/manual/checks/ovr.ts` |
+| OVR-02 | As a Tenant Manager open the Overview | A hero strip with «Here is how <tenant> is doing.»; cards Members (guests and groups, sparkline of active people), Active users, Items (space, sparkline of events), Shares; «Waiting for you», «Active people», «Recent activity» (the team), «For you», «Usage by app», the usage panel; then «Your space» with the personal lists | e2e `12-review-round1-platform.spec.ts` (R1-O-02) + `ovr.ts` |
+| OVR-03 | As Administrator open the Platform overview | A hero strip with the greeting; cards Active tenants, Active users, Administrators, Items (with the storage), Active plugins; services, to do, tenants by storage, requests with a sparkline, notifications, recent errors, one card per app; no personal week | e2e `12-review-round1-platform.spec.ts` (R1-O-03) + `ovr.ts` |
+| OVR-04 | Open each of the three overviews in light and in dark mode | Cards, hero and week strip readable (text and numbers 4.5:1 or more); the hero keeps its gradient; the sparklines keep their hue | e2e `everywhere` + `ovr.ts` |
+| OVR-05 | Open the overview of a User with no due dates and no activity, and of a tenant with no items | Each empty widget shows the small illustrated empty state (picture, title, one line): «Nothing due this week», «No activity yet», «No usage yet» | manual |
+| OVR-06 | Italian and Spanish: open the three overviews | The hero, the cards, the week strip and the widgets are translated, no English left | e2e `14-lang-es-coverage.spec.ts` + manual |
+| OVR-07 | Narrow the window to a phone (390 px) on each overview | One column, no horizontal scroll; the hero stacks its buttons under the text; the week strip keeps seven days | e2e `everywhere` |

@@ -25,6 +25,7 @@ import fu from './checks/fu.ts'
 import fub from './checks/fub.ts'
 import fc from './checks/fc.ts'
 import p10 from './checks/p10.ts'
+import ovr from './checks/ovr.ts'
 import sec from './checks/sec.ts'
 import ux from './checks/ux.ts'
 import r2 from './checks/r2.ts'
@@ -43,7 +44,7 @@ import nav from './checks/nav.ts'
 import dir from './checks/dir.ts'
 import band from './checks/band.ts'
 
-const ALL = new Map<string, L.Check>([...p0, ...p0b, ...p1, ...p2, ...p3, ...p4, ...p5, ...p6, ...p7, ...p8, ...p9, ...fu, ...fub, ...fc, ...p10, ...sec, ...ux, ...r2, ...pui, ...npi, ...tbl, ...sc, ...seed, ...pending, ...api, ...dk, ...pl, ...rt, ...sd, ...dir, ...nav, ...band].map((c) => [c.id, c]))
+const ALL = new Map<string, L.Check>([...p0, ...p0b, ...p1, ...p2, ...p3, ...p4, ...p5, ...p6, ...p7, ...p8, ...p9, ...fu, ...fub, ...fc, ...p10, ...sec, ...ux, ...r2, ...pui, ...npi, ...tbl, ...sc, ...seed, ...pending, ...api, ...dk, ...pl, ...rt, ...sd, ...dir, ...nav, ...band, ...ovr].map((c) => [c.id, c]))
 
 /** Defects already reported (docs/reports/qa-walkthrough.md) and owned by a piece of work: expected to fail. */
 const KNOWN: Record<string, string> = {

@@ -4,6 +4,7 @@
 
 export const EN: Record<string, string> = {
   '{count} items_one': '1 item',
+  '{count} items late_one': '1 item late',
   '{count} items_other': '{count} items',
   '{count} new_one': '1 new',
   '{count} new_other': '{count} new',

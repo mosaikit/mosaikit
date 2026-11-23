@@ -325,6 +325,10 @@ test.describe.serial('12-review-round1-platform', () => {
       for (const name of ['Services', 'To do', 'Tenants by storage used', 'Requests', 'For you', 'Recent errors']) await expect(page.getByRole('heading', { name, exact: true })).toBeVisible()
       await expect(page.getByText('Figures of every tenant as of')).toBeVisible()
       await expect(page.getByRole('button', { name: 'Refresh' })).toBeVisible()
+      // the hero strip and the KPI cards of the Administrator: platform counters, no personal week
+      await expect(page.getByTestId('ov-hero')).toBeVisible()
+      await expect(page.getByText('Active tenants', { exact: true })).toBeVisible()
+      await expect(page.getByRole('heading', { name: 'My week' })).toHaveCount(0)
       await everywhere('administrator overview')
     })
     await test.step('R1-O-05 Italian titles of the widgets', async () => {
@@ -350,6 +354,10 @@ test.describe.serial('12-review-round1-platform', () => {
       // the apps are in the sidebar, not repeated at the top of the overview
       await expect(page.getByRole('navigation', { name: 'Your apps' })).toHaveCount(0)
       await expect(page.getByRole('heading', { name: 'Your space' })).toBeVisible()
+      // the Tenant Manager sees the tenant first: hero, KPI cards (members, groups), usage by app, pending items
+      await expect(page.getByTestId('ov-hero')).toContainText('Here is how Overview Tenant is doing.')
+      await expect(page.getByText('Members', { exact: true }).first()).toBeVisible()
+      await expect(page.getByRole('heading', { name: 'Usage by app' })).toBeVisible()
       await everywhere('tenant manager overview')
     })
 
@@ -397,9 +405,14 @@ test.describe.serial('12-review-round1-platform', () => {
       await page.goto('./#/t/ovw')
       await expect(page.getByRole('heading', { name: 'Overview', exact: true })).toBeVisible()
       await expect(page.getByRole('navigation', { name: 'Your apps' })).toHaveCount(0)
-      for (const name of ['Pick up where you left off', 'Due soon', 'For you']) await expect(page.getByRole('heading', { name, exact: true })).toBeVisible()
+      for (const name of ['Pick up where you left off', 'My week', 'For you']) await expect(page.getByRole('heading', { name, exact: true })).toBeVisible()
       await expect(page.getByRole('region', { name: 'Shared by me' })).toBeVisible()
       await expect(page.getByRole('heading', { name: 'Waiting for you' })).toHaveCount(0)
+      // the User sees their own week: hero, KPI cards, week strip; nothing of the tenant
+      await expect(page.getByTestId('ov-hero')).toContainText('Here is your week in Overview Tenant.')
+      await expect(page.getByRole('list', { name: 'The next seven days' }).or(page.getByTestId('empty-compact').filter({ hasText: 'Nothing due this week' }))).toBeVisible()
+      await expect(page.getByRole('heading', { name: 'Usage by app' })).toHaveCount(0)
+      await expect(page.getByRole('heading', { name: 'Active people' })).toHaveCount(0)
       await everywhere('user home')
     })
     await logout(page)

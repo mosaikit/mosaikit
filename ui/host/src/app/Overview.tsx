@@ -18,6 +18,7 @@ import { to } from './router.ts'
 import { about, describe } from './logtext.ts'
 import { useNoteList } from './notes.ts'
 import { NoteRow } from './notifications.tsx'
+import { Spark } from './OverviewKit.tsx'
 
 const enc = encodeURIComponent
 
@@ -41,7 +42,7 @@ export function Widget({
   children: ReactNode
 }) {
   return (
-    <section aria-labelledby={id} className={cn('grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-2 rounded-xl border bg-card p-4', span && '@xl:col-span-2', full && '@xl:col-span-2 @4xl:col-span-4')}>
+    <section aria-labelledby={id} className={cn('grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-2 rounded-lg border bg-card p-4 shadow-sm', span && '@xl:col-span-2', full && '@xl:col-span-2 @4xl:col-span-4')}>
       <div className="flex items-center justify-between gap-2">
         <h2 id={id} className="flex min-w-0 items-center gap-2 text-sm font-semibold">
           {icon}
@@ -76,18 +77,13 @@ export function KpiRow({ children }: { children: ReactNode }) {
 
 /** A small trend: the figure, its caption and a line (the caption says what the values are). */
 export function TrendWidget({ id, title, figure, caption, values, link }: { id: string; title: string; figure: ReactNode; caption: string; values: number[]; link?: { href: string; label: string } }) {
-  const max = Math.max(1, ...values)
-  const step = values.length > 1 ? 100 / (values.length - 1) : 0
-  const points = values.map((v, i) => `${(i * step).toFixed(1)},${(30 - (v / max) * 28).toFixed(1)}`).join(' ')
   return (
     <Widget id={id} title={title} link={link}>
       <div className="flex items-baseline gap-2">
         <b className="text-2xl font-semibold tabular-nums">{figure}</b>
         <span className="text-xs text-muted-foreground">{caption}</span>
       </div>
-      <svg viewBox="0 0 100 32" preserveAspectRatio="none" role="img" aria-label={`${title}: ${caption}`} className="h-10 w-full text-primary-strong">
-        <polyline points={points} fill="none" stroke="currentColor" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
-      </svg>
+      <Spark values={values} label={`${title}: ${caption}`} className="w-full" />
     </Widget>
   )
 }
