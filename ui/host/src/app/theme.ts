@@ -182,6 +182,17 @@ media.addEventListener('change', () => {
   }
 })
 
+/** The mode in use (`light` or `dark`), also when it follows the system and the system changes. */
+export function useEffectiveMode(): 'light' | 'dark' {
+  return useSyncExternalStore(
+    (l) => {
+      listeners.add(l)
+      return () => listeners.delete(l)
+    },
+    () => effectiveMode(),
+  )
+}
+
 export function useTheme(): Theme {
   return useSyncExternalStore(
     (l) => {

@@ -35,7 +35,7 @@ import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { t } from './i18n.ts'
 import { useLiveNotes, useNoteList, useUnreadSources } from './notes.ts'
-import { effectiveMode, useTheme } from './theme.ts'
+import { useEffectiveMode } from './theme.ts'
 import { bandOf, navGroupOpen, setNavGroupOpen, sidebarOpen, useRailLabels } from './prefs.ts'
 import { allItems, arrowTarget } from './navgroups.ts'
 import { useHoverMenu } from './hoverMenu.ts'
@@ -409,7 +409,7 @@ function RailFrame({ session, route, band, bandImage, children }: { session: Ses
 export default function Shell({ session, route, children }: { session: Session; route: Route; children: ReactNode }) {
   const band = bandOf(session)
   // the mode in use as a marker a layout stylesheet can read (it cannot see `html.dark`)
-  const mode = effectiveMode(useTheme())
+  const mode = useEffectiveMode()
   useLiveNotes(session)
   const layout = useLayoutInUse(session, route)
   const ctx = useTenantCtx(route.area === 'tenant' ? route.tenant : '')
