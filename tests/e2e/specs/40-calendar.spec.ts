@@ -105,10 +105,13 @@ test.describe.serial('Calendar', () => {
     const due = frame.getByTestId('cal-task').filter({ hasText: 'CAL pay invoice' })
     await expect(due.first()).toBeVisible()
     await expect(due.first()).toHaveAttribute('title', /Task due: CAL pay invoice/)
+    // (the switch lives in the Options popover of the header; the popover is opened again for each change, the header is drawn anew)
     const sw = frame.getByRole('switch', { name: 'Show task due dates' })
+    await frame.getByTestId('cal-options').click()
     await expect(sw).toBeChecked()
     await sw.uncheck()
     await expect(due).toHaveCount(0)
+    await frame.getByTestId('cal-options').click()
     await sw.check()
     await expect(due.first()).toBeVisible()
 

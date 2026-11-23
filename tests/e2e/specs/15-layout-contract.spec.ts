@@ -369,7 +369,7 @@ async function walk(page: Page, role: Role, home: string, account: string, dark:
     await measure(page, role, href, family, vps, expectSection, true)
     push(await nav())
     n++
-    if (process.env.LC_LOG) console.log(role, href, Math.round((Date.now() - t0) / 1000) + 's')
+    if (process.env.LC_LOG || process.env.CI) console.log(role, href, Math.round((Date.now() - t0) / 1000) + 's')
   }
   expect(n, `routes found for ${role}`).toBeGreaterThan(5)
   // R-8: the main sidebar on a page of each family, at a height that makes it overflow, idle then hovered
@@ -394,7 +394,8 @@ async function walk(page: Page, role: Role, home: string, account: string, dark:
 
 test.describe('15-layout-contract', () => {
   test('walk: every route of the Administrator, a Tenant Manager and a User, at three sizes', async ({ page }) => {
-    test.setTimeout(600_000)
+    // about 6 minutes on a development machine, three times that on a runner of the CI (every app adds routes)
+    test.setTimeout(1_500_000)
     if (process.env.LC_REPLAY) return
     // data: enough organizations and people for a list to scroll and load more, a tenant of its own
     await adminLogin(page)
@@ -438,8 +439,7 @@ test.describe('15-layout-contract', () => {
       { route: '#/t/emptyco/p/com.mosaikit.contacts', app: true, action: /New contact/ },
       { route: '#/t/emptyco/p/com.mosaikit.tasks', app: true, action: /New task/ },
       { route: '#/t/emptyco/p/com.mosaikit.notes', app: true, action: /New note/ },
-      // the pages of the host that a fresh tenant leaves empty (the lists with a filter show the plain message instead)
-      { route: '#/t/emptyco/manage/groups', app: false, action: /New group/ },
+      // the pages of the host that a fresh tenant leaves empty (the lists with a filter show the plain message instead; Groups is never empty: every tenant has the built-in group All members)
       { route: '#/t/emptyco/requests', app: false, action: null },
       { route: '#/t/emptyco/shares', app: false, action: null },
       { route: '#/t/emptyco/trash', app: false, action: null },
