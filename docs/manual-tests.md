@@ -1085,7 +1085,7 @@ A plugin that declares `[permissions] realtime` opens live channels on its resou
 
 ## Chat
 
-Chat 2.0 (CHT-10 and up) is the replica of the Chat section of Microsoft Teams (plugins-plan §8). CHT-01..09 below are the checks of the channels of Chat 1.x, reached from «Channels» under the list of chats. Channels on the left, a live conversation on the right: a message is saved in the channel (the history) and arrives at once for everyone who has the channel open. Twin in `tests/e2e/specs/21-chat.spec.ts` (two sessions of one person stand for two people; the access rules are in `crates/kernel/tests/realtime.rs`).
+Chat 2.0 (CHT-10 and up) is the replica of the Chat section of Microsoft Teams (plugins-plan §8). CHT-01..09 below are the checks of the channels of Chat 1.x, reached from the **Channels** tab at the top of the list of chats. Channels on the left, a live conversation on the right: a message is saved in the channel (the history) and arrives at once for everyone who has the channel open. Twin in `tests/e2e/specs/21-chat.spec.ts` (two sessions of one person stand for two people; the access rules are in `crates/kernel/tests/realtime.rs`).
 
 | Id | Check | Expected | Twin |
 |---|---|---|---|
@@ -1108,11 +1108,12 @@ Chat 2.0 (CHT-10 and up) is the replica of the Chat section of Microsoft Teams (
 | CHT-17 | Press **Video call** | A call card shows in the chat of both, the call opens in a small window with Jitsi (camera and microphone asked), **Leave the call** ends it and the card says «Call ended · N min» with who took part | Playwright (card and frame) / manual (media) |
 | CHT-18 | **New chat** with two people and a group name | A group chat: the list shows the name and a mosaic, the header «3 people»; the other people get it in their list | Playwright |
 | CHT-19 | In a group: Add people with «Do not include the history», then remove someone, then leave | The newcomer sees only new messages; system lines say who was added, removed or left; after leaving the chat is gone from the list | Playwright (leave) / manual |
-| CHT-20 | Press **Channels** under the list | The channels of Chat 1.x open with their data unchanged | Playwright |
+| CHT-20 | At the top of the list press the **Channels** tab | The channels of Chat 1.x open with their data unchanged; the **Chats** tab goes back | Playwright |
 | CHT-21 | Attach a file from the device and one from Documents, send | The message shows the file cards; the other person opens them; the Files tab lists them; they are read-only for the chat people | Manual |
 | CHT-22 | Type @ in a group | A list of the people (and «everyone») appears; arrows and Enter choose; the person mentioned gets a notification even if she muted the chat | Manual |
 | CHT-23 | Cut the network of one window for a minute and restore it | A banner says the connection was lost; messages sent meanwhile appear after reconnecting | Manual |
 | CHT-24 | At 390 px wide, in light and dark | The list and the chat are shown one at a time with a back button; no horizontal scroll; the contrast is fine | Manual |
+| CHT-25 | Look at the sidebar, then switch Chats / Channels with the mouse and with the arrow keys, reload the page, open an old notification or link to a channel | The sidebar has one entry «Chat» with no sub-items; the tabs (icon and label) switch the view and the arrow keys move the focus with it; the last choice is remembered per person; a link to a channel opens the channels, a link to a chat opens the chats; light and dark both look right | Playwright |
 
 ## Meet
 

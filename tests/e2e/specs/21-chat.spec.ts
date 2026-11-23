@@ -2,7 +2,7 @@ import { expect, test, type FrameLocator, type Page } from '@playwright/test'
 import { PASSWORD, accessible, login, logout, nav } from './support'
 
 // Chat (docs/manual-tests.md, CHT-10..): the replica of the Chat section of Teams, with two people of one tenant (the Tenant
-// Manager and a person made here). The channels of Chat 1.x are reached from the link under the list (CHT-01..05 of the old UI
+// Manager and a person made here). The channels of Chat 1.x are reached from the Channels tab at the top of the list (CHT-01..05 of the old UI
 // are covered by the Channels check at the end).
 
 const frameOf = (page: Page) => page.frameLocator('iframe.plugin-frame')
@@ -163,9 +163,17 @@ test.describe.serial('Chat', () => {
     await expect(fb.locator('.cl-row', { hasText: 'Launch team' })).toHaveCount(0)
     await expect(fa.getByText(/left the chat/)).toBeVisible({ timeout: 45_000 })
 
-    // CHT-20: the channels of Chat 1.x are still there under Channels
-    await fa.getByRole('button', { name: /Channels/ }).click()
-    await expect(frameOf(a).getByRole('heading', { name: 'Channels', exact: true })).toBeVisible()
+    // CHT-20: the channels of Chat 1.x are still there, behind the Channels tab at the top of the list
+    await fa.getByRole('tab', { name: 'Channels' }).click()
+    await expect(fa.getByRole('heading', { name: 'Channels', exact: true })).toBeVisible()
+    // CHT-25: one entry «Chat» in the sidebar (no sub-items); the tab is remembered; arrows switch back
+    await expect(nav(a, 'Channels')).toHaveCount(0)
+    await a.reload()
+    await nav(a, 'Chat').click()
+    await expect(frameOf(a).getByRole('tab', { name: 'Channels' })).toHaveAttribute('aria-selected', 'true')
+    await frameOf(a).getByRole('tab', { name: 'Channels' }).press('ArrowLeft')
+    await expect(frameOf(a).getByRole('tab', { name: 'Chats' })).toHaveAttribute('aria-selected', 'true')
+    await expect(frameOf(a).getByRole('tab', { name: 'Chats' })).toBeFocused()
     await logout(a)
     await a.context().close()
     await b.context().close()
