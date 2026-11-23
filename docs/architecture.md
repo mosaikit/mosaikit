@@ -2696,7 +2696,7 @@ There is no personal choice of layout.
   that is turned off or removed falls back to `teams`; tenants never see layout plugins in their plugin
   lists. The sign-in page follows the style of the platform.
 - **Official layouts** (`mosaikit-plugins`): `layout-workspace` (sidebar that opens and closes),
-  `layout-suite` (launcher grid), `layout-project` (areas, with a band image), `layout-tabs` (tabs).
+  `layout-suite` (launcher grid), `layout-project` (areas, with a band image), `layout-tabs` (tabs), `layout-studio` (sidebar with 3D icons).
 
 ## 15. Known limits and next steps
 
