@@ -85,13 +85,14 @@ try {
 const listeners = new Set<() => void>()
 const media = window.matchMedia('(prefers-color-scheme: dark)')
 
-/** Applies the theme to <html>: `data-preset` and class `dark`. */
+/** Applies the theme to <html>: `data-preset`, `data-theme` (light or dark) and class `dark`. */
 export function applyTheme() {
   const dark = effectiveMode() === 'dark'
   document.documentElement.dataset.preset = current.preset
   if (current.contrast) document.documentElement.dataset.contrast = 'more'
   else delete document.documentElement.dataset.contrast
   document.documentElement.classList.toggle('dark', dark)
+  document.documentElement.dataset.theme = dark ? 'dark' : 'light'
   document.documentElement.style.colorScheme = dark ? 'dark' : 'light'
 }
 

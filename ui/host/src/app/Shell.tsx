@@ -35,6 +35,7 @@ import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { t } from './i18n.ts'
 import { useLiveNotes, useNoteList, useUnreadSources } from './notes.ts'
+import { effectiveMode, useTheme } from './theme.ts'
 import { bandOf, navGroupOpen, setNavGroupOpen, sidebarOpen, useRailLabels } from './prefs.ts'
 import { allItems, arrowTarget } from './navgroups.ts'
 import { useHoverMenu } from './hoverMenu.ts'
@@ -117,6 +118,7 @@ function RailEntry({ it }: { it: NavItem }) {
         {/* without the names under the icons the long name is the accessible name and the tooltip */}
         <a
           href={it.href}
+          data-icon={it.iconId}
           aria-label={it.short || (rail && !labels) ? it.label : undefined}
           title={(it.short || (rail && !labels)) && !(rail && kids.length > 0) ? it.label : undefined}
           onClick={(e) => {
@@ -207,7 +209,7 @@ function DistGroup({ g, className }: { g: NavGroup; className: string }) {
                 hover={hover}
                 item={{ label, icon: g.icon, active, children: allItems(g) }}
                 trigger={
-                  <SidebarMenuButton isActive={active} className={cn(railButton, !labels && railIconsOnly)} aria-label={fresh ? `${t('Open the apps of {name}', { name: label })}, ${t('new notifications')}` : t('Open the apps of {name}', { name: label })}>
+                  <SidebarMenuButton isActive={active} data-icon={g.iconId} data-group={g.id} className={cn(railButton, !labels && railIconsOnly)} aria-label={fresh ? `${t('Open the apps of {name}', { name: label })}, ${t('new notifications')}` : t('Open the apps of {name}', { name: label })}>
                     {g.icon}
                     {/* the dot comes before the name: the rail styles (and hides) the LAST span, which must be the name */}
                     {fresh && <span data-testid="group-dot" aria-hidden="true" className="absolute top-1.5 right-3 size-2 rounded-full bg-destructive" />}
@@ -230,7 +232,7 @@ function DistGroup({ g, className }: { g: NavGroup; className: string }) {
   return (
     <SidebarGroup className={className} role="group" aria-label={label} onKeyDown={onKeyDown}>
       <SidebarGroupLabel asChild>
-        <button type="button" data-navg-head className="msk-navg-head w-full cursor-pointer justify-between text-sidebar-foreground/85 hover:bg-sidebar-hover focus-visible:ring-2" aria-expanded={open} aria-controls={body} onClick={toggle}>
+        <button type="button" data-navg-head data-group={g.id} data-icon={g.iconId} className="msk-navg-head w-full cursor-pointer justify-between text-sidebar-foreground/85 hover:bg-sidebar-hover focus-visible:ring-2" aria-expanded={open} aria-controls={body} onClick={toggle}>
           <span className="flex min-w-0 items-center gap-2 [&>svg]:size-4 [&>svg]:shrink-0">
             {g.icon}
             <span className={cn('truncate', active && !open && 'font-semibold text-sidebar-primary')}>{label}</span>
@@ -263,6 +265,8 @@ function SubGroup({ g }: { g: NavGroup }) {
       <button
         type="button"
         data-navg-head
+        data-group={g.id}
+        data-icon={g.iconId}
         aria-expanded={open}
         aria-controls={body}
         onClick={() => {
@@ -404,6 +408,8 @@ function RailFrame({ session, route, band, bandImage, children }: { session: Ses
 
 export default function Shell({ session, route, children }: { session: Session; route: Route; children: ReactNode }) {
   const band = bandOf(session)
+  // the mode in use as a marker a layout stylesheet can read (it cannot see `html.dark`)
+  const mode = effectiveMode(useTheme())
   useLiveNotes(session)
   const layout = useLayoutInUse(session, route)
   const ctx = useTenantCtx(route.area === 'tenant' ? route.tenant : '')
@@ -420,7 +426,7 @@ export default function Shell({ session, route, children }: { session: Session; 
   const commentsResource = useBand()?.comments?.resource ?? null
   useEffect(() => applyStyle(style, layout), [style, layout])
   return (
-    <div className={cn('msk-shell contents', layout.class)} data-layout={layout.id}>
+    <div className={cn('msk-shell contents', layout.class)} data-layout={layout.id} data-mode={mode}>
       {route.area === 'tenant' && commentsResource && <CommentsController tenant={route.tenant} resource={commentsResource} />}
       {layout.decl.pattern === 'rail' ? (
         <RailFrame session={session} route={route} band={band} bandImage={bandImage}>

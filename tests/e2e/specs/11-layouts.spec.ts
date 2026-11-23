@@ -46,6 +46,9 @@ test.describe.serial('11-layouts', () => {
       await expect(page.locator(`.msk-shell[data-layout="${id}"]`)).toBeAttached()
       await expect(page.getByRole('heading', { name: 'Platform overview' })).toBeVisible()
       await slots(`${id}, light`)
+      // hooks for layout stylesheets: a data-icon on the entries of the navigation, the mode on the layout root
+      await expect(page.locator('.msk-shell')).toHaveAttribute('data-mode', 'light')
+      await expect(page.locator('.msk-nav-item[data-icon], .msk-tab-item[data-icon], .msk-launcher-tile[data-icon]').first()).toBeAttached()
       // the pages are reachable in every layout (Suite: in the launcher)
       if (id === 'com.mosaikit.layout-suite') {
         await page.getByRole('button', { name: 'All apps and pages' }).click()
@@ -60,6 +63,8 @@ test.describe.serial('11-layouts', () => {
       await page.emulateMedia({ colorScheme: 'dark' })
       await colorsSettled(page)
       await accessible(page, `${id}, dark`)
+      await expect(page.locator('.msk-shell')).toHaveAttribute('data-mode', 'dark')
+      await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
       // the phone: the navigation in a drawer (or the launcher), no horizontal scroll
       await page.emulateMedia({ colorScheme: 'light' })
       await page.setViewportSize({ width: 400, height: 800 })

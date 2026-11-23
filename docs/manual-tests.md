@@ -401,6 +401,9 @@ cannot sign in. At the end put it back to local accounts (P8-14).
 | P10-22 | Install a layout whose CSS has `position: fixed` or `url(https://…)` | Refused with the reason |
 | P10-23 | Look for layout plugins in the plugin list of a tenant | They do not appear: the tenant chooses them in Layout |
 | P10-24 | Italian and dark mode on the Layout and Style pages | Everything translated and readable |
+| P10-25 | In Console, inspect an app entry of the navigation (browser tools) | `.msk-nav-item` has `data-icon` (the icon of the manifest `[[nav]]`, or the plugin id) |
+| P10-26 | In Console and Workspace with a distribution that declares navigation groups, click a group heading | The apps fold and unfold like the default sidebar, the state is kept after a reload; the heading has `data-group` |
+| P10-27 | Switch light and dark in the person menu in any layout | `data-mode` of `.msk-shell` follows (`light`/`dark`), and `data-theme` of `<html>` too |
 
 ## Follow-ups A — Docker backups, errors in the plugins, OIDC logout and groups
 

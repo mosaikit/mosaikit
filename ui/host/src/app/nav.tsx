@@ -21,6 +21,8 @@ export interface NavItem {
   /** short name under the icon, when the rail is closed */
   short?: string
   icon?: ReactNode
+  /** stable id of the icon, published as `data-icon` so a layout stylesheet can replace it */
+  iconId?: string
   href?: string
   active: boolean
   children?: NavItem[]
@@ -32,6 +34,8 @@ export interface NavGroup {
   label?: string
   /** the icon of the area (Project layout) */
   icon: ReactNode
+  /** stable id of the icon of the group (`data-icon` of its heading) */
+  iconId?: string
   items: NavItem[]
   /** a group of the distribution: collapsible heading in the open sidebar, one icon and a menu in the closed one */
   collapsible?: boolean
@@ -54,6 +58,7 @@ export function appChildren(slug: string, p: PluginView, route: Route): NavItem[
     return {
       label: n.label,
       icon: n.icon ? <AppIcon id="" name={n.icon} /> : undefined,
+      iconId: n.icon || p.id,
       href: place ? to.plugin(slug, p.id, place) : undefined,
       active: place != null && here === place,
       children: kids.length ? kids.map(item) : undefined,
@@ -81,22 +86,22 @@ export function useNav(session: Session, route: Route, grouped = false): Nav {
           id: 'start',
           label: t('Platform'),
           icon: <ShieldCheck />,
-          items: [{ label: t('Platform overview'), short: t('Overview'), icon: <LayoutDashboard />, href: to.admin(), active: page === 'overview' }],
+          items: [{ label: t('Platform overview'), short: t('Overview'), icon: <LayoutDashboard />, iconId: 'overview', href: to.admin(), active: page === 'overview' }],
         },
         {
           id: 'platform',
           label: t('Platform'),
           icon: <ShieldCheck />,
           items: [
-            { label: t('Tenants'), icon: <Building2 />, href: to.admin('tenants'), active: page === 'tenants' || page === 'tenant' },
-            { label: t('People'), icon: <Users />, href: to.admin('people'), active: page === 'people' || page === 'person' },
-            { label: t('Plugins'), icon: <Puzzle />, href: to.admin('plugins'), active: page === 'plugins' || page === 'plugin' },
-            { label: t('Monitoring'), icon: <Activity />, href: to.admin('monitoring'), active: page === 'monitoring' },
-            { label: t('Log'), icon: <History />, href: to.admin('log'), active: page === 'log' },
+            { label: t('Tenants'), icon: <Building2 />, iconId: 'tenants', href: to.admin('tenants'), active: page === 'tenants' || page === 'tenant' },
+            { label: t('People'), icon: <Users />, iconId: 'people', href: to.admin('people'), active: page === 'people' || page === 'person' },
+            { label: t('Plugins'), icon: <Puzzle />, iconId: 'plugins', href: to.admin('plugins'), active: page === 'plugins' || page === 'plugin' },
+            { label: t('Monitoring'), icon: <Activity />, iconId: 'monitoring', href: to.admin('monitoring'), active: page === 'monitoring' },
+            { label: t('Log'), icon: <History />, iconId: 'log', href: to.admin('log'), active: page === 'log' },
           ],
         },
       ],
-      bottom: [{ label: t('System'), icon: <Settings />, href: to.admin('system'), active: page === 'system' }],
+      bottom: [{ label: t('System'), icon: <Settings />, iconId: 'settings', href: to.admin('system'), active: page === 'system' }],
     }
   }
   if (route.area !== 'tenant') return { groups: [], bottom: [] }
@@ -111,6 +116,7 @@ export function useNav(session: Session, route: Route, grouped = false): Nav {
         plugin: p.id,
         label: p.label,
         icon: <AppIcon id={p.id} name={p.icon_name} />,
+        iconId: p.icon_name || p.id,
         href: to.plugin(slug, p.id),
         active: page === 'plugin' && route.id === p.id && !(children ?? []).some(hasActive),
         children,
@@ -123,8 +129,8 @@ export function useNav(session: Session, route: Route, grouped = false): Nav {
       icon: <LayoutDashboard />,
       items: [
         manager
-          ? { label: t('Tenant overview'), short: t('Overview'), icon: <LayoutDashboard />, href: to.tenant(slug), active: page === 'home' }
-          : { label: t('Overview'), icon: <LayoutDashboard />, href: to.tenant(slug), active: page === 'home' },
+          ? { label: t('Tenant overview'), short: t('Overview'), icon: <LayoutDashboard />, iconId: 'overview', href: to.tenant(slug), active: page === 'home' }
+          : { label: t('Overview'), icon: <LayoutDashboard />, iconId: 'overview', href: to.tenant(slug), active: page === 'home' },
       ],
     },
     ...appGroups(apps, grouped ? defs : undefined),
@@ -135,17 +141,17 @@ export function useNav(session: Session, route: Route, grouped = false): Nav {
       label: t('Tenant management'),
       icon: <Building2 />,
       items: [
-        { label: t('Manage'), icon: <Users />, href: to.tenant(slug, 'manage'), active: page === 'manage' || page === 'person' || page === 'group' },
-        { label: t('Plugins'), icon: <Puzzle />, href: to.tenant(slug, 'plugins'), active: page === 'plugins' },
-        { label: t('Shares'), icon: <Share2 />, href: to.tenant(slug, 'shares'), active: page === 'shares' },
-        { label: t('Usage'), icon: <Gauge />, href: to.tenant(slug, 'usage'), active: page === 'usage' },
-        { label: t('Schedules'), icon: <CalendarClock />, href: to.tenant(slug, 'schedules'), active: page === 'schedules' },
-        { label: t('Log'), icon: <History />, href: to.tenant(slug, 'log'), active: page === 'log' },
+        { label: t('Manage'), icon: <Users />, iconId: 'manage', href: to.tenant(slug, 'manage'), active: page === 'manage' || page === 'person' || page === 'group' },
+        { label: t('Plugins'), icon: <Puzzle />, iconId: 'plugins', href: to.tenant(slug, 'plugins'), active: page === 'plugins' },
+        { label: t('Shares'), icon: <Share2 />, iconId: 'shares', href: to.tenant(slug, 'shares'), active: page === 'shares' },
+        { label: t('Usage'), icon: <Gauge />, iconId: 'usage', href: to.tenant(slug, 'usage'), active: page === 'usage' },
+        { label: t('Schedules'), icon: <CalendarClock />, iconId: 'schedules', href: to.tenant(slug, 'schedules'), active: page === 'schedules' },
+        { label: t('Log'), icon: <History />, iconId: 'log', href: to.tenant(slug, 'log'), active: page === 'log' },
       ],
     })
   return {
     groups: groups.filter((g) => g.items.length),
-    bottom: manager ? [{ label: t('Tenant settings'), short: t('Settings'), icon: <Settings />, href: to.tenant(slug, 'settings'), active: page === 'settings' }] : [],
+    bottom: manager ? [{ label: t('Tenant settings'), short: t('Settings'), icon: <Settings />, iconId: 'settings', href: to.tenant(slug, 'settings'), active: page === 'settings' }] : [],
   }
 }
 
@@ -158,6 +164,7 @@ function appGroups(apps: NavItem[], defs: Parameters<typeof splitApps>[1]): NavG
     id: `dist:${g.def.id}`,
     label: g.label,
     icon: <AppIcon id="" name={g.def.icon} fallback={DEFAULT_GROUP_ICON} />,
+    iconId: g.def.icon || DEFAULT_GROUP_ICON,
     items: g.items,
     collapsible: true,
     ...(g.children ? { subgroups: g.children.map(one) } : {}),

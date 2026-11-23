@@ -117,6 +117,14 @@ variable or value is refused.
 `msk-tab-item`, `msk-launcher-tile`, `msk-main`…) and nothing else. Landmarks, the «Skip to the content» link and the
 keyboard order stay the shell's.
 
+**Hooks.** The shell publishes stable attributes you can select: `data-icon="<icon id>"` on each `msk-nav-item`
+(`msk-tab-item`, `msk-launcher-tile`), the `icon` of the `[[nav]]` entry in the manifest or the plugin id when there is
+none; `data-group="<group id>"` on `msk-navg-head`; `data-mode="light|dark"` on the layout root (use
+`&[data-mode="dark"] .msk-band { … }`). To replace an icon with a PNG of the package:
+`.msk-nav-item[data-icon="notes"] { background-image: url(images/notes.png); }` and
+`.msk-nav-item[data-icon="notes"] > svg { opacity: 0; }`. `@keyframes` is not allowed. The `sidebar` and `drawer`
+patterns show the groups of the distribution as collapsible headings.
+
 **Band image.** PNG, at most 512 KB; the kernel lays the band colour over it as a scrim until the text has 4.5:1
 contrast, and refuses an image too bright even at the strongest scrim (`band_image_contrast`).
 

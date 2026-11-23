@@ -94,6 +94,7 @@ function Launcher({ open, onOpenChange, nav }: { open: boolean; onOpenChange: (v
                 <li key={it.label + it.href}>
                   <a
                     href={it.href}
+                    data-icon={it.iconId}
                     onClick={() => onOpenChange(false)}
                     aria-current={it.active ? 'page' : undefined}
                     className={cn(
@@ -128,7 +129,7 @@ function TabItem({ it }: { it: NavItem }) {
           side="bottom"
           item={it}
           trigger={
-            <button type="button" className={cls(hasActive(it))}>
+            <button type="button" data-icon={it.iconId} className={cls(hasActive(it))}>
               {it.icon}
               {it.label}
               <ChevronDown aria-hidden="true" className="size-3.5" />
@@ -139,7 +140,7 @@ function TabItem({ it }: { it: NavItem }) {
     )
   return (
     <li>
-      <a href={it.href} className={cls(it.active)} aria-current={it.active ? 'page' : undefined}>
+      <a href={it.href} data-icon={it.iconId} className={cls(it.active)} aria-current={it.active ? 'page' : undefined}>
         {it.icon}
         {it.label}
       </a>
@@ -148,7 +149,8 @@ function TabItem({ it }: { it: NavItem }) {
 }
 
 export default function Frame({ session, route, band, layout, bandImage, children }: FrameProps) {
-  const nav = useNav(session, route)
+  // the groups of the distribution (collapsible) only where the layout draws groups of apps
+  const nav = useNav(session, route, layout.decl.pattern === 'sidebar' || layout.decl.pattern === 'drawer')
   const crumbs = useCrumbs(nav, route)
   const phone = useIsMobile()
   const [drawer, setDrawer] = useState(false)

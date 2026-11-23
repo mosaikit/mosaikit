@@ -28,6 +28,8 @@ import { cn } from '@/lib/utils'
 import SearchBox from './SearchBox.tsx'
 import { initials, useTenantCtx } from './core.ts'
 import { PersonPicture } from './picture.tsx'
+import { navGroupOpen, setNavGroupOpen } from './prefs.ts'
+import { allItems } from './navgroups.ts'
 import { bandIcon, hasActive, searchGroups, type Nav, type NavGroup, type NavItem } from './nav.tsx'
 import { setLang, t, useLang, useLanguages, type Lang } from './i18n.ts'
 import { NotificationsBell } from './notifications.tsx'
@@ -59,22 +61,67 @@ export function TenantBadge({ name }: { name: string }) {
   )
 }
 
+/** A group of the tree with a heading that collapses it (groups of the distribution; the state is the one of the
+ *  default sidebar, kept in the browser). The heading carries `data-group` and `data-icon` for layout stylesheets. */
+function TreeGroup({ g, onPick, depth = 0 }: { g: NavGroup; onPick?: () => void; depth?: number }) {
+  const [open, setOpen] = useState(() => navGroupOpen(g.id))
+  const body = `msk-tree-${g.id.replace(/[^a-z0-9_-]/gi, '_')}`
+  const active = allItems(g).some(hasActive)
+  return (
+    <div role="group" aria-label={g.label} className={depth ? 'mt-1 ml-1 border-l border-sidebar-border pl-2' : 'mb-2'}>
+      <button
+        type="button"
+        data-navg-head
+        data-group={g.id}
+        data-icon={g.iconId}
+        aria-expanded={open}
+        aria-controls={body}
+        onClick={() => {
+          setOpen(!open)
+          setNavGroupOpen(g.id, !open)
+        }}
+        className="msk-navg-head flex h-8 w-full items-center gap-2 rounded-md px-2.5 text-xs font-medium text-sidebar-foreground/85 outline-none hover:bg-sidebar-hover focus-visible:ring-2 focus-visible:ring-sidebar-ring [&>svg]:size-4 [&>svg]:shrink-0"
+      >
+        {g.icon}
+        <span className={cn('flex-1 truncate text-left', active && !open && 'font-semibold text-sidebar-primary')}>{g.label}</span>
+        <ChevronDown className={cn('size-3.5 transition-transform', !open && '-rotate-90')} aria-hidden="true" />
+      </button>
+      {open && (
+        <div id={body}>
+          <ul className="flex flex-col gap-0.5">
+            {g.items.map((it) => (
+              <TreeItem key={it.label + (it.href ?? '')} item={it} onPick={onPick} mini={false} />
+            ))}
+          </ul>
+          {(g.subgroups ?? []).map((sg) => (
+            <TreeGroup key={sg.id} g={sg} onPick={onPick} depth={depth + 1} />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 /** The tree of the navigation as a list: groups with a label, entries with children that open (Console,
  *  Workspace, Project and the drawers on the phone). */
 export function NavTree({ groups, bottom, labels = true, onPick, mini = false }: { groups: NavGroup[]; bottom?: NavItem[]; labels?: boolean; onPick?: () => void; mini?: boolean }) {
   return (
     <div className="msk-nav-tree flex min-h-0 flex-1 flex-col">
       <div className={cn('overflow-y-auto px-2', mini ? 'min-h-0 flex-initial pt-2' : 'flex-1 py-2')}>
-        {groups.map((g) => (
+        {groups.map((g) =>
+          g.collapsible && labels && !mini ? (
+            <TreeGroup key={g.id} g={g} onPick={onPick} />
+          ) : (
           <div key={g.id} className={mini ? 'mb-0.5' : 'mb-2'} role="group" aria-label={g.label}>
-            {labels && !mini && g.id !== 'start' && g.label && <div className="px-2.5 pt-2 pb-1 text-xs font-medium text-sidebar-foreground/85">{g.label}</div>}
+            {labels && !mini && g.id !== 'start' && g.label && <div data-group={g.id} className="px-2.5 pt-2 pb-1 text-xs font-medium text-sidebar-foreground/85">{g.label}</div>}
             <ul className="flex flex-col gap-0.5">
-              {g.items.map((it) => (
+              {(g.collapsible ? allItems(g) : g.items).map((it) => (
                 <TreeItem key={it.label + (it.href ?? '')} item={it} onPick={onPick} mini={mini} />
               ))}
             </ul>
           </div>
-        ))}
+          ),
+        )}
       </div>
       {bottom && bottom.length > 0 && (
         <ul className={cn('flex flex-col gap-0.5 px-2', mini ? 'pb-2' : 'border-t border-sidebar-border py-2')}>
@@ -99,7 +146,7 @@ function MiniFlyout({ item }: { item: NavItem }) {
   const hover = useHoverMenu(true)
   return (
     <li {...hover.areaProps}>
-      <FlyoutMenu item={item} hover={hover} trigger={<button type="button" className={itemClass(hasActive(item), true)} aria-label={item.label}>{item.icon}</button>} />
+      <FlyoutMenu item={item} hover={hover} trigger={<button type="button" className={itemClass(hasActive(item), true)} data-icon={item.iconId} aria-label={item.label}>{item.icon}</button>} />
     </li>
   )
 }
@@ -112,7 +159,7 @@ function TreeItem({ item, onPick, mini, depth = 0 }: { item: NavItem; onPick?: (
     if (!kids.length)
       return (
         <li>
-          <a href={item.href} className={itemClass(item.active, true)} aria-label={item.label} title={item.label} aria-current={item.active ? 'page' : undefined} onClick={(e) => { if (backFromActiveEntry(item.active)) e.preventDefault(); onPick?.() }}>
+          <a href={item.href} className={itemClass(item.active, true)} data-icon={item.iconId} aria-label={item.label} title={item.label} aria-current={item.active ? 'page' : undefined} onClick={(e) => { if (backFromActiveEntry(item.active)) e.preventDefault(); onPick?.() }}>
             {item.icon}
           </a>
         </li>
@@ -126,7 +173,7 @@ function TreeItem({ item, onPick, mini, depth = 0 }: { item: NavItem; onPick?: (
     return (
       <li>
         {item.href ? (
-          <a href={item.href} style={pad} className={itemClass(item.active, false)} aria-current={item.active ? 'page' : undefined} onClick={(e) => { if (backFromActiveEntry(item.active)) e.preventDefault(); onPick?.() }}>
+          <a href={item.href} style={pad} data-icon={item.iconId} className={itemClass(item.active, false)} aria-current={item.active ? 'page' : undefined} onClick={(e) => { if (backFromActiveEntry(item.active)) e.preventDefault(); onPick?.() }}>
             {item.icon}
             <span className="truncate">{item.label}</span>
           </a>
@@ -141,12 +188,12 @@ function TreeItem({ item, onPick, mini, depth = 0 }: { item: NavItem; onPick?: (
     <li>
       <div className="flex items-center">
         {item.href ? (
-          <a href={item.href} style={pad} className={cn(itemClass(item.active, false), 'flex-1')} aria-current={item.active ? 'page' : undefined} onClick={onPick}>
+          <a href={item.href} style={pad} data-icon={item.iconId} className={cn(itemClass(item.active, false), 'flex-1')} aria-current={item.active ? 'page' : undefined} onClick={onPick}>
             {item.icon}
             <span className="truncate">{item.label}</span>
           </a>
         ) : (
-          <span style={pad} className={cn(itemClass(false, false), 'flex-1 hover:bg-transparent')}>
+          <span style={pad} data-icon={item.iconId} className={cn(itemClass(false, false), 'flex-1 hover:bg-transparent')}>
             {item.icon}
             <span className="truncate">{item.label}</span>
           </span>

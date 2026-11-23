@@ -7,6 +7,7 @@ import { bandImageOf, brightest, ratio, SCRIM_MAX, SCRIM_MIN, scrimFor, styleOf,
 import { appChildren } from './nav.tsx'
 import Frame from './frames.tsx'
 import Shell from './Shell.tsx'
+import { NavTree } from './slots.tsx'
 
 const layout = (id: string, pattern: Pattern, extra: Partial<LayoutInfo['decl']> = {}): LayoutInfo => ({
   ...TEAMS,
@@ -153,5 +154,41 @@ describe('every layout draws the same slots', () => {
     expect(html).toContain('data-layout="teams"')
     expect(html).toContain('id="main"')
     expect(html).toContain('Notes')
+  })
+
+  it('shell hooks for layout stylesheets: data-icon on items, data-mode on the root', async () => {
+    const l = layout('console', 'sidebar', { band: { brand: true, breadcrumb: true, search: 'center', tenant: 'nav' }, nav: { card: true } })
+    const html = await render(
+      <Frame session={session} route={route} band={band} layout={l} bandImage={{ src: null, scrim: 0.5 }}>
+        <p>content</p>
+      </Frame>,
+    )
+    expect(html).toMatch(/msk-nav-item[^>]*data-icon=|data-icon="[^"]+"[^>]*msk-nav-item/)
+    expect(html).toContain('data-icon="overview"')
+    const shell = await render(
+      <Shell session={session} route={route}>
+        <p>content</p>
+      </Shell>,
+    )
+    expect(shell).toMatch(/data-layout="teams" data-mode="(light|dark)"/)
+  })
+
+  it('a group of the distribution is a collapsible heading with data-group and data-icon', async () => {
+    const groups = [
+      {
+        id: 'dist:work',
+        label: 'Work',
+        icon: null,
+        iconId: 'briefcase',
+        collapsible: true,
+        items: [{ label: 'Tasks', icon: null, iconId: 'tasks', href: '#/t/rome/p/tasks', active: false, plugin: 'tasks' }],
+      },
+    ]
+    const html = await render(<NavTree groups={groups} />)
+    expect(html).toMatch(/<button[^>]*msk-navg-head/)
+    expect(html).toContain('data-group="dist:work"')
+    expect(html).toContain('data-icon="briefcase"')
+    expect(html).toContain('aria-expanded="true"')
+    expect(html).toContain('data-icon="tasks"')
   })
 })
