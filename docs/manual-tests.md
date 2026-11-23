@@ -1453,6 +1453,7 @@ The shell keeps one presence connection per tenant: people are seen as online in
 | PRS-04 | Open the same tenant in two tabs; leave one hidden for more than 2 minutes and keep working in the other | The person stays available; closing the active tab makes them away, closing both makes them offline | Cargo (`platform_presence_over_http`: tabs); vitest (hidden tab) |
 | PRS-05 | Type for 6 minutes inside a plugin page without leaving it (no input reaches the shell outside the frame) | The person does not turn away | Manual (covered by the vitest suite of plugin-api (forwardActivity)) |
 | PRS-06 | A person of another tenant is signed in | They never appear in the list of this tenant | Cargo (`platform_presence_over_http`) |
+
 ## Overview by role
 
 The overview is drawn from the role the kernel gives the person in the tenant (or the Administrator of the platform), never from a switch in the interface. The look is the same in light and dark: hero strip, cards with a sparkline, week strip.
