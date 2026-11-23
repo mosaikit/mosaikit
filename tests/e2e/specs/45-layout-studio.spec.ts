@@ -42,6 +42,8 @@ test.describe.serial('45-layout-studio', () => {
       })
       return `${r.status} ${await r.text()}`
     }, ID)
+    // the plugin comes from mosaikit-plugins: without it (an older checkout) there is nothing to test
+    test.skip(put.includes('layout_unknown'), 'layout-studio is not in this mosaikit-plugins')
     expect(put).toMatch(/^200/)
     await logout(page)
     await login(page, 'Alfa', 'manager', PASSWORD)
