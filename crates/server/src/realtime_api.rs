@@ -23,6 +23,8 @@ pub fn router() -> Router<AppState> {
         .route("/api/t/{t}/p/{plugin}/rt/{resource}/{name}/stream", get(stream))
         .route("/api/t/{t}/p/{plugin}/rt/{resource}/{name}", post(send))
         .route("/api/t/{t}/p/{plugin}/rt/{resource}/{name}/state", post(state))
+        .route("/api/t/{t}/presence/stream", get(presence_stream))
+        .route("/api/t/{t}/presence/state", post(presence_state))
 }
 
 #[derive(Deserialize)]
@@ -51,6 +53,21 @@ struct Send {
 #[derive(Deserialize)]
 struct State_ {
     state: Value,
+}
+
+#[derive(Deserialize)]
+struct PresenceQuery {
+    /// the id of the browser tab (the tabs of one person are one entry, available if any tab is)
+    tab: String,
+    /// `available` (default) or `away`
+    #[serde(default)]
+    status: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct PresenceBody {
+    tab: String,
+    status: String,
 }
 
 fn event(f: &Frame) -> Event {
@@ -145,5 +162,59 @@ async fn state(
     Json(r): Json<State_>,
 ) -> ApiResult<Json<Value>> {
     realtime::set_state(&s.k, &c, &p.plugin, uuid(&p.resource)?, &p.name, r.state).await?;
+    Ok(ok())
+}
+
+/// The presence of the tenant (platform-wide, not tied to a plugin): the first event is `presence` with everybody who has
+/// the shell open (`v` is the version of the protocol), then `join`, `state` and `leave`. Any member of the tenant may
+/// listen; nothing is stored.
+async fn presence_stream(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Query(q): Query<PresenceQuery>,
+) -> ApiResult<Response> {
+    let state = json!({ "status": q.status.as_deref().unwrap_or("available") });
+    let sub = realtime::subscribe_presence(&s.k, &c, &q.tab, &state)?;
+    let head = vec![Event::default()
+        .event("presence")
+        .id(sub.seq().to_string())
+        .data(json!({ "v": realtime::PRESENCE_VERSION, "people": sub.people, "me": sub.me }).to_string())];
+    let k = s.k.clone();
+    let mut tick = tokio::time::interval(realtime::RECHECK);
+    tick.tick().await;
+    let live = futures_util::stream::unfold((sub, tick, c, false), move |(mut sub, mut tick, c, closing)| {
+        let k = k.clone();
+        async move {
+            if closing {
+                return None;
+            }
+            loop {
+                tokio::select! {
+                    r = sub.recv() => match r {
+                        Ok(f) => return Some((event(&f), (sub, tick, c, false))),
+                        // too slow: the client asks for the whole list again by reconnecting
+                        Err(RecvError::Lagged(_)) => return Some((Event::default().event("closed").data("{}"), (sub, tick, c, true))),
+                        Err(RecvError::Closed) => return None,
+                    },
+                    _ = tick.tick() => {
+                        // logged out: the person is offline for the others within the recheck period
+                        if !realtime::session_open(&k, &c).await {
+                            return Some((Event::default().event("closed").data("{}"), (sub, tick, c, true)));
+                        }
+                    }
+                }
+            }
+        }
+    });
+    let body = futures_util::stream::iter(head).chain(live).map(Ok::<_, std::convert::Infallible>);
+    Ok(Sse::new(body).keep_alive(KeepAlive::default()).into_response())
+}
+
+async fn presence_state(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Json(r): Json<PresenceBody>,
+) -> ApiResult<Json<Value>> {
+    realtime::set_presence(&s.k, &c, &r.tab, &json!({ "status": r.status }))?;
     Ok(ok())
 }

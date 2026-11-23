@@ -2083,6 +2083,21 @@ person, 500 connections per channel (`429 rt_rate`).
 `msk.realtime.open({ resource, name, state }) → { onMessage, onPresence, onStatus, send, setState, people, status, close }`.
 Not yet: publishing from the logic of a plugin (`rt.publish`).
 
+**Platform presence.** Who has the shell open is not tied to a plugin or a resource. The kernel keeps one reserved channel per tenant,
+`(tenant, nil, "_kernel", "presence")`, on the same hub: `GET /api/t/{t}/presence/stream?tab=<id>&status=<available|away>` (any member of
+the tenant; first event `presence` `{ v: 1, people, me }`, then `join`, `state`, `leave`, `closed` when the session ends, checked every
+30 s) and `POST /api/t/{t}/presence/state` `{ tab, status }`. The state is closed (`{ status: "available" | "away" }`, anything else is
+`400 presence_state`). `tab` is a random id of the browser tab: the status of each tab is kept and the person is `available` if any tab
+is, announced once and gone (`leave`) with the last connection, so a closed browser or a lost connection shows as offline as soon as the
+server sees the socket close (keep-alive every 15 s). These connections do not count against the 20 open channels of a person; the
+limit is 5000 connections per tenant. `v` is the version of the protocol: fields are only added.
+The shell (`ui/host/src/app/presence.ts`) opens the stream once the person is in a tenant and closes it on log out. A clock decides
+the status: away after 5 minutes without input, or a tab hidden for 2 minutes; the next input or showing the tab makes it available
+again. Input inside a plugin iframe does not reach the shell: the plugin API forwards it (`presence.activity`, at most one every 15 s).
+Plugin side: `msk.presence` (`get`, `status`, `onChange`, `live`, `supported`), host ops `presence.watch` and `presence.activity`, event
+`presence` `{ live, users }`, `Hello.presence`; no permission, because it names only people of the tenant by the ids the plugin already
+sees. An older shell sends no `Hello.presence`: `supported` is false and the plugin falls back to its own logic. The plugin API stays 1.
+
 ### 8.19 Camera and microphone for the pages a plugin embeds
 
 A plugin that shows a meeting service in a frame (`permissions.frame_src`) needs the browser to let that frame use the camera, the

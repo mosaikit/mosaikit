@@ -1437,3 +1437,16 @@ Tasks, Contacts, Bookmarks, Snippets, Documents (Files), Forms and Surveys use t
 | PKA-11 | In **Documents** press `?`; then `g r`, `g f`, `g s`, `g m`, `v`, `r` | The help sheet lists the shortcuts; the keys move between Recent, Favourites, Shared with me and My files, switch list and grid and refresh | Manual (covered by the vitest suite of files (g m)) |
 | PKA-12 | In **Forms** press **New form** and choose the template Feedback | The title, introduction, thank-you text and five fields are filled in (the email field only appears for those who answer Yes to being contacted); everything can be edited; Blank form clears the fields | Manual (covered by the vitest suite of forms (templates.test.ts)) |
 | PKA-13 | Open the answers of a form and the results of a survey with 60 or more responses; export the CSV | The list of answers is a scrolling box with a header row, the counts and bars stay; the CSV has every answer with the header, and accents open right in a spreadsheet | Manual (browser twin needs 60+ answers: not automated yet) |
+
+## Platform-wide presence
+
+The shell keeps one presence connection per tenant: people are seen as online in every page, not only in Chat. Twin column: what covers the check today.
+
+| Id | Check | Expected | Twin |
+|---|---|---|---|
+| PRS-01 | Sign in as two people in two browsers; leave the second on the Notes page (not Chat); in the first open the picker of people or any list that shows a presence dot | The second person is shown online (available) although they never opened Chat | Playwright (`45-presence.spec.ts`) |
+| PRS-02 | Close the browser window of the second person (or sign out) | The first person sees them offline within a few seconds, not after minutes | Playwright (`45-presence.spec.ts`: sign out); Cargo (`platform_presence_over_http`: connection lost) |
+| PRS-03 | Leave the second person without touching mouse or keyboard for 5 minutes | They show as away; one key press or a click and they are available again | Manual (the 5-minute clock is covered by the vitest suite of presence.ts) |
+| PRS-04 | Open the same tenant in two tabs; leave one hidden for more than 2 minutes and keep working in the other | The person stays available; closing the active tab makes them away, closing both makes them offline | Cargo (`platform_presence_over_http`: tabs); vitest (hidden tab) |
+| PRS-05 | Type for 6 minutes inside a plugin page without leaving it (no input reaches the shell outside the frame) | The person does not turn away | Manual (covered by the vitest suite of plugin-api (forwardActivity)) |
+| PRS-06 | A person of another tenant is signed in | They never appear in the list of this tenant | Cargo (`platform_presence_over_http`) |

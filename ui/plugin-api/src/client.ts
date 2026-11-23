@@ -2,6 +2,7 @@ import { Bridge, BridgeError } from './bridge.ts'
 import { API_VERSION, checkHostApi } from './version.ts'
 import { translate, type Vars } from './text.ts'
 import { setBusy, withBusy } from './busy.ts'
+import { forwardActivity, makePresence, type PresenceApi } from './presence.ts'
 import type { RealtimeEvent, RealtimeMessage, RealtimePerson, RealtimeStatus, BandApi, BandState, DirectoryApi, EmbedsApi, Schedule, SchedulesApi, DirectorySearch, ExtensionView, FileEntry, Hello, HostEventName, ListResult, Listing, Notify, NotificationRef, SettingsChange, SettingsView, PublicLinkState, PublicResource, Rect, ResourceMeta, Row, SiteInfo, TabInfo, Unzipped, UploadProgress, FolderSuggestion, FileInfo, FileTicket, UiContext, Values, WebProbe, SharePreselect, SharePrincipal, PickPrincipalsOptions, ShareList } from './protocol.ts'
 
 /** The extensions of the plugin on a resource (fields and actions other plugins add to its items). */
@@ -120,6 +121,8 @@ export class Msk {
     hello: Hello,
   ) {
     this.api = checkHostApi(hello.api)
+    this.presence = makePresence(bridge, hello.presence === true && !hello.public)
+    if (this.presence.supported) forwardActivity(bridge)
     this.isPublic = !!hello.public
     this.user = hello.user
     this.tenant = hello.tenant
@@ -211,6 +214,14 @@ export class Msk {
   readonly realtime: RealtimeApi = {
     open: (o) => openChannel(this.bridge, o),
   }
+
+  /**
+   * Who of the tenant is online, in any page: `msk.presence.get()` is `{ [userId]: 'available' | 'away' }` (a person that is not
+   * there is offline), `onChange` tells every change. It needs no permission and costs nothing to the plugin: the shell keeps
+   * one connection for everybody. Check `msk.presence.supported`: an older shell does not publish it, and the plugin then keeps
+   * its own logic (for example a real-time channel).
+   */
+  readonly presence: PresenceApi
 
   crud(resource: string): CrudClient {
     const b = this.bridge

@@ -34,6 +34,7 @@ dell'host ed è accettato solo da essa. Una chiamata che non riceve risposta in 
 | `msk.isPublic`, `msk.publicResource`, `msk.publicGet()` | visualizzatore dei link pubblici (`public_view`) |
 | `msk.publicConfig()` | le impostazioni `[[config]]` con `public = true` (mai un segreto), per chiave |
 | `msk.publicCall(name, args)` | esegue un comando di `[[public_commands]]`, in sola lettura, sull'elemento condiviso; errori `command_not_public`, `public_commands_off`, `public_rate_limited` |
+| `msk.presence.get()`, `.status(id)`, `.onChange(fn)`, `.live`, `.supported` | chi dell'organizzazione è online ora, in qualsiasi pagina: `{ [userId]: 'available' \| 'away' }` (chi non c'è è offline); `away` dopo 5 minuti senza input; `live` è false mentre la connessione della shell è caduta (l'elenco allora è ignoto). Nessun permesso. Se `supported` è false (shell più vecchia) mantenere la propria logica, per esempio un canale in tempo reale. Architettura §8.18 |
 | `msk.band.set(state)`, `msk.band.reset()` | la barra superiore contestuale della shell per una risorsa a pagina intera: `{ search?: false, mode?: { value: 'view'\|'edit', canEdit, onChange }, presence?: [{ id, name, initials? }], comments?: { open, count?, onToggle }, back?: { label, onClick } }`. Nessun permesso. Vedi [la barra contestuale](#la-barra-contestuale) |
 | `msk.directory.search({ kind, q, limit? })` | le persone (`{id, username, name}`) o i gruppi (`{id, name}`) del tenant, per un selettore; richiede `[permissions] directory = true`; solo un Tenant Manager o chi può condividere; errori `permission_denied`, `invalid_argument`, `rate_limited`; mai nei link pubblici. Vedi [sicurezza](security.md#directory-la-regola-per-lautore) |
 
@@ -93,7 +94,7 @@ non ha potuto, in inglese o italiano.
 
 `context` (lingua, tema, modo: usare `msk.onContext`), `theme` (**deprecato**, le stesse variabili di `context`, ancora
 inviato nell'API 1, rimosso nell'API 2), `ext.changed` `{ extension, id }`, `ext.tab.height` `{ handle, height }` (gestito
-da `mountTab`), `band.mode` `{ value }`, `band.comments` `{}` e `band.back` `{}` (l'interruttore, il pulsante dei commenti e quello indietro della barra contestuale; gestiti
+da `mountTab`), `presence` `{ live, users }` (gestito da `msk.presence`), `band.mode` `{ value }`, `band.comments` `{}` e `band.back` `{}` (l'interruttore, il pulsante dei commenti e quello indietro della barra contestuale; gestiti
 da `msk.band`).
 
 ### La barra contestuale
