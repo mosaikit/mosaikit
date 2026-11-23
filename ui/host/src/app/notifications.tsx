@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils'
 import { KINDS, kindLabel, noteBody, noteTitle, pendingInvitation, useNoteActions, useNoteList, useUnread, type Note, type NoteFilter } from './notes.ts'
 import { t } from './i18n.ts'
 import { Empty, ErrorBox, FillBody, FillPage, Loading, PageHeader, Pills } from './kit.tsx'
+import { plainText } from './plaintext.ts'
 import { go, personal, to, type Route } from './router.ts'
 
 function KindIcon({ n }: { n: Note }) {
@@ -30,8 +31,8 @@ function KindIcon({ n }: { n: Note }) {
 export function NoteRow({ n, onOpen, select }: { n: Note; onOpen?: () => void; select?: { on: boolean; set: (on: boolean) => void } }) {
   const act = useNoteActions()
   const inv = pendingInvitation(n)
-  const title = noteTitle(n)
-  const body = noteBody(n)
+  const title = plainText(noteTitle(n))
+  const body = plainText(noteBody(n))
   const app = typeof n.data.app === 'string' ? n.data.app : ''
   const open = () => {
     if (!n.read) act.mark.mutate({ ids: [n.id], read: true })

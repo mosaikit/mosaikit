@@ -44,6 +44,7 @@ import { sortParams, type Sort } from '../tableutil.ts'
 import { EmbeddingPanel, IdentityPanel, KeysPanel, LanguagesPanel, ManagedPanel, ModePanel, NavigationPanel, NotificationsPanel, SecurityPanel } from '../SettingsPanels.tsx'
 import { UsageAlerts, UsageConsumers, UsagePanel, UsageQuotas, UsageTrend } from '../Quotas.tsx'
 import { totals, trashHint } from '../usage.ts'
+import { plainText } from '../plaintext.ts'
 import { LayoutPanel, StylePanel } from '../LayoutSettings.tsx'
 
 const enc = encodeURIComponent
@@ -151,7 +152,7 @@ export function TenantHome({ session, slug }: { session: Session; slug: string }
           <ul className="grid grid-cols-[minmax(0,1fr)] gap-0.5">
             {d.me.activity.slice(0, 5).map((e, i) => (
               <li key={i} className="flex items-baseline justify-between gap-3 py-0.5 text-sm">
-                <span className="min-w-0 truncate">{[describe(e), e.title].filter(Boolean).join(' · ')}</span>
+                <span className="min-w-0 truncate">{[describe(e), e.title && plainText(e.title)].filter(Boolean).join(' · ')}</span>
                 <span className="shrink-0 text-xs text-muted-foreground">{fmtDate(e.ts)}</span>
               </li>
             ))}

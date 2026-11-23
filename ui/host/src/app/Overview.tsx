@@ -95,12 +95,12 @@ export function TrendWidget({ id, title, figure, caption, values, link }: { id: 
 /** One row of a list of widgets: an icon, a text with a second line and an action at the right. */
 function Row({ icon, title, sub, action }: { icon: ReactNode; title: ReactNode; sub?: ReactNode; action?: ReactNode }) {
   return (
-    <li className="flex items-center gap-2.5 py-1 text-sm">
+    <li className="flex min-w-0 items-center gap-2.5 py-1 text-sm">
       <span className="text-muted-foreground" aria-hidden="true">
         {icon}
       </span>
       <span className="min-w-0 flex-1">
-        <b className="block truncate font-medium">{title}</b>
+        <b className="block font-medium [overflow-wrap:anywhere]">{title}</b>
         {sub && <span className="block truncate text-xs text-muted-foreground">{sub}</span>}
       </span>
       {action}
@@ -138,7 +138,7 @@ export function ActivityWidget({ slug }: { slug: string }) {
       {q.isLoading ? (
         <Loading />
       ) : events.length ? (
-        <ul className="grid">
+        <ul className="grid grid-cols-[minmax(0,1fr)]">
           {events.map((e) => (
             <Row
               key={e.id}

@@ -9,6 +9,7 @@ versione italiana di [CHANGELOG.md](CHANGELOG.md): tenerli allineati.
 - Plugin: `msk.publicLink.get(id)`, `msk.publicLink.create(id, { expires_in_days?, password? })` e `msk.publicLink.revoke(id)`: una pagina (in particolare quella che sostituisce la finestra di condivisione, `[ui] share_page`) mostra, crea e revoca il link pubblico di un elemento. Valgono le regole della finestra: gestire l'elemento, permesso `share` del plugin, politica dell'organizzazione (link disattivati, durata massima); gli stessi eventi nel Log e la stessa notifica. L'indirizzo è dato una sola volta, da `create`. Non disponibile nei link pubblici né nei run.
 - Una persona può creare al massimo 30 link pubblici in 10 minuti (la finestra e le pagine contano insieme).
 - Kernel: `DELETE /api/t/{t}/resources/{id}/links` revoca tutti i link attivi di un elemento.
+- Shell: nella Panoramica (Attività recente, Per te, La mia attività recente) e nel Log, un titolo scritto come link Markdown mostra solo il testo, e un titolo lungo senza spazi non esce più dalla scheda.
 
 ## 1.2.0
 
