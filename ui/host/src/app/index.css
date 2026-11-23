@@ -263,6 +263,21 @@
 /* The variables the bridge passes to the UIs of the plugins (bridge.ts, THEME_VARS). They follow the theme and the mode
    of the shell, always: `!important` because the server injects the `[colors]` of the brand of the distribution
    (brand.toml) in the page as `:root` variables with the same names, dark ones, which would put a dark plugin in a light shell. */
+/* Accents of the overviews (hero strip, KPI cards, week strip): the same hue in light and dark. */
+:root {
+  --ov-sun: #ff7a45;
+  --ov-violet: #6a5cff;
+  --ov-sky: #2d9cff;
+  --ov-leaf: #34b36b;
+  --ov-rose: #ec4c8a;
+}
+.ov-hero {
+  background: linear-gradient(120deg, #2b2c6e 0%, #4a4bb0 48%, #0b8f88 128%);
+}
+.ov-card {
+  transition: border-color 0.15s;
+}
+
 :root {
   --bg: var(--background) !important;
   --panel: var(--card) !important;
