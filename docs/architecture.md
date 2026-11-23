@@ -2659,6 +2659,15 @@ There is no personal choice of layout.
   the images of the package. Rules are scoped under `.mskl-<id>` (dots become dashes), so a layout styles
   the classes of the slots (`msk-band`, `msk-nav`, `msk-nav-item`, `msk-tab-item`, `msk-launcher-tile`,
   `msk-main`…) and nothing else.
+- **Hooks for layout stylesheets.** Stable attributes the shell publishes so a layout can restyle without
+  scripts: `data-icon="<icon id>"` on every `.msk-nav-item` (and tab and launcher tile): the icon id of the
+  manifest `[[nav]] icon`, or the plugin id when the entry has none (`overview`, `manage`, `settings`… for the
+  pages of the shell); `data-group="<group id>"` on the heading of a group (`.msk-navg-head`, also on the
+  closed rail); `data-mode="light|dark"` on `.msk-shell`, the mode in use (`html` carries `data-theme` too). A
+  layout can then draw a PNG of its package over an icon with `background-image` and `> svg { opacity: 0 }`.
+  `@keyframes` stays refused. Layouts with the pattern `sidebar` or `drawer` draw the groups of the
+  distribution as the default sidebar does: collapsible headings (the state is shared with it), subgroups
+  indented.
 - **Style** reaches the page as `data-style-radius|density|font|tabs|buttons` on `<html>`; the Layout and
   Style panels preview a change (`previewStyle`) before it is saved.
 - **Band image.** PNG, at most 512 KB, from the layout package or from the Style of the platform or the

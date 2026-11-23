@@ -118,6 +118,14 @@ sotto `.mskl-<id>` (i punti diventano trattini), quindi un layout stila le class
 `msk-nav-item`, `msk-tab-item`, `msk-launcher-tile`, `msk-main`…) e nient'altro. Landmark, il link «Salta al contenuto» e
 l'ordine da tastiera restano quelli della shell.
 
+**Hook.** La shell pubblica attributi stabili da selezionare: `data-icon="<id icona>"` su ogni `msk-nav-item`
+(`msk-tab-item`, `msk-launcher-tile`), cioè l'`icon` della voce `[[nav]]` del manifest o l'id del plugin se manca;
+`data-group="<id gruppo>"` su `msk-navg-head`; `data-mode="light|dark"` sulla radice del layout (usa
+`&[data-mode="dark"] .msk-band { … }`). Per sostituire un'icona con un PNG del pacchetto:
+`.msk-nav-item[data-icon="notes"] { background-image: url(images/notes.png); }` e
+`.msk-nav-item[data-icon="notes"] > svg { opacity: 0; }`. `@keyframes` non è ammesso. I pattern `sidebar` e `drawer`
+mostrano i gruppi della distribuzione come intestazioni comprimibili.
+
 **Immagine della banda.** PNG, al massimo 512 KB; il kernel stende sopra il colore della banda come velo finché il testo ha
 un contrasto di 4,5:1, e rifiuta un'immagine troppo chiara anche con il velo più forte (`band_image_contrast`).
 

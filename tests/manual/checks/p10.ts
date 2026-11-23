@@ -502,6 +502,54 @@ const checks: L.Check[] = [
       return c.result()
     },
   },
+  {
+    id: 'P10-25',
+    async run(ctx: any) {
+      const c = H.checker()
+      const p = await L.as(ctx, 's.greco')
+      const n = await p.locator('.msk-nav-item[data-icon]').count()
+      c.ok(n > 0, 'the entries of the navigation carry data-icon')
+      c.ok((await p.locator('.msk-nav-item[data-icon=""]').count()) === 0, 'no empty data-icon')
+      return c.result()
+    },
+  },
+  {
+    id: 'P10-26',
+    async run(ctx: any) {
+      const c = H.checker()
+      await setPlatform({ layout: 'console' })
+      const p = await L.as(ctx, 's.greco')
+      await p.reload()
+      await p.locator('.msk-shell[data-layout="console"]').waitFor({ timeout: 20000 })
+      const head = p.locator('.msk-nav .msk-navg-head[data-group]').first()
+      if (await H.vis(head)) {
+        const before = await head.getAttribute('aria-expanded')
+        await head.click()
+        c.ok((await head.getAttribute('aria-expanded')) !== before, 'the heading folds and unfolds')
+        await p.reload()
+        c.ok((await p.locator('.msk-nav .msk-navg-head[data-group]').first().getAttribute('aria-expanded')) !== before, 'the state is kept after a reload')
+        await p.locator('.msk-nav .msk-navg-head[data-group]').first().click()
+      } else c.note('the distribution declares no navigation groups: only the plain headings are checked')
+      c.ok((await p.locator('.msk-nav [data-group]').count()) > 0, 'group headings carry data-group')
+      await setPlatform({ layout: 'teams' })
+      return c.result()
+    },
+  },
+  {
+    id: 'P10-27',
+    async run(ctx: any) {
+      const c = H.checker()
+      const p = await L.page(ctx.b, { colorScheme: 'dark' })
+      await L.login(p, 'Comune di Roma', 's.greco')
+      c.ok((await p.locator('.msk-shell').getAttribute('data-mode')) === 'dark', 'data-mode is dark')
+      c.ok((await p.locator('html').getAttribute('data-theme')) === 'dark', 'data-theme of html is dark')
+      await p.emulateMedia({ colorScheme: 'light' })
+      await p.waitForTimeout(500)
+      c.ok((await p.locator('.msk-shell').getAttribute('data-mode')) === 'light', 'data-mode follows to light')
+      await p.context().close()
+      return c.result()
+    },
+  },
 ]
 
 export default checks
