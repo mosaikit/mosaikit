@@ -68,11 +68,14 @@ pubblici attivi** e le app dell'organizzazione.
 
 Ogni app si apre nella shell (Note, Attività, Contatti, File, Mappe, Siti statici… secondo l'organizzazione).
 **Siti statici** mostra i siti come **schede** (predefinito, con una miniatura) o come **elenco** (pulsanti a
-destra della barra). Un sito è un **archivio zip** o un **indirizzo web**: un indirizzo si mostra dentro
-Mosaikit in un riquadro e non viene mai scaricato; un sito che vieta di essere incorporato (X-Frame-Options o
-`frame-ancestors` di una CSP) viene riconosciuto e si apre in una nuova scheda. La miniatura la puoi caricare
-tu; altrimenti un sito indicato con un indirizzo mostra la propria immagine (`og:image`, o la prima immagine)
-e un sito zip un segnaposto. Cosa
+destra della barra). Un sito è un **archivio zip**; la miniatura la puoi caricare tu, altrimenti mostra un
+segnaposto. Un link a un sito esterno si crea nei **Segnalibri**: un segnalibro si apre in una nuova scheda o
+dentro Mosaikit, in un riquadro dell'area dei contenuti, come scegli per ciascuno; un sito che vieta di essere
+incorporato (X-Frame-Options o `frame-ancestors` di una CSP) viene riconosciuto a ogni apertura e si apre in
+una nuova scheda. Quando salvi un segnalibro, il titolo e l'immagine del sito (`og:image`, o la prima immagine)
+completano ciò che hai lasciato vuoto. I siti creati da un indirizzo web con una versione precedente restano nei
+**Siti statici**, si aprono in una nuova scheda e un banner offre di scaricarli nel formato di importazione dei
+Segnalibri. Cosa
 puoi fare in un'app dipende dal tuo **profilo di permesso**: alcune persone possono solo leggere, altre
 anche creare, eliminare o condividere. Quando qualcosa non è permesso, l'app lo dice.
 
