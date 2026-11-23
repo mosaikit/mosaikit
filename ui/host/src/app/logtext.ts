@@ -3,6 +3,7 @@
 
 import type { LogEvent } from '../types.ts'
 import { t } from './i18n.ts'
+import { plainText } from './plaintext.ts'
 
 /** Readable description of an event, in the chosen language. */
 export const ACTIONS: Record<string, string> = {
@@ -117,5 +118,5 @@ export function describe(e: Pick<LogEvent, 'action'>): string {
 export function about(e: Pick<LogEvent, 'detail' | 'resource_title'>): string {
   const d = e.detail ?? {}
   const pick = (k: string) => (typeof d[k] === 'string' || typeof d[k] === 'number' ? String(d[k]) : '')
-  return e.resource_title || pick('name') || pick('username') || pick('title') || pick('email') || ''
+  return plainText(e.resource_title || pick('name') || pick('username') || pick('title') || pick('email') || '')
 }

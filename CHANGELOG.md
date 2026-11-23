@@ -10,6 +10,7 @@ in step).
 - Plugins: `msk.publicLink.get(id)`, `msk.publicLink.create(id, { expires_in_days?, password? })` and `msk.publicLink.revoke(id)`: a page (in particular the one that replaces the share dialog, `[ui] share_page`) shows, creates and revokes the public link of an item. The rules are those of the dialog: manage the item, the `share` permission of the plugin, the policy of the tenant (links turned off, maximum lifetime); the same Log events and notification. The address is given once, by `create`. Not available in public links or runs.
 - A person can create at most 30 public links in 10 minutes (the dialog and the pages count together).
 - Kernel: `DELETE /api/t/{t}/resources/{id}/links` revokes every active link of an item.
+- Shell: in the Overview (Recent activity, For you, My recent activity) and in the Log, a title written as Markdown link shows only its text, and a long title without spaces no longer leaves its card.
 
 ## 1.2.0
 
