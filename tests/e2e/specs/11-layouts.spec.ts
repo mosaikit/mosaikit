@@ -34,7 +34,7 @@ test.describe.serial('11-layouts', () => {
     await nav(page, 'System').click()
     await appearanceTab(page, 'Layout')
     const cards = page.getByRole('radiogroup', { name: 'Layout' }).getByRole('radio')
-    await expect(cards).toHaveCount(6)
+    await expect.poll(() => cards.count()).toBeGreaterThanOrEqual(6) // Studio is one more where its plugin is installed
     await accessible(page, 'System › Layout')
 
     for (const id of ['console', 'com.mosaikit.layout-workspace', 'com.mosaikit.layout-suite', 'com.mosaikit.layout-project', 'com.mosaikit.layout-tabs']) {
