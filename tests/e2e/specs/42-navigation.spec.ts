@@ -15,7 +15,7 @@ test.describe.serial('Navigation layout', () => {
     const editor = page.getByTestId('nav-editor')
 
     // NAV-01: the setting is inherited; «Customize» makes it editable
-    await page.getByRole('button', { name: 'Customize' }).click()
+    await page.locator('[data-setting="nav.layout"]').getByRole('button', { name: 'Customize' }).click()
     await editor.getByRole('button', { name: 'Add a group' }).click()
     await editor.getByRole('textbox', { name: 'Name of the group' }).first().fill('Daily work')
     await editor.getByRole('combobox', { name: 'Add an app to the group' }).first().click()

@@ -109,11 +109,13 @@ test.describe.serial('Chat', () => {
     await bubble(fa, 'server down').hover()
     await bubble(fa, 'server down').getByRole('button', { name: 'More actions' }).click()
     await fa.getByRole('menuitem', { name: 'Pin' }).click()
+    // the Pinned tab reads the pinned messages once: wait until the pin is saved (the marker shows in the message)
+    await expect(bubble(fa, 'server down').locator('.cb-pin')).toBeVisible()
     await fa.getByRole('tab', { name: 'Pinned' }).click()
     await expect(fa.locator('.cp-item', { hasText: 'server down' })).toBeVisible()
     await fa.getByRole('tab', { name: 'Files' }).click()
     await expect(fa.getByRole('heading', { name: 'No files yet' })).toBeVisible()
-    await fa.getByRole('tab', { name: 'Chat' }).click()
+    await fa.getByRole('tab', { name: 'Chat', exact: true }).click()
 
     // CHT-16: pin and mute the chat from its menu; the filters
     await fa.locator('.cl-item').first().hover()
