@@ -66,10 +66,13 @@ links** and the apps of the tenant.
 
 Each app opens in the shell (Notes, Tasks, Contacts, Files, Maps, Static sites… depending on the tenant).
 **Static sites** shows its sites as **cards** (default, with a thumbnail) or as a **list** (buttons at the
-right of the toolbar). A site is either a **zip archive** or a **web address**: an address is shown inside
-Mosaikit in a frame and is never downloaded; a site that forbids being framed (X-Frame-Options or a CSP
-`frame-ancestors`) is detected and opens in a new tab. The thumbnail can be uploaded by you; otherwise a site
-given by address shows its own picture (`og:image`, else its first image) and a zip site a placeholder.
+right of the toolbar). A site is a **zip archive**; its thumbnail can be uploaded by you, otherwise it shows
+a placeholder. A link to an outside site is made in **Bookmarks**: a bookmark opens in a new tab or inside
+Mosaikit, in a frame of the content area, as you choose for each one; a site that forbids being framed
+(X-Frame-Options or a CSP `frame-ancestors`) is detected at every open and opens in a new tab. When you save a
+bookmark, the title and the picture of the site (`og:image`, else its first image) fill what you left empty.
+Sites made by web address with an earlier version stay in **Static sites**, open in a new tab, and a banner
+offers to download them in the import format of Bookmarks.
 What you may do in an app depends on your **permission profile**: some people may only read, some may also
 create, delete or share. When something is not allowed, the app says so.
 

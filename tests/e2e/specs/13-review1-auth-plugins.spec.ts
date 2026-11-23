@@ -1,5 +1,3 @@
-import http from 'node:http'
-import type { AddressInfo } from 'node:net'
 import { expect, test, type Page } from '@playwright/test'
 
 // Review round 1: auth and plugins (docs/manual-tests.md, section "Review round 1 - auth and plugins").
@@ -136,87 +134,6 @@ test.describe.serial('review round 1: auth and plugins', () => {
       await page.getByRole('button', { name: 'Forgot your password?' }).click()
     }
     expect(answers[0]).toBe(answers[1])
-  })
-
-  test('R1-A-04 static sites by address in a frame, the ones that forbid framing in a new tab, cards and thumbnails', async ({ page, context }) => {
-    // two sites of "the Internet" on this computer: one open to framing with an og:image, one that forbids it
-    const RED = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==', 'base64')
-    const serve = (headers: Record<string, string>, html: string) =>
-      new Promise<http.Server>((resolve) => {
-        const srv = http.createServer((req, res) => {
-          if (req.url === '/pic.png') {
-            res.writeHead(200, { 'content-type': 'image/png' })
-            res.end(RED)
-            return
-          }
-          res.writeHead(200, { 'content-type': 'text/html', ...headers })
-          res.end(html)
-        })
-        srv.listen(0, '127.0.0.1', () => resolve(srv))
-      })
-    const free = await serve({}, '<title>Free page</title><meta property="og:image" content="/pic.png"><h1>Hello from the free site</h1>')
-    const closed = await serve({ 'x-frame-options': 'DENY' }, '<title>Closed page</title><h1>Closed site</h1><img src="/pic.png">')
-    const tag = Date.now().toString(36)
-    const [freeName, closedName] = [`Free ${tag}`, `Closed ${tag}`]
-    const addr = (s: http.Server) => `http://127.0.0.1:${(s.address() as AddressInfo).port}/`
-    try {
-      await login(page, BASE_URL, 'City of Beta', 'manager', PASSWORD)
-      await nav(page, 'Sites').click()
-      const frame = page.frameLocator('iframe.plugin-frame')
-      await expect(frame.getByRole('heading', { name: 'Sites', exact: true })).toBeVisible()
-      // nothing yet: the illustrated empty state (the cards are the default view once there is an app)
-      await expect(frame.getByTestId('empty-state')).toBeVisible()
-
-      const create = async (name: string, address: string) => {
-        await frame.getByRole('button', { name: '＋ New site' }).first().click()
-        await frame.getByLabel('Web address').check()
-        await frame.locator('#msks-name').fill(name)
-        await frame.locator('#msks-url').fill(address)
-        await frame.getByRole('button', { name: '💾 Save' }).click()
-      }
-
-      // a site by address: kept as an address (nothing uploaded), with the og:image as its thumbnail
-      await create(freeName, addr(free))
-      await expect(frame.locator('.cards')).toBeVisible()
-      const card = frame.locator('article.card', { hasText: freeName })
-      await expect(card.locator('img.thumb')).toBeVisible()
-      await expect(card.locator('.cardmeta')).toContainText('127.0.0.1')
-      // opened in the frame of Mosaikit
-      await card.getByRole('button', { name: /Open$/ }).click()
-      await expect(frame.locator('iframe.sframe').nth(1)).toHaveAttribute('src', addr(free))
-      await expect(frame.frameLocator('iframe.sframe').nth(1).getByRole('heading', { name: 'Hello from the free site' })).toBeVisible()
-      await page.getByRole('button', { name: 'Back to the list of sites' }).click()
-
-      // a site that forbids framing: created with a warning, opened in a new tab, thumbnail = its first image
-      await create(closedName, addr(closed))
-      await expect(frame.locator('#msks-name')).toBeHidden()
-      await expect(frame.getByRole('status').first()).toContainText('opens in a new tab')
-      const closedCard = frame.locator('article.card', { hasText: closedName })
-      await expect(closedCard.locator('img.thumb')).toBeVisible()
-      const popup = context.waitForEvent('page')
-      await closedCard.getByRole('button', { name: /Open$/ }).click()
-      expect((await popup).url()).toBe(addr(closed))
-      await expect(frame.getByText('does not allow being shown inside Mosaikit')).toBeVisible()
-      await page.getByRole('button', { name: 'Back to the list of sites' }).click()
-
-      // the thumbnail uploaded by the person wins over the one of the site
-      await frame.locator('article.card', { hasText: freeName }).getByRole('button', { name: /Edit/ }).click()
-      const before = await frame.locator('.thumbprev').getAttribute('src')
-      await frame.locator('#msks-thumb').setInputFiles({ name: 'mine.gif', mimeType: 'image/gif', buffer: Buffer.from('R0lGODlhAQABAIAAAAUEBAAAACwAAAAAAQABAAACAkQBADs=', 'base64') })
-      await expect(frame.locator('.thumbprev')).not.toHaveAttribute('src', before ?? '')
-      await frame.getByRole('button', { name: '💾 Save' }).click()
-      await expect(frame.locator('article.card', { hasText: freeName }).locator('img.thumb')).toBeVisible()
-
-      // list view with thumbnails
-      await frame.getByRole('button', { name: 'List', exact: true }).click()
-      await expect(frame.locator('table.msk-grid img.thumbsm').first()).toBeVisible()
-      await expect(frame.locator('.cards')).toBeHidden()
-      await frame.getByRole('button', { name: 'Cards', exact: true }).click()
-      await expect(frame.locator('.cards')).toBeVisible()
-    } finally {
-      free.close()
-      closed.close()
-    }
   })
 
   test('R1-A-05 a site uploaded as a zip still opens, with a placeholder thumbnail', async ({ page }) => {
