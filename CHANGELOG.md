@@ -5,6 +5,12 @@ in Help › What is new (one `## <version>` heading per version, `- ` items, `##
 language of the person: this file in English, [CHANGELOG.it.md](CHANGELOG.it.md) in Italian (keep them
 in step).
 
+## 1.4.0
+
+- Presence of people is platform-wide: from the moment the shell of a tenant is open, the other members see the person online in every page and plugin, not only where a real-time channel is open. They are shown as offline as soon as the connection is lost (browser closed, log out). A person is away after 5 minutes without input (typing in a plugin page counts) or with a tab hidden for 2 minutes, and available again on the next input; with several tabs the person is available if any tab is.
+- Plugins: `msk.presence.get()` (`{ [userId]: 'available' | 'away' }`, a person not in it is offline), `msk.presence.status(id)`, `msk.presence.onChange(fn)`, `msk.presence.live` and `msk.presence.supported`. No permission; an older shell reports `supported = false` and the plugin keeps its own logic. The plugin API stays 1.
+- Kernel: `GET /api/t/{t}/presence/stream?tab=<id>&status=<available|away>` (server-sent events: `presence`, `join`, `state`, `leave`, `closed`) and `POST /api/t/{t}/presence/state` `{ tab, status }`; any member of the tenant, nothing is stored.
+
 ## 1.3.0
 
 - Plugins: `msk.publicLink.get(id)`, `msk.publicLink.create(id, { expires_in_days?, password? })` and `msk.publicLink.revoke(id)`: a page (in particular the one that replaces the share dialog, `[ui] share_page`) shows, creates and revokes the public link of an item. The rules are those of the dialog: manage the item, the `share` permission of the plugin, the policy of the tenant (links turned off, maximum lifetime); the same Log events and notification. The address is given once, by `create`. Not available in public links or runs.

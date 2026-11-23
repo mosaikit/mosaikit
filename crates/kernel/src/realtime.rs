@@ -68,6 +68,13 @@ struct Entry {
     name: String,
     state: Value,
     conns: usize,
+    /// presence channel only: the status of each tab (`true` = available); the person is available if any tab is
+    tabs: HashMap<String, bool>,
+}
+
+/// The state of a person on the presence channel given the status of their tabs.
+fn aggregate(tabs: &HashMap<String, bool>) -> Value {
+    serde_json::json!({ "status": if tabs.values().any(|a| *a) { "available" } else { "away" } })
 }
 
 #[derive(Default)]
@@ -236,16 +243,27 @@ struct Guard {
     key: Key,
     ch: Arc<Channel>,
     who: Person,
+    counted: bool,
+    tab: Option<String>,
 }
 
 impl Drop for Guard {
     fn drop(&mut self) {
+        let mut changed = None;
         let gone = {
             let mut g = self.ch.inner.lock().expect("lock channel");
             g.conns = g.conns.saturating_sub(1);
             match g.people.get_mut(&self.who.id) {
                 Some(e) if e.conns > 1 => {
                     e.conns -= 1;
+                    if let Some(t) = &self.tab {
+                        e.tabs.remove(t);
+                        let now = aggregate(&e.tabs);
+                        if now != e.state {
+                            e.state = now.clone();
+                            changed = Some(now);
+                        }
+                    }
                     false
                 }
                 Some(_) => {
@@ -255,10 +273,13 @@ impl Drop for Guard {
                 None => false,
             }
         };
+        if let Some(now) = changed {
+            push(&self.ch, "state", Person { state: Some(now), ..self.who.clone() }, Value::Null, None);
+        }
         if gone {
             push(&self.ch, "leave", Person { state: None, ..self.who.clone() }, Value::Null, None);
         }
-        {
+        if self.counted {
             let mut o = self.k.rt.opens.lock().expect("lock opens");
             if let Some(n) = o.get_mut(&self.who.id) {
                 *n = n.saturating_sub(1);
@@ -286,8 +307,25 @@ pub async fn subscribe(
     if size(&state) > MAX_STATE {
         return Err(bad("rt_too_large", "the state is too large"));
     }
+    let key: Key = (c.tenant.tenant_id, resource, plugin.to_string(), name.to_string());
+    join(k, c, key, last_seq, state, MAX_LISTENERS, true, None)
+}
+
+/// Joins the channel `key` (the right to do so is already checked). `counted`: the connection counts against
+/// `MAX_OPEN_PER_USER`; `max` is the largest number of connections of the channel.
+#[allow(clippy::too_many_arguments)]
+fn join(
+    k: &Arc<Kernel>,
+    c: &Caller,
+    key: Key,
+    last_seq: Option<u64>,
+    state: Value,
+    max: usize,
+    counted: bool,
+    tab: Option<&str>,
+) -> Result<Subscription> {
     let me = c.user.user_id;
-    {
+    if counted {
         let mut o = k.rt.opens.lock().expect("lock opens");
         let n = o.entry(me).or_insert(0);
         if *n >= MAX_OPEN_PER_USER {
@@ -295,30 +333,54 @@ pub async fn subscribe(
         }
         *n += 1;
     }
-    let key: Key = (c.tenant.tenant_id, resource, plugin.to_string(), name.to_string());
     let ch = k.rt.channel(&key);
     let who = person_of(c, None);
-    let (rx, joined, people, replay, gap) = {
+    let (rx, joined, state, changed, people, replay, gap) = {
         let mut g = ch.inner.lock().expect("lock channel");
-        if g.conns >= MAX_LISTENERS {
+        if g.conns >= max {
             drop(g);
-            let mut o = k.rt.opens.lock().expect("lock opens");
-            if let Some(n) = o.get_mut(&me) {
-                *n = n.saturating_sub(1);
+            if counted {
+                let mut o = k.rt.opens.lock().expect("lock opens");
+                if let Some(n) = o.get_mut(&me) {
+                    *n = n.saturating_sub(1);
+                }
             }
+            k.rt.tidy(&key);
             return Err(Error::new(Kind::TooMany, "too many people on this channel").with_code("rt_rate"));
         }
         g.conns += 1;
         let rx = ch.tx.subscribe();
+        let mut state = state;
+        let mut changed = false;
         let joined = match g.people.get_mut(&me) {
             Some(e) => {
                 e.conns += 1;
-                // the newest tab sets the state
-                e.state = state.clone();
+                match tab {
+                    // presence: the person is available if any tab is
+                    Some(t) => {
+                        e.tabs.insert(
+                            t.to_string(),
+                            state.get("status").and_then(Value::as_str) == Some("available"),
+                        );
+                        state = aggregate(&e.tabs);
+                        changed = state != e.state;
+                        e.state = state.clone();
+                    }
+                    // the newest tab sets the state
+                    None => e.state = state.clone(),
+                }
                 false
             }
             None => {
-                g.people.insert(me, Entry { name: who.name.clone(), state: state.clone(), conns: 1 });
+                let tabs = tab
+                    .map(|t| {
+                        HashMap::from([(
+                            t.to_string(),
+                            state.get("status").and_then(Value::as_str) == Some("available"),
+                        )])
+                    })
+                    .unwrap_or_default();
+                g.people.insert(me, Entry { name: who.name.clone(), state: state.clone(), conns: 1, tabs });
                 true
             }
         };
@@ -338,11 +400,22 @@ pub async fn subscribe(
             None => Vec::new(),
         };
         let gap = last_seq.is_some_and(|last| last < g.seq && oldest.is_none_or(|o| o > last + 1));
-        (rx, joined, people, replay, gap)
+        (rx, joined, state, changed, people, replay, gap)
     };
+    if changed {
+        push(&ch, "state", Person { state: Some(state.clone()), ..who.clone() }, Value::Null, None);
+    }
     let own_join = joined
         .then(|| push(&ch, "join", Person { state: Some(state), ..who.clone() }, Value::Null, None).seq);
-    Ok(Subscription { rx, people, replay, gap, me, own_join, guard: Guard { k: k.clone(), key, ch, who } })
+    Ok(Subscription {
+        rx,
+        people,
+        replay,
+        gap,
+        me,
+        own_join,
+        guard: Guard { k: k.clone(), key, ch, who, counted, tab: tab.map(String::from) },
+    })
 }
 
 /// Sends a message to the channel (to one person with `to`): needs the right to write. Returns its sequence number.
@@ -405,6 +478,81 @@ pub async fn set_state(
     Ok(())
 }
 
+// ------------------------------------------------------------------------------------------------------ platform presence
+
+/// Largest number of connections (tabs) on the presence channel of a tenant.
+pub const MAX_PRESENCE: usize = 5000;
+/// Version of the presence protocol (the `v` of the stream); grows only when a field changes meaning.
+pub const PRESENCE_VERSION: u32 = 1;
+
+/// Reserved channel of the platform: the people of a tenant that have the shell open. It is `(tenant, nil, "_kernel",
+/// "presence")`: no plugin can reach it (the name of a plugin cannot start with `_`, and the plugin routes check the
+/// resource), and nothing is stored.
+fn presence_key(c: &Caller) -> Key {
+    (c.tenant.tenant_id, Uuid::nil(), "_kernel".to_string(), "presence".to_string())
+}
+
+/// The state of a person on the presence channel: `{"status": "available" | "away"}` and nothing else.
+pub fn presence_state(v: &Value) -> Result<Value> {
+    match v.get("status").and_then(Value::as_str) {
+        Some(s @ ("available" | "away")) => Ok(serde_json::json!({ "status": s })),
+        _ => Err(bad("presence_state", "the status is `available` or `away`")),
+    }
+}
+
+/// A person with the shell open starts to be seen as online by the other members of the tenant. A person with several
+/// tabs is one entry (the state of the newest tab; the clients send the state of the whole browser). When the last
+/// connection goes, the others receive `leave`.
+pub fn subscribe_presence(k: &Arc<Kernel>, c: &Caller, tab: &str, state: &Value) -> Result<Subscription> {
+    if c.run.is_some() {
+        return Err(Error::forbidden("presence is not available in a call on behalf of a run")
+            .with_code("permission_denied"));
+    }
+    if !valid_name(tab) {
+        return Err(bad("rt_name", "the tab is 1 to 64 characters of a-z 0-9 _ - ."));
+    }
+    let state = presence_state(state)?;
+    join(k, c, presence_key(c), None, state, MAX_PRESENCE, false, Some(tab))
+}
+
+/// Changes the presence state of the caller (away, back): the caller must have the stream open.
+pub fn set_presence(k: &Kernel, c: &Caller, tab: &str, state: &Value) -> Result<()> {
+    if !valid_name(tab) {
+        return Err(bad("rt_name", "the tab is 1 to 64 characters of a-z 0-9 _ - ."));
+    }
+    let state = presence_state(state)?;
+    if !k.limiter.hit(&format!("presence:{}", c.user.user_id), 20, Duration::from_secs(10)) {
+        return Err(Error::new(Kind::TooMany, "too many changes: slow down").with_code("rt_rate"));
+    }
+    let key = presence_key(c);
+    let ch = k.rt.channel(&key);
+    let mut who = person_of(c, Some(state.clone()));
+    {
+        let mut g = ch.inner.lock().expect("lock channel");
+        match g.people.get_mut(&c.user.user_id) {
+            Some(e) if e.tabs.contains_key(tab) => {
+                e.tabs.insert(
+                    tab.to_string(),
+                    state.get("status").and_then(Value::as_str) == Some("available"),
+                );
+                let now = aggregate(&e.tabs);
+                if now == e.state {
+                    return Ok(());
+                }
+                e.state = now;
+                who.state = Some(e.state.clone());
+            }
+            _ => {
+                drop(g);
+                k.rt.tidy(&key);
+                return Err(bad("rt_not_connected", "open the presence stream first"));
+            }
+        }
+    }
+    push(&ch, "state", who, Value::Null, None);
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -451,6 +599,17 @@ mod tests {
         assert!(!f.is_for(Uuid::from_u128(3)));
         let all = Frame { to: None, ..f };
         assert!(all.is_for(Uuid::from_u128(3)));
+    }
+
+    #[test]
+    fn presence_state_is_closed() {
+        assert_eq!(
+            presence_state(&serde_json::json!({"status": "away", "x": 1})).unwrap(),
+            serde_json::json!({"status": "away"})
+        );
+        assert!(presence_state(&serde_json::json!({"status": "busy"})).is_err());
+        assert!(presence_state(&serde_json::json!({})).is_err());
+        assert!(presence_state(&Value::Null).is_err());
     }
 
     #[test]

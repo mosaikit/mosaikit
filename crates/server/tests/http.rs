@@ -3130,3 +3130,79 @@ realtime = true
         .await;
     assert_eq!(r.json()["code"], "rt_not_connected", "{}", r.text());
 }
+
+#[tokio::test]
+async fn platform_presence_over_http() {
+    let a = App::new().await;
+    let g = a.t.tenant("alfa").await;
+    a.t.member(&g, "anna").await;
+    a.t.member(&g, "bruno").await;
+    let other = a.t.tenant("beta").await;
+    a.t.member(&other, "carla").await;
+    let anna = a.login("alfa", "anna", PASSWORD).await;
+    let bruno = a.login("alfa", "bruno", PASSWORD).await;
+    let carla = a.login("beta", "carla", PASSWORD).await;
+    let open = |who: &Session, tenant: &str, tab: &str| {
+        Request::builder()
+            .uri(format!("/api/t/{tenant}/presence/stream?tab={tab}"))
+            .header(header::COOKIE, &who.cookie)
+            .body(Body::empty())
+            .unwrap()
+    };
+    // anna is online: the first event lists her only (a person of another tenant is not there)
+    let res = a.app.clone().oneshot(open(&anna, "alfa", "a1")).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let mut abody = res.into_body();
+    let mut seen = String::new();
+    read_until(&mut abody, &mut seen, "event: presence").await;
+    assert!(seen.contains("\"v\":1") && seen.contains("anna") && !seen.contains("bruno"), "{seen}");
+    let res = a.app.clone().oneshot(open(&carla, "beta", "c1")).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let _cbody = res.into_body();
+    // bruno comes in with one tab: anna sees him join, available
+    seen.clear();
+    let res = a.app.clone().oneshot(open(&bruno, "alfa", "b1")).await.unwrap();
+    let b1 = res.into_body();
+    read_until(&mut abody, &mut seen, "event: join").await;
+    assert!(seen.contains("bruno") && seen.contains("\"status\":\"available\""), "{seen}");
+    assert!(!seen.contains("carla"), "{seen}");
+    // the tab goes away: anna sees it
+    seen.clear();
+    let set = |who: &Session, tab: &str, status: &str| {
+        let (cookie, csrf) = (who.cookie.clone(), who.csrf.clone());
+        let body = json!({ "tab": tab, "status": status }).to_string();
+        Request::builder()
+            .method(Method::POST)
+            .uri("/api/t/alfa/presence/state")
+            .header(header::COOKIE, cookie)
+            .header("x-csrf-token", csrf)
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from(body))
+            .unwrap()
+    };
+    let r = a.app.clone().oneshot(set(&bruno, "b1", "away")).await.unwrap();
+    assert_eq!(r.status(), StatusCode::OK);
+    read_until(&mut abody, &mut seen, "event: state").await;
+    assert!(seen.contains("\"status\":\"away\""), "{seen}");
+    // a second tab is available: he is available (any tab is enough)
+    seen.clear();
+    let res = a.app.clone().oneshot(open(&bruno, "alfa", "b2")).await.unwrap();
+    let b2 = res.into_body();
+    read_until(&mut abody, &mut seen, "event: state").await;
+    assert!(seen.contains("\"status\":\"available\""), "{seen}");
+    // closing it leaves the other tab, which is away
+    seen.clear();
+    drop(b2);
+    read_until(&mut abody, &mut seen, "event: state").await;
+    assert!(seen.contains("\"status\":\"away\""), "{seen}");
+    // a bad status and an unknown tab are refused
+    let r = a.app.clone().oneshot(set(&bruno, "b1", "busy")).await.unwrap();
+    assert_eq!(r.status(), StatusCode::BAD_REQUEST);
+    let r = a.app.clone().oneshot(set(&bruno, "zzz", "away")).await.unwrap();
+    assert_eq!(r.status(), StatusCode::BAD_REQUEST);
+    // the connection is lost: the others see him leave at once
+    seen.clear();
+    drop(b1);
+    read_until(&mut abody, &mut seen, "event: leave").await;
+    assert!(seen.contains("bruno"), "{seen}");
+}

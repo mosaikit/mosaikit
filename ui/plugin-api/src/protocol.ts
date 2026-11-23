@@ -109,6 +109,17 @@ export interface HostEvents {
   'band.back': Record<string, never>
   /** something happened on a real-time channel the plugin opened (see `msk.realtime`) */
   'rt.event': RealtimeEvent
+  /** the list of people online changed (see `msk.presence`) */
+  presence: PresenceSnapshot
+}
+
+/** Status of a person that has the shell open: `available`, or `away` after 5 minutes without input (or a tab hidden for long). */
+export type PresenceStatus = 'available' | 'away'
+
+/** What the host sends for `msk.presence`: `live` is false while the connection of the shell is down. */
+export interface PresenceSnapshot {
+  live: boolean
+  users: Record<string, PresenceStatus>
 }
 
 /** A person on a real-time channel. `state` is what they last set with `setState` (typing, cursor, muted…). */
@@ -342,6 +353,8 @@ export interface Hello {
   /** the plugin API the host speaks (see `API_VERSION`); hosts before the handshake omit it and speak API 1 */
   api?: number
   public: boolean
+  /** recent hosts: the shell publishes the presence of the tenant (`msk.presence`) */
+  presence?: boolean
   user?: { id: string; username: string; name: string }
   tenant?: { slug: string; name: string; role: 'manager' | 'member' }
   plugin?: { id: string; version: string }

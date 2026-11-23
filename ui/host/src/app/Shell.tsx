@@ -49,6 +49,7 @@ import Frame from './frames.tsx'
 import { backFromActiveEntry, bandEmit, resetBand, useBand } from './contextband.ts'
 import CommentsController from './CommentsPanel.tsx'
 import { toggleComments, useCommentsState } from './comments.ts'
+import { startPresence } from './presence.ts'
 import { BackButton, CommentsButton, ModeSwitch, Presence } from './ContextBand.tsx'
 
 export { AppMark, TenantBadge } from './slots.tsx'
@@ -413,6 +414,9 @@ export default function Shell({ session, route, children }: { session: Session; 
   // the contextual band of a plugin page never outlives the route it was set on
   const routeKey = route.area === 'tenant' ? `${route.tenant}/${route.page}/${route.id ?? ''}` : route.area
   useEffect(() => resetBand(), [routeKey])
+  // as soon as the person is in a tenant the others see them online, in every page; closing the shell (logout, tab) ends it
+  const presenceTenant = route.area === 'tenant' ? route.tenant : ''
+  useEffect(() => (presenceTenant ? startPresence(presenceTenant) : undefined), [presenceTenant])
   const commentsResource = useBand()?.comments?.resource ?? null
   useEffect(() => applyStyle(style, layout), [style, layout])
   return (

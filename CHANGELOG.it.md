@@ -4,6 +4,12 @@ Cosa cambia da una versione di Mosaikit alla successiva. La shell mostra la sezi
 Aiuto › Novità (un titolo `## <versione>` per versione, voci `- `, gruppi `### `). Questo file è la
 versione italiana di [CHANGELOG.md](CHANGELOG.md): tenerli allineati.
 
+## 1.4.0
+
+- La presenza delle persone vale per tutta la piattaforma: da quando la shell di un'organizzazione è aperta, gli altri membri vedono la persona online in ogni pagina e plugin, non solo dove è aperto un canale in tempo reale. Risulta offline appena la connessione cade (browser chiuso, uscita). La persona è assente dopo 5 minuti senza input (scrivere in una pagina di plugin conta) o con una scheda nascosta da 2 minuti, e di nuovo disponibile al primo input; con più schede è disponibile se lo è almeno una.
+- Plugin: `msk.presence.get()` (`{ [userId]: 'available' | 'away' }`, chi non c'è è offline), `msk.presence.status(id)`, `msk.presence.onChange(fn)`, `msk.presence.live` e `msk.presence.supported`. Nessun permesso; una shell più vecchia dà `supported = false` e il plugin mantiene la propria logica. L'API dei plugin resta 1.
+- Kernel: `GET /api/t/{t}/presence/stream?tab=<id>&status=<available|away>` (server-sent events: `presence`, `join`, `state`, `leave`, `closed`) e `POST /api/t/{t}/presence/state` `{ tab, status }`; qualsiasi membro dell'organizzazione, nulla viene salvato.
+
 ## 1.3.0
 
 - Plugin: `msk.publicLink.get(id)`, `msk.publicLink.create(id, { expires_in_days?, password? })` e `msk.publicLink.revoke(id)`: una pagina (in particolare quella che sostituisce la finestra di condivisione, `[ui] share_page`) mostra, crea e revoca il link pubblico di un elemento. Valgono le regole della finestra: gestire l'elemento, permesso `share` del plugin, politica dell'organizzazione (link disattivati, durata massima); gli stessi eventi nel Log e la stessa notifica. L'indirizzo è dato una sola volta, da `create`. Non disponibile nei link pubblici né nei run.

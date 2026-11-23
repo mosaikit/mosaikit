@@ -7,6 +7,7 @@ import { useUi } from '../ui-context.ts'
 import { pickOptions, sharePre } from './sharepre.ts'
 import { pageTextsFor, t } from '../app/i18n.ts'
 import { timed } from '../app/devlog.ts'
+import { pluginInput, watchPresence } from '../app/presence.ts'
 import { NAV_RESELECT, resetBand, sanitizeBand, setBand } from '../app/contextband.ts'
 import ExtensionTab, { type TabState } from './ExtensionTab.tsx'
 
@@ -96,6 +97,15 @@ export default function PluginFrame({ plugin, session, ctx, reloadKey, ui: shell
     streams.current.clear()
   }, [])
   useEffect(() => closeStreams, [src, closeStreams])
+  // the page listens to the presence of the tenant (`msk.presence`): one subscription to the store of the shell
+  const unwatchPresence = useRef<(() => void) | null>(null)
+  useEffect(
+    () => () => {
+      unwatchPresence.current?.()
+      unwatchPresence.current = null
+    },
+    [src],
+  )
 
   /** Opens the stream of a channel and relays what arrives to the page. The browser reconnects by itself (with `Last-Event-ID`). */
   const openStream = useCallback(
@@ -168,10 +178,13 @@ export default function PluginFrame({ plugin, session, ctx, reloadKey, ui: shell
             // every document of the plugin starts with `hello`: the band and the channels of the page it replaces go
             resetBand(owner)
             closeStreams()
+            unwatchPresence.current?.()
+            unwatchPresence.current = null
             reply({
               ok: {
                 api: SHELL_API,
                 public: false,
+                presence: true,
                 user: { id: session.user.user_id, username: session.user.username, name: session.user.display_name || session.user.username },
                 tenant: { slug: ctx.tenant.slug, name: ctx.tenant.name, role: ctx.tenant.role },
                 plugin: { id: plugin.id, version: plugin.version },
@@ -207,6 +220,15 @@ export default function PluginFrame({ plugin, session, ctx, reloadKey, ui: shell
             reply({ ok: null })
             return
           }
+          // platform-wide presence (`msk.presence`): the page starts to hear the list; input in the page keeps the person available
+          case 'presence.watch':
+            unwatchPresence.current ??= watchPresence((s) => toBase('presence', s))
+            reply({ ok: null })
+            return
+          case 'presence.activity':
+            pluginInput()
+            reply({ ok: null })
+            return
           case 'rt.close': {
             const handle = String(m.args?.handle ?? '')
             streams.current.get(handle)?.close()
