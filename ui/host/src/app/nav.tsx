@@ -141,7 +141,6 @@ export function useNav(session: Session, route: Route, grouped = false): Nav {
       label: t('Tenant management'),
       icon: <Building2 />,
       iconId: 'tenants',
-      collapsible: true,
       items: [
         { label: t('Manage'), icon: <Users />, iconId: 'manage', href: to.tenant(slug, 'manage'), active: page === 'manage' || page === 'person' || page === 'group' },
         { label: t('Plugins'), icon: <Puzzle />, iconId: 'plugins', href: to.tenant(slug, 'plugins'), active: page === 'plugins' },
