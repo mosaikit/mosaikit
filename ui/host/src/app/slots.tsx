@@ -29,7 +29,7 @@ import { cn } from '@/lib/utils'
 import SearchBox from './SearchBox.tsx'
 import { initials, useTenantCtx } from './core.ts'
 import { PersonPicture } from './picture.tsx'
-import { navGroupOpen, setNavGroupOpen } from './prefs.ts'
+import { navGroupOpen, setNavGroupOpen, useRailLabels } from './prefs.ts'
 import { allItems } from './navgroups.ts'
 import { bandIcon, hasActive, searchGroups, type Nav, type NavGroup, type NavItem } from './nav.tsx'
 import { setLang, t, useLang, useLanguages, type Lang } from './i18n.ts'
@@ -143,19 +143,22 @@ export function NavTree({ groups, bottom, labels = true, onPick, mini = false }:
   )
 }
 
-const itemClass = (active: boolean, mini: boolean) =>
+const itemClass = (active: boolean, mini: boolean, labels = false) =>
   cn(
     'msk-nav-item flex h-9 w-full min-w-0 items-center gap-2.5 rounded-md px-2.5 text-left text-sm text-sidebar-foreground outline-none hover:bg-sidebar-hover focus-visible:ring-2 focus-visible:ring-sidebar-ring [&>svg]:size-[18px] [&>svg]:shrink-0',
     active && 'bg-sidebar-accent font-semibold text-sidebar-accent-foreground',
     mini && 'justify-center px-0',
+    // the closed bar with the names under the icons (Account › Appearance and language), as the rail of Teams
+    mini && labels && 'h-[56px] flex-col gap-1',
   )
 
 /** An icon of the closed sidebar with a menu: it opens on click, keyboard and, with a mouse, on hover. */
 function MiniFlyout({ item }: { item: NavItem }) {
   const hover = useHoverMenu(true)
+  const labels = useRailLabels()
   return (
     <li {...hover.areaProps}>
-      <FlyoutMenu item={item} hover={hover} trigger={<button type="button" className={itemClass(hasActive(item), true)} data-icon={item.iconId} aria-label={item.label}>{item.icon}</button>} />
+      <FlyoutMenu item={item} hover={hover} trigger={<button type="button" className={itemClass(hasActive(item), true, labels)} data-icon={item.iconId} aria-label={item.label}>{item.icon}{labels && <span className="max-w-[56px] truncate text-[11px] leading-none">{item.short ?? item.label}</span>}</button>} />
     </li>
   )
 }
@@ -163,13 +166,15 @@ function MiniFlyout({ item }: { item: NavItem }) {
 function TreeItem({ item, onPick, mini, depth = 0 }: { item: NavItem; onPick?: () => void; mini: boolean; depth?: number }) {
   const kids = item.children ?? []
   const [open, setOpen] = useState(() => hasActive(item))
+  const labels = useRailLabels()
   if (mini) {
     // closed sidebar: only the icon; an entry with children opens its pages in a menu at the side
     if (!kids.length)
       return (
         <li>
-          <a href={item.href} className={itemClass(item.active, true)} data-icon={item.iconId} aria-label={item.label} title={item.label} aria-current={item.active ? 'page' : undefined} onClick={(e) => { if (backFromActiveEntry(item.active)) e.preventDefault(); onPick?.() }}>
+          <a href={item.href} className={itemClass(item.active, true, labels)} data-icon={item.iconId} aria-label={item.label} title={item.label} aria-current={item.active ? 'page' : undefined} onClick={(e) => { if (backFromActiveEntry(item.active)) e.preventDefault(); onPick?.() }}>
             {item.icon}
+            {labels && <span className="max-w-[56px] truncate text-[11px] leading-none">{item.short ?? item.label}</span>}
           </a>
         </li>
       )

@@ -32,10 +32,18 @@ pub struct Personal {
     pub link_views: i64,
     pub recent_shares: Vec<SharedItem>,
     pub activity: Vec<Activity>,
+    /// the actions of the person for each of the last 35 days (the map of «Your activity»)
+    pub days: Vec<MyDay>,
     /// «Pick up where you left off»: the items the person created or changed last, still visible
     pub pick_up: Vec<HomeItem>,
     /// «Due soon»: visible items with a due date (`due_field` of the plugins) within a week, late ones too
     pub due: Vec<HomeItem>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct MyDay {
+    pub day: String,
+    pub events: i64,
 }
 
 /// An item of the Home of a person, with the time that matters (last change, or due date).
@@ -241,7 +249,25 @@ async fn personal(k: &Kernel, c: &Caller) -> Result<Personal> {
             at: r.get(3),
         }
     };
+    let my_days = mosaikit_db::query(
+        "select to_char(d::date, 'YYYY-MM-DD'), count(e.id)
+         from generate_series(current_date - 34, current_date, interval '1 day') d
+         left join core.events e on e.tenant_id = $1 and e.user_id = $2 and e.ts >= d and e.ts < d + interval '1 day'
+         group by d order by d",
+    )
+    .sqlite(
+        "with recursive d(day) as (
+           select date('now', '-34 days') union all select date(day, '+1 day') from d where day < date('now'))
+         select d.day, count(e.id)
+         from d left join core_events e on e.tenant_id = ?1 and e.user_id = ?2 and e.ts >= d.day and e.ts < date(d.day, '+1 day')
+         group by d.day order by d.day",
+    )
+    .bind(t)
+    .bind(me)
+    .fetch_all(&k.db)
+    .await?;
     Ok(Personal {
+        days: my_days.iter().map(|r| MyDay { day: r.get(0), events: r.get(1) }).collect(),
         pick_up: picked.iter().map(item).collect(),
         due: due.iter().map(item).collect(),
         resources,

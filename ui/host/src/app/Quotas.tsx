@@ -626,18 +626,47 @@ export function QuotaAlert({ slug, manager, compact }: { slug: string; manager: 
 }
 
 /** The Usage panel of the overview of the tenant (Tenant Manager). */
-export function UsagePanel({ slug }: { slug: string }) {
+/** Usage on the overview: for each figure its icon slot, the value against the limit and a line of its trend
+ *  (`series` has the values day by day, by metric). */
+export function UsagePanel({ slug, series }: { slug: string; series?: Partial<Record<QuotaMetric, number[]>> }) {
   const q = useApi<TenantQuotas>(['quotas', slug], `/api/t/${enc(slug)}/manage/quotas`)
   if (!q.data) return null
+  const tones: Record<string, string> = { storage: 'text-sky-500', people: 'text-emerald-500', items: 'text-rose-500' }
   return (
-    <section className="grid gap-3 rounded-xl border bg-card p-4">
+    <section className="grid content-start gap-3 rounded-lg border bg-card p-4 shadow-sm" data-widget="ov-usage">
       <div className="flex items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold">{t('Usage')}</h2>
+        <h2 data-widget-title="ov-usage" className="flex min-w-0 items-center gap-2 text-sm font-semibold">
+          <span data-widget-icon="" aria-hidden="true" className="shrink-0" />
+          {t('Usage')}
+        </h2>
         <a className="text-sm text-primary underline-offset-4 hover:underline" href={to.tenant(slug, 'usage')}>
           {t('Details')}
         </a>
       </div>
-      <QuotaList rows={q.data.rows} forecast={false} />
+      <ul className="grid gap-4">
+        {q.data.rows.map((r) => {
+          const values = series?.[r.metric] ?? []
+          return (
+            <li key={r.metric} className="flex items-center gap-3" data-quota={r.metric}>
+              <span data-widget-icon="" data-usage={r.metric} aria-hidden="true" className="shrink-0" />
+              <span className="min-w-0 flex-1">
+                <b className="block text-sm">{metricLabel(r.metric)}</b>
+                <span className="text-xs text-muted-foreground tabular-nums">{r.metric === 'storage' ? fmtBytes(r.used) : r.used} · {r.limit === null ? t('no limit') : fmtQuota(r.metric, r.limit)}</span>
+              </span>
+              <svg viewBox="0 0 100 32" preserveAspectRatio="none" role="img" aria-label={metricLabel(r.metric)} className={cn('h-10 w-32 shrink-0', tones[r.metric] ?? 'text-primary')}>
+                {values.length > 1 ? (
+                  <>
+                    <path d={values.map((v, k) => `${k ? 'L' : 'M'}${((k / (values.length - 1)) * 100).toFixed(2)} ${(30 - (v / Math.max(1, ...values)) * 26).toFixed(2)}`).join(' ') + ' L100 32 L0 32 Z'} fill="currentColor" opacity="0.14" />
+                    <path d={values.map((v, k) => `${k ? 'L' : 'M'}${((k / (values.length - 1)) * 100).toFixed(2)} ${(30 - (v / Math.max(1, ...values)) * 26).toFixed(2)}`).join(' ')} fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+                  </>
+                ) : (
+                  <path d="M0 29 L100 29" stroke="currentColor" strokeWidth="1.5" opacity="0.4" vectorEffect="non-scaling-stroke" />
+                )}
+              </svg>
+            </li>
+          )
+        })}
+      </ul>
     </section>
   )
 }

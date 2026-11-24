@@ -16,7 +16,7 @@ const hue = (a: Accent) => (a === 'indigo' ? 'var(--primary-strong)' : `var(--ov
 
 /** The strip at the top of an overview: a gradient, the greeting, one line and the actions. The colours are the
  *  same in light and dark (white on a deep gradient, 4.5:1 or more everywhere). */
-export function Hero({ id, title, sub, actions }: { id: string; title: string; sub?: ReactNode; actions?: ReactNode }) {
+export function Hero({ id, eyebrow, title, sub, actions }: { id: string; eyebrow?: string; title: string; sub?: ReactNode; actions?: ReactNode }) {
   return (
     <section aria-labelledby={id} data-testid="ov-hero" className="ov-hero relative overflow-hidden rounded-lg px-6 py-5 text-white shadow-sm max-[620px]:px-4">
       <svg aria-hidden="true" viewBox="0 0 400 120" preserveAspectRatio="xMidYMid slice" className="pointer-events-none absolute inset-0 size-full opacity-20">
@@ -26,6 +26,7 @@ export function Hero({ id, title, sub, actions }: { id: string; title: string; s
       </svg>
       <div className="relative flex flex-col items-start justify-between gap-y-4">
         <div className="min-w-0">
+          {eyebrow && <p className="mb-1 text-xs font-semibold tracking-wider text-white/85 uppercase">{eyebrow}</p>}
           <h2 id={id} className="text-2xl leading-tight font-extrabold">
             {title}
           </h2>
@@ -38,15 +39,16 @@ export function Hero({ id, title, sub, actions }: { id: string; title: string; s
 }
 
 /** A button on the hero: white, or outlined. */
-export function HeroLink({ href, children, ghost }: { href: string; children: ReactNode; ghost?: boolean }) {
+export function HeroLink({ href, children, ghost, icon }: { href: string; children: ReactNode; ghost?: boolean; icon?: ReactNode }) {
   return (
     <a
       href={href}
       className={cn(
-        'inline-flex h-9 items-center rounded-md border px-3.5 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-white/80',
+        'inline-flex h-10 items-center gap-2 rounded-md border px-4 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-white/80',
         ghost ? 'border-white/60 text-white hover:bg-white/15' : 'border-white bg-white text-[#2b2c6e] hover:bg-white/90',
       )}
     >
+      {icon}
       {children}
     </a>
   )
@@ -194,5 +196,119 @@ export function AppShortcuts({ slug, apps, counts }: { slug: string; apps: Plugi
         </li>
       ))}
     </ul>
+  )
+}
+
+/** An area with a line, dashed guides, the first and last label and a dot on the last value (the trend of a card). */
+export function AreaChart({ values, labels, label, className }: { values: number[]; labels?: [string, string]; label: string; className?: string }) {
+  const max = Math.max(1, ...values)
+  const n = values.length
+  const x = (i: number) => (n > 1 ? (i / (n - 1)) * 100 : 100)
+  const y = (v: number) => 4 + (1 - v / max) * 40
+  const line = values.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(2)} ${y(v).toFixed(2)}`).join(' ')
+  const gid = `ov-area-${label.replace(/[^a-z0-9]/gi, '')}`
+  return (
+    <div className={cn('grid gap-1', className)}>
+      <svg viewBox="0 0 100 48" preserveAspectRatio="none" role="img" aria-label={label} className="h-28 w-full text-primary-strong">
+        <defs>
+          <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="currentColor" stopOpacity="0.28" />
+            <stop offset="100%" stopColor="currentColor" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        {[4, 24, 44].map((g) => (
+          <line key={g} x1="0" x2="100" y1={g} y2={g} stroke="currentColor" strokeOpacity="0.25" strokeDasharray="2 2" strokeWidth="0.5" vectorEffect="non-scaling-stroke" />
+        ))}
+        {n > 1 && <path d={`${line} L100 44 L0 44 Z`} fill={`url(#${gid})`} />}
+        {n > 1 && <path d={line} fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />}
+      </svg>
+      {labels && (
+        <div className="flex justify-between text-[11px] text-muted-foreground">
+          <span>{labels[0]}</span>
+          <span>{labels[1]}</span>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** Columns for the last days, the latest one in the strong colour; a label under every third. */
+export function DayBars({ days, label }: { days: { label: string; value: number }[]; label: string }) {
+  const max = Math.max(1, ...days.map((d) => d.value))
+  return (
+    <div role="img" aria-label={label} className="grid gap-1">
+      <div className="flex h-16 items-end gap-[3px]">
+        {days.map((d, i) => (
+          <span
+            key={i}
+            title={`${d.label}: ${d.value}`}
+            className={cn('min-h-[3px] flex-1 rounded-t-[3px]', i === days.length - 1 ? 'bg-primary-strong' : 'bg-primary-strong/30')}
+            style={{ height: `${Math.max(4, (d.value / max) * 100)}%` }}
+          />
+        ))}
+      </div>
+      <div className="flex gap-[3px] text-[11px] text-muted-foreground">
+        {days.map((d, i) => (
+          <span key={i} className="flex-1 overflow-visible whitespace-nowrap">
+            {i % 3 === 0 ? d.label : ''}
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/** The actions of the person, day by day, in weeks (columns) and week days (rows, Monday first). */
+export function Heatmap({ days, label, tip }: { days: { day: string; events: number }[]; label: string; tip: (day: string, n: number) => string }) {
+  if (!days.length) return null
+  const first = new Date(days[0].day + 'T00:00:00')
+  const offset = (first.getDay() + 6) % 7
+  const cells: ({ day: string; events: number } | null)[] = [...Array<null>(offset).fill(null), ...days]
+  while (cells.length % 7) cells.push(null)
+  const weeks = cells.length / 7
+  const max = Math.max(1, ...days.map((d) => d.events))
+  const level = (n: number) => (n === 0 ? 0.12 : 0.3 + 0.7 * (n / max))
+  const letters = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
+  const months = Array.from({ length: weeks }, (_, w) => {
+    const d = cells.slice(w * 7, w * 7 + 7).find(Boolean)
+    const m = d ? new Date(d.day + 'T00:00:00') : null
+    return m && (w === 0 || m.getMonth() !== new Date((cells.slice((w - 1) * 7, w * 7).find(Boolean) as { day: string }).day + 'T00:00:00').getMonth()) ? m.toLocaleString(undefined, { month: 'short' }) : ''
+  })
+  return (
+    <div role="img" aria-label={label} className="grid gap-1 text-[11px] text-muted-foreground">
+      <div className="grid gap-1" style={{ gridTemplateColumns: `14px repeat(${weeks}, minmax(0, 1fr))` }}>
+        <span />
+        {months.map((m, i) => (
+          <span key={i}>{m}</span>
+        ))}
+        {letters.map((l, r) => (
+          <>
+            <span key={`l${r}`} className="leading-4">{l}</span>
+            {Array.from({ length: weeks }, (_, w) => {
+              const c = cells[w * 7 + r]
+              return c ? (
+                <span key={`${r}-${w}`} title={tip(c.day, c.events)} className="h-4 rounded-[3px] bg-primary-strong" style={{ opacity: level(c.events) }} />
+              ) : (
+                <span key={`${r}-${w}`} className="h-4" />
+              )
+            })}
+          </>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/** Parts of a total side by side, each with its number. */
+export function SegmentBar({ parts }: { parts: { n: number; className: string }[] }) {
+  const shown = parts.filter((p) => p.n > 0)
+  return (
+    <div className="flex h-6 gap-[3px] overflow-hidden rounded-[6px] text-xs font-semibold text-white" aria-hidden="true" data-testid="ov-waiting-bar">
+      {shown.map((p, i) => (
+        <span key={i} className={cn('flex items-center justify-center', p.className)} style={{ flex: p.n }}>
+          {p.n}
+        </span>
+      ))}
+    </div>
   )
 }
