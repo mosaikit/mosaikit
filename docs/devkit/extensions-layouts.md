@@ -123,7 +123,15 @@ none; `data-group="<group id>"` on `msk-navg-head`; `data-mode="light|dark"` on 
 `&[data-mode="dark"] .msk-band { … }`). To replace an icon with a PNG of the package:
 `.msk-nav-item[data-icon="notes"] { background-image: url(images/notes.png); }` and
 `.msk-nav-item[data-icon="notes"] > svg { opacity: 0; }`. `@keyframes` is not allowed. The `sidebar` and `drawer`
-patterns show the groups of the distribution as collapsible headings.
+patterns show the groups of the distribution as collapsible headings, each with the number of its apps
+(`msk-navg-count`), and the closed sidebar shows one icon for each group (`data-icon` of the group) with its apps in a
+menu at the side.
+
+The same hooks on the pages: `msk-band-brand` (the block of the brand over the sidebar, as wide as it), `msk-band-search`
+(the search of the band), and on the Overview `ov-hero` (the banner), `ov-card` (a key figure, with the icon of the
+figure as a `lucide-*` class of its `svg`), `data-widget="<id>"` on each panel, `data-widget-title="<id>"` on its heading
+and an empty `data-widget-icon` span in front of the title (and `data-usage="storage|people|items"` on the rows of
+Usage), where a layout puts its own picture with `background-image`.
 
 **Band image.** PNG, at most 512 KB; the kernel lays the band colour over it as a scrim until the text has 4.5:1
 contrast, and refuses an image too bright even at the strongest scrim (`band_image_contrast`).

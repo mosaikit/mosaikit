@@ -124,7 +124,15 @@ l'ordine da tastiera restano quelli della shell.
 `&[data-mode="dark"] .msk-band { … }`). Per sostituire un'icona con un PNG del pacchetto:
 `.msk-nav-item[data-icon="notes"] { background-image: url(images/notes.png); }` e
 `.msk-nav-item[data-icon="notes"] > svg { opacity: 0; }`. `@keyframes` non è ammesso. I pattern `sidebar` e `drawer`
-mostrano i gruppi della distribuzione come intestazioni comprimibili.
+mostrano i gruppi della distribuzione come intestazioni comprimibili, ognuna con il numero delle sue app
+(`msk-navg-count`), e la sidebar chiusa mostra un'icona per ogni gruppo (`data-icon` del gruppo) con le sue app in un
+menu a lato.
+
+Gli stessi hook nelle pagine: `msk-band-brand` (il blocco del marchio sopra la sidebar, largo come lei), `msk-band-search`
+(la ricerca della banda) e, nella Panoramica, `ov-hero` (il banner), `ov-card` (una cifra chiave, con l'icona della cifra
+come classe `lucide-*` del suo `svg`), `data-widget="<id>"` su ogni scheda, `data-widget-title="<id>"` sul suo titolo e
+uno span vuoto `data-widget-icon` davanti al titolo (e `data-usage="storage|people|items"` sulle righe di Utilizzo), dove
+un layout mette un'immagine sua con `background-image`.
 
 **Immagine della banda.** PNG, al massimo 512 KB; il kernel stende sopra il colore della banda come velo finché il testo ha
 un contrasto di 4,5:1, e rifiuta un'immagine troppo chiara anche con il velo più forte (`band_image_contrast`).
