@@ -24,7 +24,7 @@ export function Hero({ id, title, sub, actions }: { id: string; title: string; s
           <path key={i} d={`M-10 ${30 + i * 16} C 90 ${5 + i * 20}, 180 ${70 + i * 8}, 270 ${40 + i * 12} S 380 ${20 + i * 14}, 420 ${50 + i * 10}`} fill="none" stroke="#fff" strokeWidth="1" />
         ))}
       </svg>
-      <div className="relative flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+      <div className="relative flex flex-col items-start justify-between gap-y-4">
         <div className="min-w-0">
           <h2 id={id} className="text-2xl leading-tight font-extrabold">
             {title}
