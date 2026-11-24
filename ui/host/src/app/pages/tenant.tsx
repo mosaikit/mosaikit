@@ -39,7 +39,7 @@ import { LinkDialog, ProfilesSection, RequestsTable } from './people.tsx'
 import { AppShortcuts, Hero, HeroLink, KpiCard, WeekStrip } from '../OverviewKit.tsx'
 import { greeting, perDay } from '../overviewdata.ts'
 import { HBars } from '../Charts.tsx'
-import { ActivityWidget, KpiRow, NotesWidget, TrendWidget, WaitingWidget, Widget, WidgetGrid } from '../Overview.tsx'
+import { ActivityWidget, KpiRow, NotesWidget, PeopleWidget, WaitingWidget, Widget, WidgetGrid } from '../Overview.tsx'
 import { describe } from '../logtext.ts'
 import { BulkBar, FilterColumn, ListPage, type FacetGroup } from '../listkit.tsx'
 import { ListTable } from '../ListTable.tsx'
@@ -55,6 +55,9 @@ const ROLE: Record<string, string> = {
   tenant_manager: 'Tenant Manager',
   user: 'User',
 }
+
+/** Running total of a series (the trend of a figure that only grows). */
+const cumulative = (v: number[]) => v.reduce<number[]>((a, x) => [...a, (a[a.length - 1] ?? 0) + x], [])
 
 /* ── Overview ────────────────────────────────────────────────────────── */
 
@@ -187,14 +190,17 @@ export function TenantHome({ session, slug }: { session: Session; slug: string }
       <div className="grid gap-4 p-6 max-[620px]:p-4">
         <Hero
           id="ov-hero"
-          title={`${greeting()}, ${name}`}
-          sub={manager ? t('Here is how {tenant} is doing.', { tenant: c.tenant.name }) : t('Here is your week in {tenant}.', { tenant: c.tenant.name })}
+          eyebrow={manager ? `${t('Manager')} · ${c.tenant.name}` : undefined}
+          title={manager ? t('Run your portal with confidence.') : `${greeting()}, ${name}`}
+          sub={manager ? t('See who is active, what waits for your decision and how much of your plan is used.') : t('Here is your week in {tenant}.', { tenant: c.tenant.name })}
           actions={
             manager ? (
               <>
-                <HeroLink href={to.tenant(slug, 'manage', 'pending')}>{t('Waiting for you')}</HeroLink>
-                <HeroLink href={to.tenant(slug, 'usage')} ghost>
-                  {t('Usage')}
+                <HeroLink href={to.tenant(slug, 'manage', 'pending')} icon={<ShieldCheck className="size-4" />}>
+                  {t('Review queue')}
+                </HeroLink>
+                <HeroLink href={to.tenant(slug, 'manage')} icon={<Users className="size-4" />} ghost>
+                  {t('Manage people')}
                 </HeroLink>
               </>
             ) : (
@@ -216,24 +222,24 @@ export function TenantHome({ session, slug }: { session: Session; slug: string }
           {manager && d?.tenant && (
             <>
               <KpiRow>
-                <KpiCard accent="indigo" icon={<Users />} label={t('Members')} value={d.tenant.members} hint={`${t('{count} guests', { count: d.tenant.guests })} · ${t('{count} groups', { count: d.tenant.groups })}`} values={days.map((x) => x.users)} trend={t('active people per day')} onClick={() => go(to.tenant(slug, 'manage'))} />
+                <KpiCard accent="indigo" icon={<Users />} label={t('Members')} value={d.tenant.members} hint={`${t('{count} guests', { count: d.tenant.guests })} · ${t('{count} groups', { count: d.tenant.groups })}`} onClick={() => go(to.tenant(slug, 'manage'))} />
                 <KpiCard accent="violet" icon={<Activity />} label={t('Active users (30 days)')} value={d.tenant.active_users_30d} />
-                <KpiCard accent="sky" icon={<Folder />} label={t('Items')} value={d.tenant.resources.reduce((s, r) => s + r.count, 0)} hint={fmtBytes(d.tenant.resources.reduce((s, r) => s + r.bytes, 0))} values={days.map((x) => x.events)} trend={t('events per day')} />
+                <KpiCard accent="sky" icon={<Folder />} label={t('Items')} value={d.tenant.resources.reduce((s, r) => s + r.count, 0)} hint={fmtBytes(d.tenant.resources.reduce((s, r) => s + r.bytes, 0))} />
                 <KpiCard accent="leaf" icon={<Share2 />} label={t('Shares')} value={d.tenant.shares} hint={t('{count} public links', { count: d.tenant.public_links })} onClick={() => go(to.tenant(slug, 'shares'))} />
               </KpiRow>
               <WaitingWidget slug={slug} publicLinks={d.tenant.public_links} />
-              <TrendWidget
+              <PeopleWidget
                 id="ov-people"
-                title={t('Active people')}
-                figure={d.tenant.active_users_30d}
-                caption={t('signed in the last 30 days, of {n}', { n: d.tenant.members })}
-                values={days.map((x) => x.users)}
+                members={d.tenant.members}
+                active={d.tenant.active_users_30d}
+                prev={d.tenant.active_users_prev_30d}
+                days={days}
                 link={{ href: to.tenant(slug, 'manage'), label: t('People') }}
               />
-              <ActivityWidget slug={slug} />
-              <NotesWidget href={to.tenant(slug, 'notifications')} />
+              <ActivityWidget slug={slug} days={days.map((x) => ({ day: x.day, events: x.events }))} />
+              <NotesWidget href={to.tenant(slug, 'notifications')} activity={d.me.days} />
               <div className="[&>section]:h-full">
-                <UsagePanel slug={slug} />
+                <UsagePanel slug={slug} series={{ items: cumulative(days.map((x) => x.creates ?? 0)), people: cumulative(days.map((x) => x.users)), storage: days.map(() => 0) }} />
               </div>
               <UsageByApp resources={d.tenant.resources} />
               <h2 className="-mb-1 text-sm font-semibold @xl:col-span-2 @4xl:col-span-3">{t('Your space')}</h2>

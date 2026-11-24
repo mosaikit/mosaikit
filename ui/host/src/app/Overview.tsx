@@ -4,7 +4,7 @@
 // Every widget reads a cheap source: counters from the overview, a snapshot, or a page of five rows.
 
 import type { ReactNode } from 'react'
-import { CircleAlert, History, Lock, Mail, Share2 } from 'lucide-react'
+import { CircleAlert, ShieldCheck } from 'lucide-react'
 import { fmtBytes, fmtDate } from '../api.ts'
 import type { AccessRequest, GlobalKpi, Invitation, LogEvent, LogPage, PluginKpi, ResourceStat, TenantInfo } from '../types.ts'
 import { cn } from '@/lib/utils'
@@ -14,6 +14,7 @@ import { Donut, HBars } from './Charts.tsx'
 import { useApi, usePaged, type PageOf } from './core.ts'
 import { fmtNumber, t } from './i18n.ts'
 import { Empty, Loading } from './kit.tsx'
+import { AreaChart, DayBars, Heatmap, SegmentBar } from './OverviewKit.tsx'
 import { to } from './router.ts'
 import { about, describe } from './logtext.ts'
 import { useNoteList } from './notes.ts'
@@ -104,44 +105,84 @@ function Row({ icon, title, sub, action }: { icon: ReactNode; title: ReactNode; 
   )
 }
 
-/** The notifications of the person, the latest four. */
-export function NotesWidget({ href }: { href: string }) {
+/** The notifications of the person, the latest four; with `activity` the map of the last five weeks beside them. */
+export function NotesWidget({ href, activity }: { href: string; activity?: { day: string; events: number }[] }) {
   const notes = useNoteList({ limit: 4 })
   const items = notes.data?.items ?? []
+  const list = notes.isLoading ? (
+    <Loading />
+  ) : items.length ? (
+    <ul className="grid grid-cols-[minmax(0,1fr)] gap-1">
+      {items.map((n) => (
+        <NoteRow key={n.id} n={n} />
+      ))}
+    </ul>
+  ) : (
+    <Empty compact art="inbox" title={t('You are all caught up')}>
+      {t('No notifications. New mentions, shares and approvals show up here.')}
+    </Empty>
+  )
   return (
     <Widget id="ov-notes" title={t('For you')} link={{ href, label: t('All notifications') }} span>
-      {notes.isLoading ? (
-        <Loading />
-      ) : items.length ? (
-        <ul className="grid grid-cols-[minmax(0,1fr)] gap-1">
-          {items.map((n) => (
-            <NoteRow key={n.id} n={n} />
-          ))}
-        </ul>
+      {activity && activity.length > 0 ? (
+        <div className="grid items-center gap-6 @xl:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
+          {list}
+          <div className="grid gap-2">
+            <p className="text-xs text-muted-foreground">{t('Your activity, last 5 weeks')}</p>
+            <Heatmap days={activity} label={t('Your activity, last 5 weeks')} tip={(day, n) => `${day} - ${t('{count} actions', { count: n })}`} />
+          </div>
+        </div>
       ) : (
-        <Empty compact art="inbox" title={t('No notifications')} />
+        list
       )}
     </Widget>
   )
 }
 
+/** The people who signed in: the figure of 30 days against the members, the change against the month before and the
+ *  daily trend. */
+export function PeopleWidget({ id, members, active, prev, days, link }: { id: string; members: number; active: number; prev?: number; days: { day: string; users: number }[]; link?: { href: string; label: string } }) {
+  const fmt = (d: string) => new Date(d + 'T00:00:00').toLocaleDateString(undefined, { day: 'numeric', month: 'short' })
+  const delta = prev === undefined ? null : active - prev
+  return (
+    <Widget id={id} title={t('Active people')} link={link}>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-baseline gap-1.5">
+          <b className="text-4xl font-extrabold tabular-nums">{active}</b>
+          <span className="text-lg font-semibold text-muted-foreground">/ {members}</span>
+        </div>
+        {delta !== null && (
+          <span className={cn('rounded-full px-2.5 py-1 text-xs font-semibold', delta >= 0 ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' : 'bg-destructive/10 text-destructive')}>
+            {t('{n} vs last month', { n: `${delta >= 0 ? '+' : ''}${delta}` })}
+          </span>
+        )}
+      </div>
+      <p className="text-sm text-muted-foreground">{t('signed in over the last 30 days')}</p>
+      <AreaChart values={days.map((d) => d.users)} labels={days.length ? [fmt(days[0].day), fmt(days[days.length - 1].day)] : undefined} label={t('Active people')} />
+    </Widget>
+  )
+}
+
 /** The latest events of the tenant: one page of five from the Log. */
-export function ActivityWidget({ slug }: { slug: string }) {
+export function ActivityWidget({ slug, days }: { slug: string; days?: { day: string; events: number }[] }) {
   const q = useApi<LogPage>(['ov-activity', slug], `/api/t/${enc(slug)}/manage/log?limit=5`)
   const events: LogEvent[] = q.data?.events ?? []
+  const last = (days ?? []).slice(-12).map((d) => ({ label: d.day.slice(8), value: d.events }))
   return (
     <Widget id="ov-activity" title={t('Recent activity')} link={{ href: to.tenant(slug, 'log'), label: t('Log') }}>
+      {last.length > 0 && <DayBars days={last} label={t('Recent activity')} />}
       {q.isLoading ? (
         <Loading />
       ) : events.length ? (
         <ul className="grid grid-cols-[minmax(0,1fr)]">
           {events.map((e) => (
-            <Row
-              key={e.id}
-              icon={e.ok ? <History className="size-4" /> : <CircleAlert className="size-4 text-destructive" />}
-              title={[describe(e), about(e)].filter(Boolean).join(' · ')}
-              sub={`${e.user_name || e.username || ''} · ${fmtDate(e.ts)}`}
-            />
+            <li key={e.id} className="flex items-center gap-3 py-1.5">
+              <span aria-hidden="true" className={cn('flex size-7 shrink-0 items-center justify-center rounded-full', e.ok ? 'bg-emerald-500/15 text-emerald-600' : 'bg-destructive/10 text-destructive')}>
+                {e.ok ? <ShieldCheck className="size-4" /> : <CircleAlert className="size-4" />}
+              </span>
+              <span className="min-w-0 flex-1 truncate text-sm font-medium">{[describe(e), about(e) || e.user_name || e.username].filter(Boolean).join(' · ')}</span>
+              <span className="shrink-0 text-xs text-muted-foreground tabular-nums">{new Date(e.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}</span>
+            </li>
           ))}
         </ul>
       ) : (
@@ -172,23 +213,32 @@ export function WaitingWidget({ slug, publicLinks }: { slug: string; publicLinks
       ) : (
         <>
           <div className="flex items-baseline gap-2">
-            <b className="text-3xl font-extrabold tabular-nums">{nReq + nInv + publicLinks}</b>
-            <span className="text-xs text-muted-foreground">{t('open items need you')}</span>
+            <b className="text-4xl font-extrabold tabular-nums">{nReq + nInv + publicLinks}</b>
+            <span className="text-sm text-muted-foreground">{t('open items need you')}</span>
           </div>
-          <div className="flex h-5 overflow-hidden rounded-full text-[11px] font-semibold text-white" data-testid="ov-waiting-bar" aria-hidden="true">
+          <SegmentBar
+            parts={[
+              { n: publicLinks, className: 'bg-indigo-700' },
+              { n: nReq, className: 'bg-orange-500' },
+              { n: nInv, className: 'bg-sky-500' },
+            ]}
+          />
+          <ul className="grid">
             {[
-              [publicLinks, 'bg-indigo-600'],
-              [nReq, 'bg-orange-500'],
-              [nInv, 'bg-sky-500'],
-            ].map(([n, c], i) => (Number(n) > 0 ? <span key={i} className={cn('flex items-center justify-center', String(c))} style={{ flex: Number(n) }}>{String(n)}</span> : null))}
-          </div>
-        <ul className="grid">
-          {nReq > 0 && (
-            <Row icon={<Lock className="size-4" />} title={t('{count} access requests', { count: nReq })} sub={t('To decide')} action={open(to.tenant(slug, 'manage', 'pending'), t('Decide'))} />
-          )}
-          {nInv > 0 && <Row icon={<Mail className="size-4" />} title={t('{count} invitations not accepted yet', { count: nInv })} action={open(to.tenant(slug, 'manage', 'pending'), t('See'))} />}
-          {publicLinks > 0 && <Row icon={<Share2 className="size-4" />} title={t('{count} active public links', { count: publicLinks })} action={open(to.tenant(slug, 'shares'), t('Review'))} />}
-        </ul>
+              { n: publicLinks, label: t('Public links'), dot: 'bg-indigo-700', href: to.tenant(slug, 'shares'), action: t('Check') },
+              { n: nReq, label: t('Reviews'), dot: 'bg-orange-500', href: to.tenant(slug, 'manage', 'pending'), action: t('Review') },
+              { n: nInv, label: t('Invitations'), dot: 'bg-sky-500', href: to.tenant(slug, 'manage', 'pending'), action: t('Open') },
+            ]
+              .filter((r) => r.n > 0)
+              .map((r) => (
+                <li key={r.label} className="flex items-center gap-3 border-b py-2 last:border-b-0">
+                  <span className={cn('size-2.5 rounded-[3px]', r.dot)} aria-hidden="true" />
+                  <span className="min-w-0 flex-1 text-sm">{r.label}</span>
+                  <b className="text-sm tabular-nums">{r.n}</b>
+                  {open(r.href, r.action)}
+                </li>
+              ))}
+          </ul>
         </>
       )}
     </Widget>

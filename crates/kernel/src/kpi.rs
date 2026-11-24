@@ -30,6 +30,8 @@ pub struct DayStat {
     pub day: String,
     pub events: i64,
     pub users: i64,
+    /// items created that day
+    pub creates: i64,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -42,6 +44,8 @@ pub struct CoreKpi {
     pub public_links: i64,
     pub link_views: i64,
     pub active_users_30d: i64,
+    /// the people active in the 30 days before those (for the «vs last month» of the overview)
+    pub active_users_prev_30d: i64,
     pub activity: Vec<DayStat>,
 }
 
@@ -210,13 +214,14 @@ pub(crate) async fn core(k: &Kernel, tenant: Uuid) -> Result<CoreKpi> {
               where r.tenant_id = $1 and l.revoked_at is null and (l.expires_at is null or l.expires_at > now())
                 and not core.in_trash(r.id)),
            (select coalesce(sum(l.view_count), 0)::bigint from core.public_links l join core.resources r on r.id = l.resource_id where r.tenant_id = $1),
-           (select count(distinct user_id) from core.events where tenant_id = $1 and ts > now() - interval '30 days' and user_id is not null)",
+           (select count(distinct user_id) from core.events where tenant_id = $1 and ts > now() - interval '30 days' and user_id is not null),
+           (select count(distinct user_id) from core.events where tenant_id = $1 and ts > now() - interval '60 days' and ts <= now() - interval '30 days' and user_id is not null)",
     )
     .bind(tenant)
     .fetch_one(&k.db)
     .await?;
     let days = mosaikit_db::query(
-        "select to_char(d::date, 'YYYY-MM-DD'), count(e.id), count(distinct e.user_id)
+        "select to_char(d::date, 'YYYY-MM-DD'), count(e.id), count(distinct e.user_id), count(e.id) filter (where e.action = 'resource.create')
          from generate_series(current_date - 29, current_date, interval '1 day') d
          left join core.events e on e.tenant_id = $1 and e.ts >= d and e.ts < d + interval '1 day'
          group by d order by d",
@@ -224,7 +229,7 @@ pub(crate) async fn core(k: &Kernel, tenant: Uuid) -> Result<CoreKpi> {
     .sqlite(
         "with recursive d(day) as (
            select date('now', '-29 days') union all select date(day, '+1 day') from d where day < date('now'))
-         select d.day, count(e.id), count(distinct e.user_id)
+         select d.day, count(e.id), count(distinct e.user_id), count(case when e.action = 'resource.create' then 1 end)
          from d left join core_events e on e.tenant_id = ?1 and e.ts >= d.day and e.ts < date(d.day, '+1 day')
          group by d.day order by d.day",
     )
@@ -239,8 +244,9 @@ pub(crate) async fn core(k: &Kernel, tenant: Uuid) -> Result<CoreKpi> {
         public_links: r.get(4),
         link_views: r.get(5),
         active_users_30d: r.get(6),
+        active_users_prev_30d: r.get(7),
         resources: resource_stats(k, Some(tenant)).await?,
-        activity: days.iter().map(|d| DayStat { day: d.get(0), events: d.get(1), users: d.get(2) }).collect(),
+        activity: days.iter().map(|d| DayStat { day: d.get(0), events: d.get(1), users: d.get(2), creates: d.get(3) }).collect(),
     })
 }
 

@@ -8,7 +8,7 @@ id = "mosaikit"
 # name shown to users (title, sign-in, icon in the notification area)
 name = "Mosaikit"
 # version of the product
-version = "1.3.0"
+version = "1.4.0"
 description = "Multi-tenant web platform built out of plugins"
 # name of the desktop executable (without .exe)
 executable = "mosaikit"
@@ -70,25 +70,25 @@ label = "Работа"
 
 [[nav_groups]]
 id = "communication"
-label = "Com"
+label = "Social"
 icon = "message-square"
-plugins = ["com.mosaikit.chat", "com.mosaikit.meet", "com.mosaikit.announcements"]
+plugins = ["com.mosaikit.chat", "com.mosaikit.announcements"]
 [nav_groups.i18n.it]
-label = "Com"
+label = "Social"
 [nav_groups.i18n.es]
-label = "Com"
+label = "Social"
 [nav_groups.i18n.pt]
-label = "Com"
+label = "Social"
 [nav_groups.i18n.fr]
-label = "Com"
+label = "Social"
 [nav_groups.i18n.nl]
-label = "Com"
+label = "Sociaal"
 [nav_groups.i18n.ar]
-label = "التواصل"
+label = "اجتماعي"
 [nav_groups.i18n.zh]
-label = "沟通"
+label = "社交"
 [nav_groups.i18n.ru]
-label = "Общение"
+label = "Социальное"
 
 [[nav_groups]]
 id = "people"

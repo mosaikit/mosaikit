@@ -662,7 +662,8 @@ export interface TenantKpi {
     public_links: number
     link_views: number
     active_users_30d: number
-    activity: { day: string; events: number; users: number }[]
+    active_users_prev_30d?: number
+    activity: { day: string; events: number; users: number; creates?: number }[]
   }
   plugins: PluginKpi[]
 }
@@ -762,6 +763,8 @@ export interface Overview {
     link_views: number
     recent_shares: { resource_id: string; plugin_id: string; plugin: string; title: string; owner: string; level: Level; granted_at: string }[]
     activity: { ts: string; action: string; plugin_id: string | null; plugin: string | null; title: string | null }[]
+    /** the actions of the person for each of the last 35 days */
+    days?: { day: string; events: number }[]
     /** «Pick up where you left off» and «Due soon» (recent servers) */
     pick_up?: HomeItem[]
     due?: HomeItem[]
