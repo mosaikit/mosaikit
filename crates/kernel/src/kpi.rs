@@ -246,7 +246,10 @@ pub(crate) async fn core(k: &Kernel, tenant: Uuid) -> Result<CoreKpi> {
         active_users_30d: r.get(6),
         active_users_prev_30d: r.get(7),
         resources: resource_stats(k, Some(tenant)).await?,
-        activity: days.iter().map(|d| DayStat { day: d.get(0), events: d.get(1), users: d.get(2), creates: d.get(3) }).collect(),
+        activity: days
+            .iter()
+            .map(|d| DayStat { day: d.get(0), events: d.get(1), users: d.get(2), creates: d.get(3) })
+            .collect(),
     })
 }
 
