@@ -86,7 +86,13 @@ function HomeLists({ slug, pickUp, due, notifications = true }: { slug: string; 
       {box(
         'home-pick-up',
         t('Pick up where you left off'),
-        pickUp.length ? <ul className="grid gap-0.5">{pickUp.map((x) => item(x, fmtDay(x.at)))}</ul> : <p className="text-sm text-muted-foreground">{t('The items you create or change show here.')}</p>,
+        pickUp.length ? (
+          <ul className="grid gap-0.5">{pickUp.map((x) => item(x, fmtDay(x.at)))}</ul>
+        ) : (
+          <Empty compact art="documents" title={t('No activity yet')}>
+            {t('The items you create or change show here.')}
+          </Empty>
+        ),
         undefined,
         true,
       )}
@@ -102,7 +108,7 @@ function HomeLists({ slug, pickUp, due, notifications = true }: { slug: string; 
               ))}
             </ul>
           ) : (
-            <p className="text-sm text-muted-foreground">{t('No notifications')}</p>
+            <Empty compact art="inbox" title={t('No notifications')} />
           ),
           <a href={to.tenant(slug, 'notifications')} className="text-sm text-primary-strong underline-offset-4 hover:underline">
             {t('All notifications')}
@@ -149,7 +155,7 @@ export function TenantHome({ session, slug }: { session: Session; slug: string }
       )}
       {d && <HomeLists slug={slug} pickUp={d.me.pick_up ?? []} due={d.me.due ?? []} notifications={!manager} />}
       {d && (
-        <Widget id="ov-mine" title={t('My recent activity')} span={!manager}>
+        <Widget id="ov-mine" title={t('My recent activity')} span>
           {d.me.activity.length > 0 ? (
             <ul className="grid grid-cols-[minmax(0,1fr)] gap-0.5">
               {d.me.activity.slice(0, 5).map((e, i) => (
@@ -171,13 +177,13 @@ export function TenantHome({ session, slug }: { session: Session; slug: string }
           <AppShortcuts slug={slug} apps={apps} counts={mine} />
         </Widget>
       )}
-      <SharedByMeSection slug={slug} full={manager} />
+      <SharedByMeSection slug={slug} />
     </>
   )
   const first = apps[0]
   return (
     <>
-      <PageHeader title={manager ? t('Tenant overview') : t('Overview')} sub={t('{role} in {tenant}', { role: manager ? t(ROLE.tenant_manager) : t('User'), tenant: c.tenant.name })} />
+      <h1 className="sr-only">{manager ? t('Tenant overview') : t('Overview')}</h1>
       <div className="grid gap-4 p-6 max-[620px]:p-4">
         <Hero
           id="ov-hero"

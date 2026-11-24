@@ -266,7 +266,7 @@ export function SharedByMeSection({ slug, full }: { slug: string; full?: boolean
       ) : q.error ? (
         <ErrorBox error={q.error} />
       ) : rows.length === 0 ? (
-        <p className="text-sm text-muted-foreground">{t('You have not shared anything yet.')}</p>
+        <Empty compact art="shares" title={t('You have not shared anything yet.')} />
       ) : (
         <ul className="grid gap-2">
           {rows.map((r) => (

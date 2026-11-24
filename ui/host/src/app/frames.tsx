@@ -181,7 +181,7 @@ export default function Frame({ session, route, band, layout, bandImage, childre
     ) : null
 
   const header = (
-    <header className={cn('msk-band band-surface sticky top-0 z-20 flex h-[50px] shrink-0 items-center gap-3 bg-band px-4 text-band-foreground', pattern === 'sidebar' && 'h-[56px]')} {...bandStyle(bandImage)}>
+    <header className={cn('msk-band band-surface sticky top-0 z-20 flex h-[50px] shrink-0 items-center gap-3 bg-band px-4 text-band-foreground')} {...bandStyle(bandImage)}>
       {phone && (
         <button type="button" className={bandIcon} aria-haspopup="dialog" aria-label={t('Open the navigation')} onClick={phoneNav}>
           <Menu className="size-[18px]" />
@@ -233,11 +233,11 @@ export default function Frame({ session, route, band, layout, bandImage, childre
               'msk-nav msk-hoverscroll sticky flex shrink-0 flex-col self-start overflow-hidden bg-sidebar text-sidebar-foreground',
               card
                 ? 'top-[68px] m-3 mr-0 h-[calc(100svh-80px)] rounded-xl border border-sidebar-border shadow-sm'
-                : cn('border-r border-sidebar-border', pattern === 'sidebar' ? 'top-[56px] h-[calc(100svh-56px)]' : 'top-[50px] h-[calc(100svh-50px)]'),
+                : cn('border-r border-sidebar-border', 'top-[50px] h-[calc(100svh-50px)]'),
               pattern === 'sidebar' && mini ? 'w-[60px]' : 'w-60',
             )}
           >
-            {pattern === 'sidebar' && (
+            {pattern === 'sidebar' && d.band.tenant === 'nav' && (
               <div className={cn('flex items-center border-b border-sidebar-border p-2', mini ? 'justify-center' : 'justify-between')}>
                 {!mini && d.band.tenant === 'nav' && (
                   <div className="min-w-0 flex-1">

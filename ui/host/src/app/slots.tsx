@@ -89,7 +89,7 @@ function TreeGroup({ g, onPick, depth = 0 }: { g: NavGroup; onPick?: () => void;
         <ChevronDown className={cn('size-3.5 transition-transform', !open && '-rotate-90')} aria-hidden="true" />
       </button>
       {open && (
-        <div id={body}>
+        <div id={body} className={depth ? undefined : 'pl-3'}>
           <ul className="flex flex-col gap-0.5">
             {g.items.map((it) => (
               <TreeItem key={it.label + (it.href ?? '')} item={it} onPick={onPick} mini={false} />

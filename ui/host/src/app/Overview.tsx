@@ -13,7 +13,7 @@ import AppIcon from './AppIcon.tsx'
 import { Donut, HBars } from './Charts.tsx'
 import { useApi, usePaged, type PageOf } from './core.ts'
 import { fmtNumber, t } from './i18n.ts'
-import { Loading } from './kit.tsx'
+import { Empty, Loading } from './kit.tsx'
 import { to } from './router.ts'
 import { about, describe } from './logtext.ts'
 import { useNoteList } from './notes.ts'
@@ -119,7 +119,7 @@ export function NotesWidget({ href }: { href: string }) {
           ))}
         </ul>
       ) : (
-        <p className="text-sm text-muted-foreground">{t('No notifications')}</p>
+        <Empty compact art="inbox" title={t('No notifications')} />
       )}
     </Widget>
   )
@@ -168,7 +168,7 @@ export function WaitingWidget({ slug, publicLinks }: { slug: string; publicLinks
       {loading ? (
         <Loading />
       ) : nReq + nInv + publicLinks === 0 ? (
-        <p className="text-sm text-muted-foreground">{t('Nothing waiting for you.')}</p>
+        <Empty compact art="inbox" title={t('Nothing waiting for you.')} />
       ) : (
         <>
           <div className="flex items-baseline gap-2">

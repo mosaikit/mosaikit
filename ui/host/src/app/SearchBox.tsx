@@ -207,7 +207,7 @@ export default function SearchBox({ session, route, groups, wide }: { session: S
           <Search className="size-4 shrink-0" />
           {/* on a narrow bar only the icon shows: the text becomes sr-only and still names the button */}
           <span className={cn('flex-1 truncate text-left max-[620px]:sr-only', wide ? '@max-[300px]:sr-only' : '@max-[600px]:sr-only')}>{t('Search everywhere')}</span>
-          <kbd className="rounded border border-current/30 px-1.5 font-mono text-[11px] @max-[300px]:hidden max-[620px]:hidden">{t('Ctrl K')}</kbd>
+          <kbd className="rounded border border-current/30 px-1.5 font-mono text-[11px] @max-[860px]:hidden max-[620px]:hidden">{t('Ctrl K')}</kbd>
         </button>
       ) : (
         <CommandPrimitive
