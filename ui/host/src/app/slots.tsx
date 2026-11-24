@@ -7,6 +7,7 @@ import { useState, type ReactNode } from 'react'
 import { useHoverMenu, type HoverMenu } from './hoverMenu.ts'
 import { backFromActiveEntry } from './contextband.ts'
 import { useQueryClient } from '@tanstack/react-query'
+import { Badge } from '@/components/ui/badge'
 import { Bell, Check, ChevronDown, ChevronRight, CircleHelp, Contrast, Info, KeyRound, LogOut, Settings, ShieldCheck, Trash2, UserRound } from 'lucide-react'
 import { api } from '../api.ts'
 import { useBrand } from '../brand.ts'
@@ -84,6 +85,7 @@ function TreeGroup({ g, onPick, depth = 0 }: { g: NavGroup; onPick?: () => void;
       >
         {g.icon}
         <span className={cn('flex-1 truncate text-left', active && !open && 'font-semibold text-sidebar-primary')}>{g.label}</span>
+        <Badge data-testid="group-count" className="msk-navg-count h-5 min-w-5 px-1.5 py-0 text-[11px] leading-none tabular-nums" aria-hidden="true">{allItems(g).length}</Badge>
         <ChevronDown className={cn('size-3.5 transition-transform', !open && '-rotate-90')} aria-hidden="true" />
       </button>
       {open && (
@@ -630,6 +632,6 @@ export function BandActions({ session, route, band }: { session: Session; route:
 }
 
 /** The search of the band (off with the top bar of the Administrator). */
-export function BandSearch({ session, route, nav }: { session: Session; route: Route; nav: Nav }) {
-  return <SearchBox session={session} route={route} groups={searchGroups(nav)} />
+export function BandSearch({ session, route, nav, wide }: { session: Session; route: Route; nav: Nav; wide?: boolean }) {
+  return <SearchBox session={session} route={route} groups={searchGroups(nav)} wide={wide} />
 }

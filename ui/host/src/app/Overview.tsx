@@ -42,10 +42,10 @@ export function Widget({
   children: ReactNode
 }) {
   return (
-    <section aria-labelledby={id} className={cn('grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-2 rounded-lg border bg-card p-4 shadow-sm', span && '@xl:col-span-2', full && '@xl:col-span-2 @4xl:col-span-4')}>
+    <section aria-labelledby={id} data-widget={id} className={cn('grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-2 rounded-lg border bg-card p-4 shadow-sm', span && '@xl:col-span-2', full && '@xl:col-span-2 @4xl:col-span-4')}>
       <div className="flex items-center justify-between gap-2">
-        <h2 id={id} className="flex min-w-0 items-center gap-2 text-sm font-semibold">
-          {icon}
+        <h2 id={id} data-widget-title={id} className="flex min-w-0 items-center gap-2 text-sm font-semibold">
+          {icon ?? <span data-widget-icon="" aria-hidden="true" className="shrink-0" />}
           <span className="truncate">{title}</span>
         </h2>
         {link && (
@@ -170,6 +170,18 @@ export function WaitingWidget({ slug, publicLinks }: { slug: string; publicLinks
       ) : nReq + nInv + publicLinks === 0 ? (
         <p className="text-sm text-muted-foreground">{t('Nothing waiting for you.')}</p>
       ) : (
+        <>
+          <div className="flex items-baseline gap-2">
+            <b className="text-3xl font-extrabold tabular-nums">{nReq + nInv + publicLinks}</b>
+            <span className="text-xs text-muted-foreground">{t('open items need you')}</span>
+          </div>
+          <div className="flex h-5 overflow-hidden rounded-full text-[11px] font-semibold text-white" data-testid="ov-waiting-bar" aria-hidden="true">
+            {[
+              [publicLinks, 'bg-indigo-600'],
+              [nReq, 'bg-orange-500'],
+              [nInv, 'bg-sky-500'],
+            ].map(([n, c], i) => (Number(n) > 0 ? <span key={i} className={cn('flex items-center justify-center', String(c))} style={{ flex: Number(n) }}>{String(n)}</span> : null))}
+          </div>
         <ul className="grid">
           {nReq > 0 && (
             <Row icon={<Lock className="size-4" />} title={t('{count} access requests', { count: nReq })} sub={t('To decide')} action={open(to.tenant(slug, 'manage', 'pending'), t('Decide'))} />
@@ -177,6 +189,7 @@ export function WaitingWidget({ slug, publicLinks }: { slug: string; publicLinks
           {nInv > 0 && <Row icon={<Mail className="size-4" />} title={t('{count} invitations not accepted yet', { count: nInv })} action={open(to.tenant(slug, 'manage', 'pending'), t('See'))} />}
           {publicLinks > 0 && <Row icon={<Share2 className="size-4" />} title={t('{count} active public links', { count: publicLinks })} action={open(to.tenant(slug, 'shares'), t('Review'))} />}
         </ul>
+        </>
       )}
     </Widget>
   )

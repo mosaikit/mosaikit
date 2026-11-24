@@ -71,7 +71,8 @@ const norm = (s: string) =>
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
 
-export default function SearchBox({ session, route, groups }: { session: Session; route: Route; groups: SearchGroup[] }) {
+/** `wide`: the field of a layout with a wide search; it keeps its label down to a narrow box (the others fold into an icon at 600 px). */
+export default function SearchBox({ session, route, groups, wide }: { session: Session; route: Route; groups: SearchGroup[]; wide?: boolean }) {
   const [open, setOpen] = useState(false)
   const [q, setQ] = useState('')
   const [dq, setDq] = useState('')
@@ -190,7 +191,8 @@ export default function SearchBox({ session, route, groups }: { session: Session
       ref={box}
       data-tour="search"
       className={cn(
-        'relative flex min-w-0 justify-center @max-[600px]:justify-end max-[900px]:static max-[900px]:ml-auto max-[900px]:basis-80 max-[620px]:basis-auto',
+        'relative flex min-w-0 justify-center max-[900px]:static max-[900px]:ml-auto max-[900px]:basis-80 max-[620px]:basis-auto',
+        wide ? '@max-[300px]:justify-end' : '@max-[600px]:justify-end',
         open && 'max-[900px]:flex-1 max-[620px]:basis-auto',
       )}
     >
@@ -200,12 +202,12 @@ export default function SearchBox({ session, route, groups }: { session: Session
           onClick={openBox}
           aria-keyshortcuts="Control+K"
           aria-haspopup="dialog"
-          className="flex h-8 w-full items-center gap-2.5 rounded-md bg-search px-3 text-sm text-search-foreground outline-none hover:brightness-[1.04] focus-visible:ring-2 focus-visible:ring-white/70 @max-[600px]:w-8 @max-[600px]:justify-center @max-[600px]:bg-transparent @max-[600px]:px-0 @max-[600px]:text-band-foreground/90 @max-[600px]:hover:bg-band-hover max-[620px]:w-8! max-[620px]:justify-center max-[620px]:bg-transparent max-[620px]:px-0 max-[620px]:text-band-foreground/90"
+          className={cn('flex h-8 w-full items-center gap-2.5 rounded-md bg-search px-3 text-sm text-search-foreground outline-none hover:brightness-[1.04] focus-visible:ring-2 focus-visible:ring-white/70 max-[620px]:w-8! max-[620px]:justify-center max-[620px]:bg-transparent max-[620px]:px-0 max-[620px]:text-band-foreground/90', wide ? '@max-[300px]:w-8 @max-[300px]:justify-center @max-[300px]:bg-transparent @max-[300px]:px-0 @max-[300px]:text-band-foreground/90 @max-[300px]:hover:bg-band-hover' : '@max-[600px]:w-8 @max-[600px]:justify-center @max-[600px]:bg-transparent @max-[600px]:px-0 @max-[600px]:text-band-foreground/90 @max-[600px]:hover:bg-band-hover')}
         >
           <Search className="size-4 shrink-0" />
           {/* on a narrow bar only the icon shows: the text becomes sr-only and still names the button */}
-          <span className="flex-1 truncate text-left @max-[600px]:sr-only max-[620px]:sr-only">{t('Search everywhere')}</span>
-          <kbd className="rounded border border-current/30 px-1.5 font-mono text-[11px] @max-[860px]:hidden max-[620px]:hidden">{t('Ctrl K')}</kbd>
+          <span className={cn('flex-1 truncate text-left max-[620px]:sr-only', wide ? '@max-[300px]:sr-only' : '@max-[600px]:sr-only')}>{t('Search everywhere')}</span>
+          <kbd className="rounded border border-current/30 px-1.5 font-mono text-[11px] @max-[300px]:hidden max-[620px]:hidden">{t('Ctrl K')}</kbd>
         </button>
       ) : (
         <CommandPrimitive
