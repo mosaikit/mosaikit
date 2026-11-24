@@ -397,7 +397,7 @@ label='File'
                 assert!(all.insert(p.clone()), "{p} is in two groups");
             }
         }
-        assert_eq!(all.len(), 19);
+        assert_eq!(all.len(), 18);
         // every listed app exists in the official plugins, when they are next to this repository
         let plugins = root().join("../mosaikit-plugins");
         if plugins.is_dir() {
