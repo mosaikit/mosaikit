@@ -114,6 +114,12 @@ export function NavTree({ groups, bottom, labels = true, onPick, mini = false }:
           g.collapsible && labels && !mini ? (
             <TreeGroup key={g.id} g={g} onPick={onPick} />
           ) : (
+          mini && g.collapsible ? (
+            // closed sidebar: one icon for the group of the distribution, its apps in a menu at the side
+            <ul key={g.id} className="mb-0.5 flex flex-col gap-0.5" aria-label={g.label}>
+              <MiniFlyout item={{ label: g.label ?? g.id, icon: g.icon, iconId: g.iconId, active: allItems(g).some(hasActive), children: allItems(g) }} />
+            </ul>
+          ) : (
           <div key={g.id} className={mini ? 'mb-0.5' : 'mb-2'} role="group" aria-label={g.label}>
             {labels && !mini && g.id !== 'start' && g.label && <div data-group={g.id} className="px-2.5 pt-2 pb-1 text-xs font-medium text-sidebar-foreground/85">{g.label}</div>}
             <ul className="flex flex-col gap-0.5">
@@ -122,6 +128,7 @@ export function NavTree({ groups, bottom, labels = true, onPick, mini = false }:
               ))}
             </ul>
           </div>
+          )
           ),
         )}
       </div>
