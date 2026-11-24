@@ -104,6 +104,12 @@ fn csp_for(
     if m.permissions.web {
         frame_src.push_str(" https: http:");
     }
+    // sites (`content`) and files are shown from the public origin, which is not `'self'` when every
+    // plugin has its own host (wildcard): without it the browser blocks the frame and the page stays blank
+    if m.permissions.content || m.permissions.files {
+        frame_src.push(' ');
+        frame_src.push_str(public_origin);
+    }
     let api = if api_origin.is_empty() { String::new() } else { format!(" {api_origin}") };
     let eval = if m.permissions.script_eval { " 'unsafe-eval' 'wasm-unsafe-eval'" } else { "" };
     format!(
@@ -880,6 +886,14 @@ label = \"P\"
 {perms}"
         ))
         .unwrap()
+    }
+
+    #[test]
+    fn content_plugins_may_frame_the_public_origin() {
+        let csp = |m| super::csp_for(&m, "http://p/ui/x/", "http://app", "http://pub", &[], &[], "");
+        assert!(csp(manifest("content = true
+")).contains("frame-src 'self' blob:  http://pub;"));
+        assert!(!csp(manifest("")).contains("frame-src 'self' blob:  http://pub"));
     }
 
     #[test]
