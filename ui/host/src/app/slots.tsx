@@ -114,7 +114,7 @@ export function NavTree({ groups, bottom, labels = true, onPick, mini = false }:
           g.collapsible && labels && !mini ? (
             <TreeGroup key={g.id} g={g} onPick={onPick} />
           ) : (
-          mini && g.collapsible ? (
+          mini && (g.collapsible || g.id === 'manage') ? (
             // closed sidebar: one icon for the group of the distribution, its apps in a menu at the side
             <ul key={g.id} className="mb-0.5 flex flex-col gap-0.5" aria-label={g.label}>
               <MiniFlyout item={{ label: g.label ?? g.id, icon: g.icon, iconId: g.iconId, active: allItems(g).some(hasActive), children: allItems(g) }} />
