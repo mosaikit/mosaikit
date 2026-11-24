@@ -7,6 +7,8 @@ in step).
 
 ## 1.4.0
 
+- Shell: layouts with the `sidebar` pattern show the sidebar button in the band, the number of apps of each group, and a search box that keeps its label at 430 px (`msk-band-search`, `msk-navg-count`); the widgets of the Overview carry `data-widget` / `data-widget-title` and an empty `data-widget-icon` slot for layout stylesheets, and «Waiting for you» shows the total with a bar by kind.
+- Layout Studio 1.1.0 (mosaikit-plugins): wide search, narrower sidebar, 3D icons on the groups, the key figures and the widgets of the Overview, and a hero banner with 3D art.
 - Presence of people is platform-wide: from the moment the shell of a tenant is open, the other members see the person online in every page and plugin, not only where a real-time channel is open. They are shown as offline as soon as the connection is lost (browser closed, log out). A person is away after 5 minutes without input (typing in a plugin page counts) or with a tab hidden for 2 minutes, and available again on the next input; with several tabs the person is available if any tab is.
 - Plugins: `msk.presence.get()` (`{ [userId]: 'available' | 'away' }`, a person not in it is offline), `msk.presence.status(id)`, `msk.presence.onChange(fn)`, `msk.presence.live` and `msk.presence.supported`. No permission; an older shell reports `supported = false` and the plugin keeps its own logic. The plugin API stays 1.
 - Kernel: `GET /api/t/{t}/presence/stream?tab=<id>&status=<available|away>` (server-sent events: `presence`, `join`, `state`, `leave`, `closed`) and `POST /api/t/{t}/presence/state` `{ tab, status }`; any member of the tenant, nothing is stored.

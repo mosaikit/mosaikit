@@ -6,6 +6,9 @@ versione italiana di [CHANGELOG.md](CHANGELOG.md): tenerli allineati.
 
 ## 1.4.0
 
+- Shell: i layout con il pattern `sidebar` mostrano il pulsante della barra laterale nella banda, il numero di app di ogni gruppo e una ricerca che tiene l'etichetta a 430 px (`msk-band-search`, `msk-navg-count`); i widget della Panoramica portano `data-widget` / `data-widget-title` e uno spazio vuoto `data-widget-icon` per i fogli di stile dei layout, e «In attesa di te» mostra il totale con una barra per tipo.
+- Layout Studio 1.1.0 (mosaikit-plugins): ricerca larga, barra laterale più stretta, icone 3D su gruppi, cifre chiave e widget della Panoramica, banner con grafica 3D.
+
 - La presenza delle persone vale per tutta la piattaforma: da quando la shell di un'organizzazione è aperta, gli altri membri vedono la persona online in ogni pagina e plugin, non solo dove è aperto un canale in tempo reale. Risulta offline appena la connessione cade (browser chiuso, uscita). La persona è assente dopo 5 minuti senza input (scrivere in una pagina di plugin conta) o con una scheda nascosta da 2 minuti, e di nuovo disponibile al primo input; con più schede è disponibile se lo è almeno una.
 - Plugin: `msk.presence.get()` (`{ [userId]: 'available' | 'away' }`, chi non c'è è offline), `msk.presence.status(id)`, `msk.presence.onChange(fn)`, `msk.presence.live` e `msk.presence.supported`. Nessun permesso; una shell più vecchia dà `supported = false` e il plugin mantiene la propria logica. L'API dei plugin resta 1.
 - Kernel: `GET /api/t/{t}/presence/stream?tab=<id>&status=<available|away>` (server-sent events: `presence`, `join`, `state`, `leave`, `closed`) e `POST /api/t/{t}/presence/state` `{ tab, status }`; qualsiasi membro dell'organizzazione, nulla viene salvato.

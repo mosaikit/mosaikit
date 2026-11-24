@@ -170,9 +170,9 @@ export default function Frame({ session, route, band, layout, bandImage, childre
   const wideSearch = d.band.search === 'wide'
 
   const navToggle =
-    pattern === 'drawer' && !phone ? (
+    (pattern === 'drawer' || pattern === 'sidebar') && !phone ? (
       <button type="button" className={bandIcon} aria-expanded={!mini} aria-controls="msk-nav" aria-label={mini ? t('Open the navigation') : t('Close the navigation')} onClick={() => setMini(!mini)}>
-        <Menu className="size-[18px]" />
+        {pattern === 'sidebar' ? <PanelLeft className="size-[18px]" /> : <Menu className="size-[18px]" />}
       </button>
     ) : pattern === 'launcher' && !phone ? (
       <button type="button" className={bandIcon} aria-haspopup="dialog" aria-label={t('All apps and pages')} onClick={() => setLauncher(true)}>
@@ -199,8 +199,8 @@ export default function Frame({ session, route, band, layout, bandImage, childre
       )}
       <div className={cn('flex min-w-0 flex-1', wideSearch ? 'justify-start' : 'justify-center')}>
         {band.search && (
-          <div className={cn('@container w-full', wideSearch ? 'max-w-[720px]' : 'max-w-[420px]')}>
-            <BandSearch session={session} route={route} nav={nav} />
+          <div className={cn('msk-band-search @container w-full', wideSearch ? 'max-w-[720px]' : 'max-w-[420px]')}>
+            <BandSearch session={session} route={route} nav={nav} wide={wideSearch} />
           </div>
         )}
       </div>

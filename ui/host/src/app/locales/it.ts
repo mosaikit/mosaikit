@@ -2027,6 +2027,7 @@ export const IT: Record<string, string> = {
   'the latest below': 'le ultime qui sotto',
   'My recent activity': 'La mia attività recente',
   'signed in the last 30 days, of {n}': 'hanno acceduto negli ultimi 30 giorni, su {n}',
+  'open items need you': 'elementi aspettano te',
   'Waiting for you': 'In attesa di te',
   'To decide': 'Da decidere',
   'Decide': 'Decidi',
