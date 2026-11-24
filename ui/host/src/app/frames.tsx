@@ -180,31 +180,67 @@ export default function Frame({ session, route, band, layout, bandImage, childre
       </button>
     ) : null
 
+  // a sidebar with the centred search: the band is the one of Teams (a block of the width of the sidebar with the brand,
+  // then the button, the tenant, the search in the middle of the bar and the actions at the right)
+  const teamsBand = pattern === 'sidebar' && !phone && !wideSearch
   const header = (
-    <header className={cn('msk-band band-surface sticky top-0 z-20 flex h-[50px] shrink-0 items-center gap-3 bg-band px-4 text-band-foreground')} {...bandStyle(bandImage)}>
+    <header
+      className={cn(
+        'msk-band band-surface sticky top-0 z-20 h-[50px] shrink-0 items-center bg-band text-band-foreground',
+        teamsBand ? '@container grid grid-cols-[minmax(max-content,1fr)_minmax(0,420px)_minmax(max-content,1fr)] gap-3 pr-4' : 'flex gap-3 px-4',
+      )}
+      {...bandStyle(bandImage)}
+    >
       {phone && (
         <button type="button" className={bandIcon} aria-haspopup="dialog" aria-label={t('Open the navigation')} onClick={phoneNav}>
           <Menu className="size-[18px]" />
         </button>
       )}
-      {navToggle}
-      {(band.logo || !phone) && d.band.brand && <Brand compact={phone} />}
-      {d.band.tenant === 'band' && !phone && <TenantSwitcher session={session} route={route} />}
-      <DevPill />
-      {d.band.breadcrumb && !phone && (
+      {teamsBand ? (
         <>
-          <span aria-hidden="true" className="h-5 w-px bg-band-line" />
-          <Breadcrumb crumbs={crumbs} />
+          <div className="flex min-w-0 items-center gap-2">
+            {(band.logo || !phone) && d.band.brand && (
+              <div className={cn('msk-band-brand flex h-[50px] shrink-0 items-center border-r border-band-line pl-4', mini ? 'w-[60px] justify-center pl-0' : 'w-60')}>
+                <Brand compact={mini} />
+              </div>
+            )}
+            {navToggle}
+            {d.band.tenant === 'band' && <TenantSwitcher session={session} route={route} />}
+            <DevPill />
+            {d.band.breadcrumb && (
+              <>
+                <span aria-hidden="true" className="h-5 w-px bg-band-line" />
+                <Breadcrumb crumbs={crumbs} />
+              </>
+            )}
+          </div>
+          {band.search ? <div className="msk-band-search min-w-0"><BandSearch session={session} route={route} nav={nav} /></div> : <span />}
+          <div className="flex items-center gap-2 justify-self-end">
+            <BandActions session={session} route={route} band={band} />
+          </div>
+        </>
+      ) : (
+        <>
+          {navToggle}
+          {(band.logo || !phone) && d.band.brand && <Brand compact={phone} />}
+          {d.band.tenant === 'band' && !phone && <TenantSwitcher session={session} route={route} />}
+          <DevPill />
+          {d.band.breadcrumb && !phone && (
+            <>
+              <span aria-hidden="true" className="h-5 w-px bg-band-line" />
+              <Breadcrumb crumbs={crumbs} />
+            </>
+          )}
+          <div className={cn('flex min-w-0 flex-1', wideSearch ? 'justify-start' : 'justify-center')}>
+            {band.search && (
+              <div className={cn('msk-band-search @container w-full', wideSearch ? 'max-w-[720px]' : 'max-w-[420px]')}>
+                <BandSearch session={session} route={route} nav={nav} wide={wideSearch} />
+              </div>
+            )}
+          </div>
+          <BandActions session={session} route={route} band={band} />
         </>
       )}
-      <div className={cn('flex min-w-0 flex-1', wideSearch ? 'justify-start' : 'justify-center')}>
-        {band.search && (
-          <div className={cn('msk-band-search @container w-full', wideSearch ? 'max-w-[720px]' : 'max-w-[420px]')}>
-            <BandSearch session={session} route={route} nav={nav} wide={wideSearch} />
-          </div>
-        )}
-      </div>
-      <BandActions session={session} route={route} band={band} />
     </header>
   )
 
