@@ -42,7 +42,7 @@ export function Widget({
   children: ReactNode
 }) {
   return (
-    <section aria-labelledby={id} data-widget={id} className={cn('grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-2 rounded-lg border bg-card p-4 shadow-sm', span && '@xl:col-span-2', full && '@xl:col-span-2 @4xl:col-span-4')}>
+    <section aria-labelledby={id} data-widget={id} className={cn('grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-2 rounded-lg border bg-card p-4 shadow-sm', span && '@xl:col-span-2', full && '@xl:col-span-2 @4xl:col-span-3')}>
       <div className="flex items-center justify-between gap-2">
         <h2 id={id} data-widget-title={id} className="flex min-w-0 items-center gap-2 text-sm font-semibold">
           {icon ?? <span data-widget-icon="" aria-hidden="true" className="shrink-0" />}
@@ -65,14 +65,14 @@ export function Widget({
 export function WidgetGrid({ children }: { children: ReactNode }) {
   return (
     <div className="@container">
-      <div className="grid grid-flow-dense grid-cols-[minmax(0,1fr)] gap-4 @xl:grid-cols-[repeat(2,minmax(0,1fr))] @4xl:grid-cols-[repeat(4,minmax(0,1fr))]">{children}</div>
+      <div className="grid grid-flow-dense grid-cols-[minmax(0,1fr)] gap-4 @xl:grid-cols-[repeat(2,minmax(0,1fr))] @4xl:grid-cols-[repeat(3,minmax(0,1fr))]">{children}</div>
     </div>
   )
 }
 
 /** A row of counters that takes the whole row of the grid and fills it. */
 export function KpiRow({ children }: { children: ReactNode }) {
-  return <div className="grid grid-cols-[repeat(auto-fit,minmax(170px,1fr))] gap-3 @xl:col-span-2 @4xl:col-span-4">{children}</div>
+  return <div className="grid grid-cols-[repeat(auto-fit,minmax(170px,1fr))] gap-3 @xl:col-span-2 @4xl:col-span-3">{children}</div>
 }
 
 /** A small trend: the figure, its caption and a line (the caption says what the values are). */
@@ -130,7 +130,7 @@ export function ActivityWidget({ slug }: { slug: string }) {
   const q = useApi<LogPage>(['ov-activity', slug], `/api/t/${enc(slug)}/manage/log?limit=5`)
   const events: LogEvent[] = q.data?.events ?? []
   return (
-    <Widget id="ov-activity" title={t('Recent activity')} link={{ href: to.tenant(slug, 'log'), label: t('Log') }} span>
+    <Widget id="ov-activity" title={t('Recent activity')} link={{ href: to.tenant(slug, 'log'), label: t('Log') }}>
       {q.isLoading ? (
         <Loading />
       ) : events.length ? (
@@ -360,7 +360,7 @@ export function AdminWidgets({ lead }: { lead?: ReactNode }) {
           <p className="text-sm text-muted-foreground">{t('No errors.')}</p>
         )}
       </Widget>
-      {ids.length > 0 && <h2 className="-mb-1 text-sm font-semibold @xl:col-span-2 @4xl:col-span-4">{t('Apps, in every tenant')}</h2>}
+      {ids.length > 0 && <h2 className="-mb-1 text-sm font-semibold @xl:col-span-2 @4xl:col-span-3">{t('Apps, in every tenant')}</h2>}
       {ids.map((id) => (
         <AppCard key={id} plugin={id} stats={(kpi.data?.resources ?? []).filter((r) => r.plugin_id === id)} kpis={(kpi.data?.plugins ?? []).filter((k) => k.plugin_id === id)} />
       ))}

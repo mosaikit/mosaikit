@@ -232,11 +232,11 @@ export function TenantHome({ session, slug }: { session: Session; slug: string }
               />
               <ActivityWidget slug={slug} />
               <NotesWidget href={to.tenant(slug, 'notifications')} />
-              <UsageByApp resources={d.tenant.resources} />
-              <div className="@xl:col-span-2 [&>section]:h-full">
+              <div className="[&>section]:h-full">
                 <UsagePanel slug={slug} />
               </div>
-              <h2 className="-mb-1 text-sm font-semibold @xl:col-span-2 @4xl:col-span-4">{t('Your space')}</h2>
+              <UsageByApp resources={d.tenant.resources} />
+              <h2 className="-mb-1 text-sm font-semibold @xl:col-span-2 @4xl:col-span-3">{t('Your space')}</h2>
             </>
           )}
           {personal}
