@@ -891,8 +891,11 @@ label = \"P\"
     #[test]
     fn content_plugins_may_frame_the_public_origin() {
         let csp = |m| super::csp_for(&m, "http://p/ui/x/", "http://app", "http://pub", &[], &[], "");
-        assert!(csp(manifest("content = true
-")).contains("frame-src 'self' blob:  http://pub;"));
+        assert!(csp(manifest(
+            "content = true
+"
+        ))
+        .contains("frame-src 'self' blob:  http://pub;"));
         assert!(!csp(manifest("")).contains("frame-src 'self' blob:  http://pub"));
     }
 
