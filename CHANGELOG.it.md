@@ -4,6 +4,11 @@ Cosa cambia da una versione di Mosaikit alla successiva. La shell mostra la sezi
 Aiuto › Novità (un titolo `## <versione>` per versione, voci `- `, gruppi `### `). Questo file è la
 versione italiana di [CHANGELOG.md](CHANGELOG.md): tenerli allineati.
 
+## 1.4.1
+
+- Siti 0.11.1 (mosaikit-plugins): i moduli per creare e modificare un sito si aprono in una finestra modale con il corpo scorrevole e il piè di pagina fisso.
+- Siti con contenuti o file e host dei plugin con carattere jolly: i siti pubblici non restano più vuoti (la CSP dei plugin permette ai plugin con contenuti o file di incorniciare l'origine pubblica).
+
 ## 1.4.0
 
 - Shell: i layout con il pattern `sidebar` mostrano il pulsante della barra laterale nella banda, il numero di app di ogni gruppo e una ricerca che tiene l'etichetta a 430 px (`msk-band-search`, `msk-navg-count`); i widget della Panoramica portano `data-widget` / `data-widget-title` e uno spazio vuoto `data-widget-icon` per i fogli di stile dei layout, e «In attesa di te» mostra il totale con una barra per tipo.
