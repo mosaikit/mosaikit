@@ -5,6 +5,11 @@ in Help › What is new (one `## <version>` heading per version, `- ` items, `##
 language of the person: this file in English, [CHANGELOG.it.md](CHANGELOG.it.md) in Italian (keep them
 in step).
 
+## 1.4.1
+
+- Sites 0.11.1 (mosaikit-plugins): the forms to create and edit a site open in a modal with a scrolling body and a fixed footer.
+- Sites with content or files and a wildcard plugin host: public sites are no longer blank (the plugin CSP lets plugins with content or files frame the public origin).
+
 ## 1.4.0
 
 - Shell: layouts with the `sidebar` pattern show the sidebar button in the band, the number of apps of each group, and a search box that keeps its label at 430 px (`msk-band-search`, `msk-navg-count`); the widgets of the Overview carry `data-widget` / `data-widget-title` and an empty `data-widget-icon` slot for layout stylesheets, and «Waiting for you» shows the total with a bar by kind.
