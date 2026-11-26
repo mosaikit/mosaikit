@@ -547,7 +547,7 @@ export function Manage({ slug, section }: { slug: string; section?: string }) {
           { name: 'username', label: t('Username'), required: true },
           { name: 'display_name', label: t('Display name') },
           { name: 'email', label: t('Email'), type: 'email', required: true, hint: t('Required: the password is recovered at this address.') },
-          { name: 'password', label: t('Initial password'), type: 'password', required: true, hint: t('At least {n} characters', { n: pwMin }) },
+          { name: 'password', label: t('Initial password'), type: 'password', required: true, min: pwMin, repeat: true, hint: t('At least {n} characters', { n: pwMin }) },
           { name: 'role', label: t('Role'), options: [['user', 'User'], ['tenant_manager', t('Tenant Manager')]] },
         ]}
         submit={t('Create user')}
@@ -1793,22 +1793,32 @@ function Policy({ slug }: { slug: string }) {
             </span>
             <Switch checked={s.public_links_enabled} onCheckedChange={(x) => setV({ ...s, public_links_enabled: x })} />
           </label>
-          <div className="grid gap-1.5">
-            <Label htmlFor="maxd">{t('Maximum length of links, in days (0 = no limit)')}</Label>
-            <Input
-              id="maxd"
-              type="number"
-              min={0}
-              className="w-32"
-              value={s.public_link_max_days}
-              onChange={(e) =>
-                setV({
-                  ...s,
-                  public_link_max_days: Math.max(0, +e.target.value),
-                })
-              }
-            />
-          </div>
+          <label className="flex items-center justify-between gap-4">
+            <span>
+              <b className="block text-sm">{t('Permanent links')}</b>
+              <span className="text-xs text-muted-foreground">{t('The links never expire. Turn it off to set a maximum length.')}</span>
+            </span>
+            <Switch checked={s.public_link_max_days === 0} onCheckedChange={(x) => setV({ ...s, public_link_max_days: x ? 0 : 30 })} aria-label={t('Permanent links')} />
+          </label>
+          {s.public_link_max_days > 0 && (
+            <div className="grid gap-1.5">
+              <Label htmlFor="maxd">{t('Maximum length of the links, in days')}</Label>
+              <Input
+                id="maxd"
+                type="number"
+                min={1}
+                max={3650}
+                className="w-32"
+                value={s.public_link_max_days}
+                onChange={(e) =>
+                  setV({
+                    ...s,
+                    public_link_max_days: Math.min(3650, Math.max(1, Math.round(+e.target.value) || 1)),
+                  })
+                }
+              />
+            </div>
+          )}
           <label className="flex items-center justify-between gap-4">
             <span>
               <b className="block text-sm">{t('Public commands')}</b>

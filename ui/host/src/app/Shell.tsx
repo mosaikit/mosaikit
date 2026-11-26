@@ -51,7 +51,7 @@ import { backFromActiveEntry, bandEmit, resetBand, useBand } from './contextband
 import CommentsController from './CommentsPanel.tsx'
 import { toggleComments, useCommentsState } from './comments.ts'
 import { startPresence } from './presence.ts'
-import { BackButton, CommentsButton, ModeSwitch, Presence } from './ContextBand.tsx'
+import { BackButton, BandIdentity, CommentsButton, ModeSwitch, Presence } from './ContextBand.tsx'
 
 export { AppMark, TenantBadge } from './slots.tsx'
 
@@ -306,7 +306,7 @@ function AppSidebar({ session, route, band }: { session: Session; route: Route; 
         <SidebarHeader className="band-surface h-[50px] flex-row items-center gap-2.5 border-r border-b border-band-line bg-band px-4 text-band-foreground group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
           {band.logo || isMobile ? (
             <>
-              <AppMark variant="negative" />
+              <AppMark />
               <span className="truncate text-[17px] font-bold group-data-[collapsible=icon]:hidden">{brand.name}</span>
             </>
           ) : (
@@ -365,15 +365,17 @@ function TopBar({ session, route, band, bandImage }: { session: Session; route: 
           <TenantSwitcher session={session} route={route} />
         </div>
         <DevPill />
-        {ctxBand?.back && <BackButton back={ctxBand.back} onBack={() => bandEmit('band.back', {})} />}
+        {ctxBand?.back && !ctxBand.identity && <BackButton back={ctxBand.back} onBack={() => bandEmit('band.back', {})} />}
       </div>
-      {searchOn ? (
+      {ctxBand?.identity ? (
+        <BandIdentity identity={ctxBand.identity} back={ctxBand.back} onBack={() => bandEmit('band.back', {})} />
+      ) : searchOn ? (
         <BandSearch session={session} route={route} nav={nav} />
       ) : (
         <div className="flex justify-center max-[900px]:flex-1">{modeSwitch}</div>
       )}
       <div className="flex items-center gap-2 justify-self-end">
-        {searchOn && modeSwitch}
+        {(searchOn || ctxBand?.identity) && modeSwitch}
         {ctxBand && <Presence people={ctxBand.presence} />}
         {ctxBand?.comments && (
           <CommentsButton

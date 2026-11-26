@@ -8,7 +8,7 @@ import { api, errText, fmtDate } from '../api.ts'
 import type { Grant, Level, LinkInfo, Principal, ResourceMeta, TenantContext } from '../types.ts'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/checkbox'
+import { Switch } from '@/components/ui/switch'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -61,13 +61,13 @@ export default function ShareDialog({ ctx, resourceId, onClose, preselect }: { c
   const [q, setQ] = useState('')
   const [pick, setPick] = useState<Principal | null>(null)
   const [level, setLevel] = useState<Level>('read')
-  const [days, setDays] = useState(ctx.tenant.settings.public_link_max_days || 7)
+  const [days, setDays] = useState(ctx.tenant.settings.public_link_max_days || 30)
   const [pw, setPw] = useState('')
   const [created, setCreated] = useState<string | null>(null)
   const [createdExpiry, setCreatedExpiry] = useState<string | null>(null)
-  // the link of a tenant that does not limit the lifetime can be made without an expiry
+  // a tenant with permanent links (no maximum) offers a permanent link, which is the default, or one with an expiry
   const maxDays = ctx.tenant.settings.public_link_max_days
-  const [noExpiry, setNoExpiry] = useState(false)
+  const [noExpiry, setNoExpiry] = useState(!maxDays)
   const [ownerQ, setOwnerQ] = useState('')
   const [busy, setBusy] = useState(false)
   const found = useDirectory(slug, q)
@@ -246,24 +246,25 @@ export default function ShareDialog({ ctx, resourceId, onClose, preselect }: { c
               ) : (
                 <>
                   <div className="flex flex-wrap items-end gap-3">
-                    <div className="grid gap-1.5">
-                      <Label htmlFor="sh-days">{t('Expiry (days)')}</Label>
-                      <Input
-                        id="sh-days"
-                        type="number"
-                        disabled={noExpiry}
-                        className="w-32"
-                        min={1}
-                        max={ctx.tenant.settings.public_link_max_days || 3650}
-                        value={days}
-                        onChange={(e) => setDays(Number(e.target.value))}
-                      />
-                    </div>
                     {!maxDays && (
                       <label className="flex h-9 items-center gap-2 text-sm">
-                        <Checkbox checked={noExpiry} onCheckedChange={(v) => setNoExpiry(!!v)} aria-label={t('The link does not expire')} />
-                        {t('The link does not expire')}
+                        <Switch checked={noExpiry} onCheckedChange={(v) => setNoExpiry(v)} aria-label={t('Permanent link')} />
+                        {t('Permanent link')}
                       </label>
+                    )}
+                    {!noExpiry && (
+                      <div className="grid gap-1.5">
+                        <Label htmlFor="sh-days">{maxDays ? t('Expiry (days, at most {n})', { n: maxDays }) : t('Expiry (days)')}</Label>
+                        <Input
+                          id="sh-days"
+                          type="number"
+                          className="w-32"
+                          min={1}
+                          max={maxDays || 3650}
+                          value={days}
+                          onChange={(e) => setDays(Number(e.target.value))}
+                        />
+                      </div>
                     )}
                     <div className="grid gap-1.5">
                       <Label htmlFor="sh-pw">{t('Password (optional)')}</Label>

@@ -42,7 +42,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 import { passwordMin, useAction, useApi, useConfig, useConfirm } from '../core.ts'
 import { fmtDay, fmtNumber, t } from '../i18n.ts'
-import { Empty, ErrorBox, Kpi, Loading, PageHeader, Pills, SaveBar, Sections, Sliced } from '../kit.tsx'
+import { Empty, ErrorBox, Kpi, Loading, PageHeader, PasswordStrength, Pills, SaveBar, Sections, Sliced } from '../kit.tsx'
 import { ListTable } from '../ListTable.tsx'
 import { go, to } from '../router.ts'
 import { alertDetailText } from '../notes.ts'
@@ -130,6 +130,7 @@ interface Wizard {
   manager_display_name: string
   manager_email: string
   manager_password: string
+  manager_password2: string
 }
 
 const EMPTY: Wizard = {
@@ -146,6 +147,7 @@ const EMPTY: Wizard = {
   manager_display_name: '',
   manager_email: '',
   manager_password: '',
+  manager_password2: '',
 }
 
 function slugOf(name: string): string {
@@ -158,12 +160,28 @@ function slugOf(name: string): string {
     .slice(0, 40)
 }
 
-function Field({ id, label, hint, children }: { id: string; label: string; hint?: ReactNode; children: ReactNode }) {
+/** A field of the wizard: `required` adds the asterisk, `error` (shown once the person left the field or tried to
+ *  go on) says what is missing or wrong, in place of the hint. */
+function Field({ id, label, hint, required, error, children }: { id: string; label: string; hint?: ReactNode; required?: boolean; error?: string; children: ReactNode }) {
   return (
     <div className="grid gap-1.5">
-      <Label htmlFor={id}>{label}</Label>
+      <Label htmlFor={id}>
+        {label}
+        {required && (
+          <span aria-hidden="true" className="text-destructive">
+            {' '}
+            *
+          </span>
+        )}
+      </Label>
       {children}
-      {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
+      {error ? (
+        <p id={`${id}-error`} role="alert" className="text-xs text-destructive">
+          {error}
+        </p>
+      ) : (
+        hint && <p className="text-xs text-muted-foreground">{hint}</p>
+      )}
     </div>
   )
 }
@@ -177,21 +195,42 @@ export function NewTenantWizard({ open, onOpenChange }: { open: boolean; onOpenC
   const [w, setW] = useState<Wizard>(EMPTY)
   const [slugTouched, setSlugTouched] = useState(false)
   const [busy, setBusy] = useState(false)
+  // fields the person has left, and steps where "Next" was tried: only then an error is shown
+  const [touched, setTouched] = useState<Set<string>>(new Set())
+  const [tried, setTried] = useState<Set<number>>(new Set())
   const set = (p: Partial<Wizard>) => setW((x) => ({ ...x, ...p }))
   useEffect(() => {
     if (open) {
       setStep(0)
       setW(EMPTY)
       setSlugTouched(false)
+      setTouched(new Set())
+      setTried(new Set())
     }
   }, [open])
   const steps = [t('Tenant'), t('Sign-in'), t('Tenant Manager'), t('Summary')]
-  const valid = [
-    !!w.name.trim() && /^[a-z0-9][a-z0-9-]{1,39}$/.test(w.slug) && (!w.trial || !!w.trial_until),
-    !w.oidc || (!!w.issuer.trim() && !!w.client_id.trim()),
-    !!w.manager_username.trim() && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(w.manager_email.trim()) && w.manager_password.length >= pwMin,
-    true,
-  ]
+  const required = t('This field is required')
+  // what is missing or wrong, by field, and the step each field is in
+  const errs: Record<string, string> = {}
+  if (!w.name.trim()) errs.name = required
+  if (!w.slug) errs.slug = required
+  else if (!/^[a-z0-9][a-z0-9-]{1,39}$/.test(w.slug)) errs.slug = t('Use 2 to 40 lowercase letters, digits or hyphens, starting with a letter or a digit')
+  if (w.trial && !w.trial_until) errs.trial_until = t('Choose the end date of the trial')
+  if (w.oidc && !w.issuer.trim()) errs.issuer = required
+  else if (w.oidc && !/^https?:\/\/\S+$/.test(w.issuer.trim())) errs.issuer = t('Enter a web address, starting with https://')
+  if (w.oidc && !w.client_id.trim()) errs.client_id = required
+  if (!w.manager_username.trim()) errs.manager_username = required
+  if (!w.manager_email.trim()) errs.manager_email = required
+  else if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(w.manager_email.trim())) errs.manager_email = t('Enter a valid email address, like name@example.org')
+  if (!w.manager_password) errs.manager_password = required
+  else if (w.manager_password.length < pwMin) errs.manager_password = t('Use at least {n} characters', { n: pwMin })
+  if (!w.manager_password2) errs.manager_password2 = required
+  else if (w.manager_password2 !== w.manager_password) errs.manager_password2 = t('The two passwords are not the same')
+  const stepFields = [['name', 'slug', 'trial_until'], ['issuer', 'client_id'], ['manager_username', 'manager_email', 'manager_password', 'manager_password2'], []]
+  const valid = stepFields.map((f) => f.every((k) => !errs[k]))
+  const touch = (k: string) => setTouched((s) => new Set(s).add(k))
+  const err = (k: string) => (errs[k] && (touched.has(k) || tried.has(step)) ? errs[k] : undefined)
+  const bad = (k: string) => !!err(k) || undefined
   async function create() {
     setBusy(true)
     try {
@@ -242,28 +281,41 @@ export function NewTenantWizard({ open, onOpenChange }: { open: boolean; onOpenC
         </ol>
         <form
           className="grid gap-4"
+          noValidate
           onSubmit={(e) => {
             e.preventDefault()
-            if (!valid[step]) return
+            if (!valid[step]) {
+              setTried((s) => new Set(s).add(step))
+              const first = stepFields[step].find((k) => errs[k])
+              if (first) e.currentTarget.querySelector<HTMLElement>(`[name="${first}"]`)?.focus()
+              return
+            }
             if (step < steps.length - 1) setStep(step + 1)
             else void create()
           }}
         >
+          {step < 3 && <p className="text-xs text-muted-foreground">{t('Fields marked with * are required.')}</p>}
           {step === 0 && (
             <>
-              <Field id="nt-name" label={t('Name')}>
+              <Field id="nt-name" label={t('Name')} required error={err('name')}>
                 <Input
                   id="nt-name"
-                  required
+                  name="name"
+                  aria-required
+                  aria-invalid={bad('name')}
                   value={w.name}
+                  onBlur={() => touch('name')}
                   onChange={(e) => set({ name: e.target.value, slug: slugTouched ? w.slug : slugOf(e.target.value) })}
                 />
               </Field>
-              <Field id="nt-slug" label={t('Identifier')} hint={t('Lowercase letters, digits and hyphens: it goes in the address and does not change')}>
+              <Field id="nt-slug" label={t('Identifier')} required error={err('slug')} hint={t('Lowercase letters, digits and hyphens: it goes in the address and does not change')}>
                 <Input
                   id="nt-slug"
+                  name="slug"
                   className="font-mono"
-                  required
+                  aria-required
+                  aria-invalid={bad('slug')}
+                  onBlur={() => touch('slug')}
                   value={w.slug}
                   onChange={(e) => {
                     setSlugTouched(true)
@@ -279,8 +331,8 @@ export function NewTenantWizard({ open, onOpenChange }: { open: boolean; onOpenC
                 <Switch checked={w.trial} onCheckedChange={(v) => set({ trial: v })} aria-label={t('Trial period')} />
               </label>
               {w.trial && (
-                <Field id="nt-trial" label={t('End of the trial')}>
-                  <Input id="nt-trial" type="date" required value={w.trial_until} min={new Date(now + 86400000).toISOString().slice(0, 10)} onChange={(e) => set({ trial_until: e.target.value })} />
+                <Field id="nt-trial" label={t('End of the trial')} required error={err('trial_until')}>
+                  <Input id="nt-trial" name="trial_until" type="date" aria-required aria-invalid={bad('trial_until')} onBlur={() => touch('trial_until')} value={w.trial_until} min={new Date(now + 86400000).toISOString().slice(0, 10)} onChange={(e) => set({ trial_until: e.target.value })} />
                 </Field>
               )}
             </>
@@ -307,12 +359,12 @@ export function NewTenantWizard({ open, onOpenChange }: { open: boolean; onOpenC
               </div>
               {w.oidc && (
                 <>
-                  <Field id="nt-issuer" label={t('Address of the provider (issuer)')}>
-                    <Input id="nt-issuer" className="font-mono" required placeholder="https://login.example.org/realms/staff" value={w.issuer} onChange={(e) => set({ issuer: e.target.value })} />
+                  <Field id="nt-issuer" label={t('Address of the provider (issuer)')} required error={err('issuer')}>
+                    <Input id="nt-issuer" name="issuer" className="font-mono" aria-required aria-invalid={bad('issuer')} onBlur={() => touch('issuer')} placeholder="https://login.example.org/realms/staff" value={w.issuer} onChange={(e) => set({ issuer: e.target.value })} />
                   </Field>
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <Field id="nt-client" label={t('Client id')}>
-                      <Input id="nt-client" className="font-mono" required value={w.client_id} onChange={(e) => set({ client_id: e.target.value })} />
+                    <Field id="nt-client" label={t('Client id')} required error={err('client_id')}>
+                      <Input id="nt-client" name="client_id" className="font-mono" aria-required aria-invalid={bad('client_id')} onBlur={() => touch('client_id')} value={w.client_id} onChange={(e) => set({ client_id: e.target.value })} />
                     </Field>
                     <Field id="nt-secret" label={t('Client secret')}>
                       <Input id="nt-secret" type="password" autoComplete="new-password" value={w.client_secret} onChange={(e) => set({ client_secret: e.target.value })} />
@@ -329,18 +381,22 @@ export function NewTenantWizard({ open, onOpenChange }: { open: boolean; onOpenC
                 {w.oidc ? t('The first Tenant Manager is a local account, to set the tenant up until the provider gives the roles.') : t('The first Tenant Manager invites the others and chooses the settings of the tenant.')}
               </p>
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field id="nt-user" label={t('Username of the Tenant Manager')}>
-                  <Input id="nt-user" required autoComplete="off" value={w.manager_username} onChange={(e) => set({ manager_username: e.target.value })} />
+                <Field id="nt-user" label={t('Username of the Tenant Manager')} required error={err('manager_username')}>
+                  <Input id="nt-user" name="manager_username" aria-required aria-invalid={bad('manager_username')} onBlur={() => touch('manager_username')} autoComplete="off" value={w.manager_username} onChange={(e) => set({ manager_username: e.target.value })} />
                 </Field>
                 <Field id="nt-dname" label={t('Name of the Tenant Manager')}>
                   <Input id="nt-dname" value={w.manager_display_name} onChange={(e) => set({ manager_display_name: e.target.value })} />
                 </Field>
               </div>
-              <Field id="nt-email" label={t('Email of the Tenant Manager')} hint={t('Required: the password is recovered at this address.')}>
-                <Input id="nt-email" type="email" required autoComplete="off" value={w.manager_email} onChange={(e) => set({ manager_email: e.target.value })} />
+              <Field id="nt-email" label={t('Email of the Tenant Manager')} required error={err('manager_email')} hint={t('Required: the password is recovered at this address.')}>
+                <Input id="nt-email" name="manager_email" type="email" aria-required aria-invalid={bad('manager_email')} onBlur={() => touch('manager_email')} autoComplete="off" value={w.manager_email} onChange={(e) => set({ manager_email: e.target.value })} />
               </Field>
-              <Field id="nt-pw" label={t('Initial password')} hint={t('At least {n} characters', { n: pwMin })}>
-                <Input id="nt-pw" type="password" autoComplete="new-password" required minLength={pwMin} value={w.manager_password} onChange={(e) => set({ manager_password: e.target.value })} />
+              <Field id="nt-pw" label={t('Initial password')} required error={err('manager_password')} hint={t('At least {n} characters', { n: pwMin })}>
+                <Input id="nt-pw" name="manager_password" type="password" autoComplete="new-password" aria-required aria-invalid={bad('manager_password')} onBlur={() => touch('manager_password')} value={w.manager_password} onChange={(e) => set({ manager_password: e.target.value })} />
+              </Field>
+              <PasswordStrength value={w.manager_password} />
+              <Field id="nt-pw2" label={t('Repeat the password')} required error={err('manager_password2')}>
+                <Input id="nt-pw2" name="manager_password2" type="password" autoComplete="new-password" aria-required aria-invalid={bad('manager_password2')} onBlur={() => touch('manager_password2')} value={w.manager_password2} onChange={(e) => set({ manager_password2: e.target.value })} />
               </Field>
             </>
           )}
@@ -375,7 +431,7 @@ export function NewTenantWizard({ open, onOpenChange }: { open: boolean; onOpenC
                 {t('Back')}
               </Button>
             )}
-            <Button type="submit" disabled={!valid[step] || busy}>
+            <Button type="submit" disabled={busy}>
               {busy && <Loader2 className="animate-spin" />}
               {step < steps.length - 1 ? t('Next') : t('Create the tenant')}
             </Button>

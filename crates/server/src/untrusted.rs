@@ -506,14 +506,42 @@ async fn public_path(
     Path((token, path)): Path<(String, String)>,
     headers: HeaderMap,
 ) -> Response {
-    let r = match open(&s, &token, &headers).await {
-        Ok(r) => r,
-        Err(res) => return *res,
+    // a key in the address (`~<key>/`) stands for the unlocking of a protected link: the files of a static site are
+    // asked by a frame without an origin, which sends no cookie
+    let (path, key) = match path.strip_prefix('~') {
+        Some(rest) => match rest.split_once('/') {
+            Some((key, tail)) => (tail.to_string(), Some(key.to_string())),
+            None => {
+                return Redirect::permanent(&format!("{}/p/{token}/~{rest}/", s.k.cfg.plugin_base_path))
+                    .into_response()
+            }
+        },
+        None => (path, None),
     };
-    if path.is_empty() {
+    let r = match links::resolve(&s.k, &token).await {
+        Ok(r) => r,
+        Err(_) => return not_found_page(),
+    };
+    let by_key =
+        key.as_deref().is_some_and(|k| r.password_hash.is_some() && links::check_unlock_key(&s.k, &r, k));
+    if !by_key && !unlocked(&s, &headers, &r) {
+        return html(pages::password(&r.title, false), PAGE_CSP);
+    }
+    let is_site = r.meta.pointer("/content/entry").and_then(Value::as_str).is_some();
+    // a protected static site opens under the key, so that its own files can be asked without the cookie
+    if is_site && !by_key && r.password_hash.is_some() && path.is_empty() {
+        links::count_view(&s.k, &r).await;
+        let key = links::new_unlock_key(&s.k, &r);
+        return Redirect::to(&format!("{}/p/{token}/~{key}/", s.k.cfg.plugin_base_path)).into_response();
+    }
+    // the first load of a protected site was counted at the redirect to its key
+    if path.is_empty() && !(is_site && by_key) {
         links::count_view(&s.k, &r).await;
     }
-    let base = format!("{}/p/{token}/", s.k.cfg.plugin_base_path);
+    let base = match key.as_deref().filter(|_| by_key) {
+        Some(k) => format!("{}/p/{token}/~{k}/", s.k.cfg.plugin_base_path),
+        None => format!("{}/p/{token}/", s.k.cfg.plugin_base_path),
+    };
     let fa = embedders(&s, r.tenant).await;
     // static site
     if let Some(entry) = r.meta.pointer("/content/entry").and_then(Value::as_str) {

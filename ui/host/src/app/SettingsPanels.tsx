@@ -75,7 +75,7 @@ function labels(): Record<string, [string, string]> {
 
 
 /** A group of settings with its save bar (it appears only after a change). */
-export function Panel({ level, keys, title, description, children }: { level: Level; keys: string[]; title: string; description?: string; children: (d: Draft, s: (key: string) => Setting | undefined) => ReactNode }) {
+export function Panel({ level, keys, title, description, children }: { level: Level; keys: string[]; title?: string; description?: string; children: (d: Draft, s: (key: string) => Setting | undefined) => ReactNode }) {
   const q = useLevelSettings(level)
   const d = useDraft(level, q.data)
   if (q.isLoading) return <Loading />
@@ -84,10 +84,12 @@ export function Panel({ level, keys, title, description, children }: { level: Le
   return (
     <div>
       <Card>
-        <CardHeader>
-          <CardTitle>{title}</CardTitle>
-          {description && <CardDescription>{description}</CardDescription>}
-        </CardHeader>
+        {title && (
+          <CardHeader>
+            <CardTitle>{title}</CardTitle>
+            {description && <CardDescription>{description}</CardDescription>}
+          </CardHeader>
+        )}
         <CardContent className="grid gap-5">{shown.length ? children(d, d.find) : null}</CardContent>
       </Card>
       <SaveBar dirty={d.dirty} busy={d.busy} onSave={() => void d.save()} onCancel={d.cancel} />
@@ -319,7 +321,7 @@ function Images({ level }: { level: Level }) {
   )
 }
 
-export function ImageSlot({ level, slot, label, hint, setting, accept = 'image/svg+xml,image/png,image/webp,.ico', wide }: { level: Level; slot: string; label: string; hint: string; setting?: Setting; accept?: string; wide?: boolean }) {
+export function ImageSlot({ level, slot, label, hint, setting, accept = 'image/svg+xml,image/png,image/webp,.ico', wide, bare }: { level: Level; slot: string; label: string; hint: string; setting?: Setting; accept?: string; wide?: boolean; bare?: boolean }) {
   const qc = useQueryClient()
   const input = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false)
@@ -346,10 +348,10 @@ export function ImageSlot({ level, slot, label, hint, setting, accept = 'image/s
   }
   const dark = slot === 'logo_dark' || slot === 'band'
   return (
-    <div className="grid gap-2 rounded-lg border p-3" data-image={slot}>
-      <b className="text-sm">{label}</b>
-      <span className="text-xs text-muted-foreground">{hint}</span>
-      <div className={cn('flex h-20 items-center justify-center rounded-md border', dark ? 'bg-band' : 'bg-background')}>
+    <div className={cn('grid gap-2', !bare && 'rounded-lg border p-3')} data-image={slot}>
+      {!bare && <b className="text-sm">{label}</b>}
+      {!bare && <span className="text-xs text-muted-foreground">{hint}</span>}
+      <div className={cn('flex items-center justify-center rounded-md border', bare ? 'h-10' : 'h-20', dark ? 'bg-band' : 'bg-background')}>
         {value ? (
           <img src={imageUrl(level, slot, value)} alt={label} className={wide ? 'h-full w-full rounded-md object-cover' : 'max-h-16 max-w-[80%] object-contain'} />
         ) : (

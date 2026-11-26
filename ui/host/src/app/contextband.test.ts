@@ -19,6 +19,7 @@ describe('sanitizeBand', () => {
       ],
       comments: { open: true, count: 4, resource: null },
       back: null,
+      identity: null,
     })
   })
 
@@ -31,7 +32,7 @@ describe('sanitizeBand', () => {
   })
 
   it('an empty state leaves everything as the shell draws it', () => {
-    expect(sanitizeBand({})).toEqual({ hideSearch: false, mode: null, presence: [], comments: null, back: null })
+    expect(sanitizeBand({})).toEqual({ hideSearch: false, mode: null, presence: [], comments: null, back: null, identity: null })
     expect(sanitizeBand(undefined).hideSearch).toBe(false)
     // `search: true` never adds anything
     expect(sanitizeBand({ search: true }).hideSearch).toBe(false)
@@ -83,6 +84,26 @@ describe('the back button', () => {
     expect(() => sanitizeBand({ back: { label: 3 } })).toThrow('invalid band')
     expect(() => sanitizeBand({ back: { label: '  ' } })).toThrow('invalid band')
     expect(() => sanitizeBand({ back: 'x' })).toThrow('invalid band')
+  })
+})
+
+describe('the identity block', () => {
+  const PNG = 'data:image/png;base64,iVBORw0KGgo='
+  it('keeps the name as plain text and a picture given as a data address, and hides the search', () => {
+    const v = sanitizeBand({ identity: { name: '  <b>Flooding</b>  site ', logo: PNG } })
+    expect(v.identity).toEqual({ name: '<b>Flooding</b> site', logo: PNG })
+    expect(v.hideSearch).toBe(true)
+    expect(sanitizeBand({ identity: { name: 'Site' } }).identity).toEqual({ name: 'Site', logo: null })
+    expect(sanitizeBand({ identity: { name: 'Site', logo: null } }).identity?.logo).toBeNull()
+    expect(sanitizeBand({}).identity).toBeNull()
+  })
+  it('refuses an empty name, a logo that is not a small picture data address, and a wrong type', () => {
+    expect(() => sanitizeBand({ identity: { name: '  ' } })).toThrow('invalid band')
+    expect(() => sanitizeBand({ identity: { name: 'S', logo: 'https://example.org/x.png' } })).toThrow('invalid band')
+    expect(() => sanitizeBand({ identity: { name: 'S', logo: 'data:image/svg+xml;base64,PHN2Zz4=' } })).toThrow('invalid band')
+    expect(() => sanitizeBand({ identity: { name: 'S', logo: 'data:text/html;base64,PGI+' } })).toThrow('invalid band')
+    expect(() => sanitizeBand({ identity: { name: 'S', logo: PNG + 'A'.repeat(150_000) } })).toThrow('invalid band')
+    expect(() => sanitizeBand({ identity: 'x' })).toThrow('invalid band')
   })
 })
 

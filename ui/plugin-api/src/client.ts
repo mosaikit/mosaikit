@@ -480,6 +480,7 @@ export class Msk {
           ...(s.presence ? { presence: s.presence.map((p) => ({ id: p.id, name: p.name, ...(p.initials ? { initials: p.initials } : {}) })) } : {}),
           ...(s.comments ? { comments: { ...(s.comments.resource ? { resource: s.comments.resource } : {}), ...(s.comments.open !== undefined ? { open: s.comments.open } : {}), ...(s.comments.count !== undefined ? { count: s.comments.count } : {}) } } : {}),
           ...(s.back ? { back: { label: s.back.label } } : {}),
+          ...(s.identity ? { identity: { name: s.identity.name, ...(s.identity.logo ? { logo: s.identity.logo } : {}) } } : {}),
         }
         void this.bridge.call('band.set', wire).catch(() => {})
       },

@@ -5,7 +5,7 @@
 
 import { useSyncExternalStore } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { CircleHelp, CirclePlay, Keyboard, Sparkles } from 'lucide-react'
+import { CircleHelp, CirclePlay, Info, Keyboard } from 'lucide-react'
 import { api } from '../api.ts'
 import { useBrand } from '../brand.ts'
 import type { PersonPrefs, Session } from '../types.ts'
@@ -15,7 +15,7 @@ import type { Route } from './router.ts'
 
 // ------------------------------------------------------------------ state
 
-type Open = 'guide' | 'whatsnew' | 'shortcuts' | null
+type Open = 'guide' | 'about' | 'shortcuts' | null
 interface HelpState {
   open: Open
   tour: { id: string; step: number } | null
@@ -148,6 +148,27 @@ export interface HelpItem {
   disabled?: boolean
 }
 
+/** The name and the version the About dialog leads with: the product when the distribution is one, otherwise Mosaikit. */
+export function aboutName(brand: ReturnType<typeof useBrand>): { name: string; version: string; product: boolean } {
+  const a = brand.about
+  if (a?.product) return { name: a.product, version: a.version ?? '', product: true }
+  return { name: 'Mosaikit', version: brand.kernel_version || brand.version, product: false }
+}
+
+/** The line under the title of About: the version and, for a product other than Mosaikit, the Mosaikit it is based on. */
+export function aboutSub(brand: ReturnType<typeof useBrand>): string {
+  const n = aboutName(brand)
+  if (!n.version) return t('Version of the product')
+  if (n.product && n.name.toLowerCase() !== 'mosaikit')
+    return t('Version {v}, based on Mosaikit {b}', { v: n.version, b: brand.about?.base ?? brand.kernel_version })
+  return t('Version {v}', { v: n.version })
+}
+
+function aboutLabel(brand: ReturnType<typeof useBrand>): string {
+  const n = aboutName(brand)
+  return t('About {name} {v}', { name: n.name, v: n.version }).trim()
+}
+
 /** The items of the help (menu of the bar, or person menu). */
 export function useHelpItems(session: Session, route: Route): HelpItem[] {
   const brand = useBrand()
@@ -157,7 +178,7 @@ export function useHelpItems(session: Session, route: Route): HelpItem[] {
   return [
     { icon: CirclePlay, label: t('Guided tour of this page'), run: () => tour && startTour(tour), fresh, disabled: !tour },
     { icon: CircleHelp, label: t('Guide of Mosaikit'), run: () => (guide ? void window.open(guide, '_blank', 'noopener') : openHelp('guide')) },
-    { icon: Sparkles, label: t('What is new in version {v}', { v: brand.version || '1.0' }), run: () => openHelp('whatsnew') },
+    { icon: Info, label: aboutLabel(brand), run: () => openHelp('about') },
     { icon: Keyboard, label: t('Keyboard shortcuts'), run: () => openHelp('shortcuts') },
   ]
 }

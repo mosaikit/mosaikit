@@ -186,6 +186,23 @@ export async function refreshLanguages() {
 // not in the unit tests: there is no server to ask
 if (import.meta.env.MODE !== 'test') void refreshLanguages()
 
+/** The name of a language in the current one (`Italian` while reading English), or null when it is the same as
+ *  the name in the language itself or the browser does not know it. */
+export function translatedName(l: { id: string; name: string }, current: string): string | null {
+  try {
+    const n = new Intl.DisplayNames([current], { type: 'language' }).of(l.id)
+    return n && n.toLowerCase() !== l.name.toLowerCase() && n.toLowerCase() !== l.id ? n : null
+  } catch {
+    return null
+  }
+}
+
+/** The label of a language in a one-line list: its name in the current language and, when different, its own. */
+export function languageLabel(l: { id: string; name: string }, current: string): string {
+  const n = translatedName(l, current)
+  return n ? `${n} · ${l.name}` : l.name
+}
+
 /** The languages offered where one is. */
 export function useLanguages(): typeof LANGS {
   useSyncExternalStore(

@@ -53,6 +53,7 @@ test.describe.serial('14-feedback-c', () => {
       await created.getByLabel('Name', { exact: true }).fill('Bis Admin')
       await created.getByLabel('Email').fill('root@example.test')
       await created.getByLabel('Initial password').fill('password-e2e-123')
+      await created.getByLabel('Repeat the password').fill('password-e2e-123')
       await created.getByRole('button', { name: 'Create' }).click()
       await expect(page.getByText('already used by another account').first()).toBeVisible()
       await created.getByLabel('Email').fill('bis@example.test')

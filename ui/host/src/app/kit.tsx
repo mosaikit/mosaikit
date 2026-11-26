@@ -3,7 +3,7 @@
 // object); save bar only with changes; settings managed by the platform; dialogs
 // with a form, empty and loading states.
 
-import { useEffect, useRef, useState, useSyncExternalStore, type FormEvent, type ReactNode, type RefObject } from 'react'
+import { Fragment, useEffect, useRef, useState, useSyncExternalStore, type FormEvent, type ReactNode, type RefObject } from 'react'
 import { ChevronRight, Loader2, Lock, MoreHorizontal } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -476,7 +476,46 @@ export interface FieldDef {
   hint?: string
   options?: [string, string][]
   initial?: string
+  /** minimum length of a password (default: none) */
+  min?: number
+  /** a password asked twice, with the bar of its strength */
+  repeat?: boolean
 }
+
+/** Strength of a password, 0 (empty) to 4: length and variety of characters, and a penalty for repeated ones. */
+export function passwordScore(p: string): number {
+  if (!p) return 0
+  let s = 0
+  if (p.length >= 8) s++
+  if (p.length >= 12) s++
+  if (/[a-z]/.test(p) && /[A-Z]/.test(p)) s++
+  if (/\d/.test(p)) s++
+  if (/[^A-Za-z0-9]/.test(p)) s++
+  if (p.length >= 16) s++
+  if (new Set(p).size < 5) s = Math.min(s, 1)
+  return Math.max(1, Math.min(4, Math.ceil(s * 0.7)))
+}
+
+/** The bar and the word of the strength of a password. */
+export function PasswordStrength({ value }: { value: string }) {
+  const score = passwordScore(value)
+  const label = ['', t('Weak'), t('Fair'), t('Good'), t('Strong')][score]
+  const color = ['bg-muted', 'bg-destructive', 'bg-warn', 'bg-primary/70', 'bg-primary'][score]
+  return (
+    <div className="grid gap-1" aria-live="polite">
+      <div className="flex gap-1" aria-hidden="true">
+        {[1, 2, 3, 4].map((i) => (
+          <span key={i} className={cn('h-1.5 flex-1 rounded-full', i <= score ? color : 'bg-muted')} />
+        ))}
+      </div>
+      <p className="text-xs text-muted-foreground">
+        {t('Password strength')}: <b className="text-foreground">{value ? label : '—'}</b>
+      </p>
+    </div>
+  )
+}
+
+const REPEAT = '__repeat'
 
 /** A dialog with a form: the fields are text, password or a choice. */
 export function FormDialog({
@@ -499,13 +538,43 @@ export function FormDialog({
   const init = () => Object.fromEntries(fields.map((f) => [f.name, f.initial ?? (f.options ? f.options[0][0] : '')]))
   const [v, setV] = useState<Record<string, string>>(init)
   const [busy, setBusy] = useState(false)
+  // fields the person has left, and whether the button was pressed: only then an error is shown
+  const [touched, setTouched] = useState<Set<string>>(new Set())
+  const [tried, setTried] = useState(false)
+  const reset = () => {
+    setV(init())
+    setTouched(new Set())
+    setTried(false)
+  }
+  // what is missing or wrong, by field (the repeat of a password is `<name>__repeat`)
+  const errs: Record<string, string> = {}
+  for (const f of fields) {
+    const val = v[f.name] ?? ''
+    if (f.options) continue
+    if (f.required && !val.trim()) errs[f.name] = t('This field is required')
+    else if (f.type === 'email' && val.trim() && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(val.trim())) errs[f.name] = t('Enter a valid email address, like name@example.org')
+    else if (f.min && val && val.length < f.min) errs[f.name] = t('Use at least {n} characters', { n: f.min })
+    if (f.repeat) {
+      const r = v[f.name + REPEAT] ?? ''
+      if (f.required && !r) errs[f.name + REPEAT] = t('This field is required')
+      else if (r !== val) errs[f.name + REPEAT] = t('The two passwords are not the same')
+    }
+  }
+  const shown = (k: string) => (errs[k] && (tried || touched.has(k)) ? errs[k] : undefined)
+  const touch = (k: string) => setTouched((s) => new Set(s).add(k))
   async function send(e: FormEvent) {
     e.preventDefault()
+    const first = Object.keys(errs)[0]
+    if (first) {
+      setTried(true)
+      e.currentTarget.querySelector<HTMLElement>(`[name="${first}"]`)?.focus()
+      return
+    }
     setBusy(true)
     try {
-      await onSubmit(v)
+      await onSubmit(Object.fromEntries(Object.entries(v).filter(([k]) => !k.endsWith(REPEAT))))
       onOpenChange(false)
-      setV(init())
+      reset()
     } catch {
       /* the caller shows the error message (toast) */
     } finally {
@@ -516,19 +585,29 @@ export function FormDialog({
     <Dialog
       open={open}
       onOpenChange={(o) => {
-        if (o) setV(init())
+        if (o) reset()
         onOpenChange(o)
       }}
     >
       <DialogContent>
-        <form onSubmit={(e) => void send(e)} className="grid gap-4">
+        <form onSubmit={(e) => void send(e)} noValidate className="grid gap-4">
           <DialogHeader>
             <DialogTitle>{title}</DialogTitle>
             {description && <DialogDescription>{description}</DialogDescription>}
           </DialogHeader>
+          {fields.some((f) => f.required) && <p className="text-xs text-muted-foreground">{t('Fields marked with * are required.')}</p>}
           {fields.map((f) => (
-            <div key={f.name} className="grid gap-1.5">
-              <Label htmlFor={`f-${f.name}`}>{f.label}</Label>
+            <Fragment key={f.name}>
+            <div className="grid gap-1.5">
+              <Label htmlFor={`f-${f.name}`}>
+                {f.label}
+                {f.required && (
+                  <span aria-hidden="true" className="text-destructive">
+                    {' '}
+                    *
+                  </span>
+                )}
+              </Label>
               {f.options ? (
                 <Select value={v[f.name]} onValueChange={(x) => setV({ ...v, [f.name]: x })}>
                   <SelectTrigger id={`f-${f.name}`} className="w-full">
@@ -545,16 +624,55 @@ export function FormDialog({
               ) : (
                 <Input
                   id={`f-${f.name}`}
+                  name={f.name}
                   type={f.type ?? 'text'}
                   autoComplete={f.type === 'password' ? 'new-password' : 'off'}
-                  minLength={f.type === 'password' ? 10 : undefined}
-                  required={f.required}
+                  aria-required={f.required}
+                  aria-invalid={shown(f.name) ? true : undefined}
+                  onBlur={() => touch(f.name)}
                   value={v[f.name] ?? ''}
                   onChange={(e) => setV({ ...v, [f.name]: e.target.value })}
                 />
               )}
-              {f.hint && <p className="text-xs text-muted-foreground">{f.hint}</p>}
+              {shown(f.name) ? (
+                <p role="alert" className="text-xs text-destructive">
+                  {shown(f.name)}
+                </p>
+              ) : (
+                f.hint && <p className="text-xs text-muted-foreground">{f.hint}</p>
+              )}
             </div>
+            {f.repeat && (
+              <>
+                <PasswordStrength value={v[f.name] ?? ''} />
+                <div className="grid gap-1.5">
+                  <Label htmlFor={`f-${f.name}${REPEAT}`}>
+                    {t('Repeat the password')}
+                    <span aria-hidden="true" className="text-destructive">
+                      {' '}
+                      *
+                    </span>
+                  </Label>
+                  <Input
+                    id={`f-${f.name}${REPEAT}`}
+                    name={f.name + REPEAT}
+                    type="password"
+                    autoComplete="new-password"
+                    aria-required
+                    aria-invalid={shown(f.name + REPEAT) ? true : undefined}
+                    onBlur={() => touch(f.name + REPEAT)}
+                    value={v[f.name + REPEAT] ?? ''}
+                    onChange={(e) => setV({ ...v, [f.name + REPEAT]: e.target.value })}
+                  />
+                  {shown(f.name + REPEAT) && (
+                    <p role="alert" className="text-xs text-destructive">
+                      {shown(f.name + REPEAT)}
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
+            </Fragment>
           ))}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

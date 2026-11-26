@@ -90,8 +90,8 @@ Open the item in its app and choose **Share**.
    - **Edit**: edits the content.
    - **Manage**: shares, moves, deletes.
 2. **Shared with** lists who has access; change the level or **Revoke**.
-3. **Public link (read only)**: a link anybody can open without signing in. Optional **Expiry (days)** and
-   **Password (optional)**, then **Create link**. *The link is shown only now*: copy it at once. The list
+3. **Public link (read only)**: a link anybody can open without signing in. The link is **Permanent** by default; turn that off to choose the **Expiry (days)** (at most the maximum set by the Tenant Manager, when there is one),, and an optional
+   **Password**, then **Create link**. *The link is shown only now*: copy it at once. The list
    **Public links** shows when each one was created, when it expires and its views; **Revoke** closes it.
    If the tenant turned public links off, the dialog says so.
 4. **Ownership**: give the item to another person (**Transfer**).

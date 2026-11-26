@@ -19,7 +19,7 @@ import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 import { isApp, passwordMin, useAction, useApi, useTenantCtx } from '../core.ts'
-import { setLang, t, useLang, useLanguages, type Lang } from '../i18n.ts'
+import { setLang, languageLabel, t, useLang, useLanguages, type Lang } from '../i18n.ts'
 import { Empty, ErrorBox, FormDialog, Loading, Locked, PageHeader, SaveBar, Sections, type Section } from '../kit.tsx'
 import { ListTable } from '../ListTable.tsx'
 import { go, personal, to, type Route } from '../router.ts'
@@ -436,7 +436,7 @@ function Appearance({ route }: { route: Route }) {
             <SelectContent>
               {langs.map((l) => (
                 <SelectItem key={l.id} value={l.id}>
-                  {l.name}
+                  {languageLabel(l, lang)}
                 </SelectItem>
               ))}
             </SelectContent>

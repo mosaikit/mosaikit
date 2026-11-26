@@ -15,7 +15,7 @@ import { useBrand } from '../brand.ts'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { openHelp, openSearch, releaseNotes, set, targetOf, TOURS, useHelpState, useTourDone } from './help.ts'
+import { aboutName, aboutSub, openHelp, openSearch, releaseNotes, set, targetOf, TOURS, useHelpState, useTourDone } from './help.ts'
 import { t, useLang, type Lang } from './i18n.ts'
 import { useSession } from './core.ts'
 import { GuideText } from './GuideText.tsx'
@@ -212,6 +212,28 @@ function HelpDialog({ open, title, description, wide, children }: { open: boolea
   )
 }
 
+/** About: the licence and text of `[about]` and the notes of the version in a scrollable area (name, version and base are the title and the line under it). */
+function AboutBody() {
+  const brand = useBrand()
+  const a = brand.about
+  return (
+    <div className="grid gap-4">
+      {a?.licence && (
+        <p className="text-sm">
+          <span className="text-muted-foreground">{t('Licence')}</span> {a.licence}
+        </p>
+      )}
+      {a?.text && <p className="text-sm whitespace-pre-line">{a.text}</p>}
+      <section aria-label={t('What is new in version {v}', { v: brand.version || '1.0' })} className="grid gap-2">
+        <h3 className="text-sm font-semibold">{t('What is new in version {v}', { v: brand.version || '1.0' })}</h3>
+        <div className="max-h-64 overflow-y-auto rounded-md border bg-muted/30 p-3" tabIndex={0}>
+          <WhatsNew version={brand.version} />
+        </div>
+      </section>
+    </div>
+  )
+}
+
 /** Dialogs, tour and keyboard shortcuts of the shell. */
 export function HelpLayer({ route, search }: { route: Route; search: boolean }) {
   const { open } = useHelpState()
@@ -236,8 +258,8 @@ export function HelpLayer({ route, search }: { route: Route; search: boolean }) 
       <HelpDialog open={open === 'guide'} title={t('Guide of Mosaikit')} description={t('The guide of your role; the others are a click away.')} wide>
         <Guide start={guideOf(route, session)} />
       </HelpDialog>
-      <HelpDialog open={open === 'whatsnew'} title={t('What is new in version {v}', { v: brand.version || '1.0' })} description={t('The changes of this version.')}>
-        <WhatsNew version={brand.version} />
+      <HelpDialog open={open === 'about'} title={aboutName(brand).name} description={aboutSub(brand)}>
+        <AboutBody />
       </HelpDialog>
       <HelpDialog open={open === 'shortcuts'} title={t('Keyboard shortcuts')} description={t('Outside the fields where you type.')}>
         <div className="overflow-x-auto rounded-xl border bg-card" data-static-table>

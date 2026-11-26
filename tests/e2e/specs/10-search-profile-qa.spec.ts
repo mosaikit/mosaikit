@@ -59,8 +59,10 @@ test.describe.serial('10-search-profile-qa', () => {
     await accessible(page, 'keyboard shortcuts')
     await page.keyboard.press('Escape')
     await page.getByRole('button', { name: 'Help', exact: true }).click()
-    await page.getByRole('menuitem', { name: /What is new/ }).click()
-    await expect(page.getByRole('dialog', { name: /What is new/ })).toContainText('The changes of this version')
+    await page.getByRole('menuitem', { name: /^About Mosaikit/ }).click()
+    await expect(page.getByRole('dialog', { name: 'Mosaikit' })).toContainText('Version')
+    // the notes of the version are in the dialog itself, in a scrollable area
+    await expect(page.getByRole('dialog', { name: 'Mosaikit' }).getByRole('region', { name: /What is new/ })).toBeVisible()
     await page.keyboard.press('Escape')
     // "g" then "n": the notifications
     await page.keyboard.press('g')

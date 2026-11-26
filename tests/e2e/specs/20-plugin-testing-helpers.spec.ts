@@ -135,8 +135,8 @@ test('expectAccessible fails with the list of the violations', async ({ page }) 
 
 test('the About dialog of the person menu shows the base the product runs on', async ({ page }) => {
   await signIn(page, APP, 'alice')
-  await page.getByRole('button', { name: /person menu/ }).click()
-  await page.getByRole('menuitem', { name: 'About' }).click()
-  await expect(page.getByRole('dialog')).toContainText('Powered by Mosaikit')
+  await page.getByRole('button', { name: 'Help', exact: true }).click()
+  await page.getByRole('menuitem', { name: /^About / }).click()
+  await expect(page.getByRole('dialog')).toContainText('based on Mosaikit')
   await expectAccessible(page)
 })

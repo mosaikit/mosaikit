@@ -148,6 +148,7 @@ export async function createTenant(page: Page, slug: string, name: string) {
   await d.getByLabel('Username of the Tenant Manager').fill('manager')
   await d.getByLabel('Email of the Tenant Manager').fill(`manager@${slug}.example.org`)
   await d.getByLabel('Initial password').fill(PASSWORD)
+  await d.getByLabel('Repeat the password').fill(PASSWORD)
   await d.getByRole('button', { name: 'Next' }).click()
   await d.getByRole('button', { name: 'Create the tenant' }).click()
   await expect(page.getByRole('heading', { name, exact: true })).toBeVisible()

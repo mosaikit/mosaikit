@@ -406,6 +406,8 @@ pub struct Defaults {
     pub locked: Vec<String>,
     /// the groups of the sidebar the distribution declared (`[[nav_groups]]`): the default of `nav.layout`
     pub nav: Value,
+    /// codes of the languages the active language plugins bring: offered by default, with the built-in ones
+    pub plugin_languages: Vec<String>,
 }
 
 impl Defaults {
@@ -417,6 +419,7 @@ impl Defaults {
             product: k.product.defaults.clone(),
             locked: k.product.locked.clone(),
             nav: json!(k.nav_groups),
+            plugin_languages: k.plugins.languages().iter().map(|l| l.code.clone()).collect(),
         }
     }
 
@@ -439,7 +442,14 @@ impl Defaults {
             "appearance.mode" | "lang.default" | "format.locale" => json!("auto"),
             "timezone" => json!("UTC"),
             "band" => serde_json::to_value(super::settings::ShellBand::default()).unwrap_or(Value::Null),
-            "lang.enabled" => json!(LANGUAGES),
+            // a language plugin that is installed is offered unless the distribution or the settings say otherwise
+            "lang.enabled" => {
+                let mut all: Vec<&str> = LANGUAGES.to_vec();
+                all.extend(
+                    self.plugin_languages.iter().map(String::as_str).filter(|c| !LANGUAGES.contains(c)),
+                );
+                json!(all)
+            }
             "security.password_min" => json!(PASSWORD_FLOOR),
             "security.lock_attempts" => json!(8),
             "security.lock_minutes" => json!(15),
@@ -1061,7 +1071,22 @@ mod tests {
             product: Map::new(),
             locked: Vec::new(),
             nav: json!([]),
+            plugin_languages: Vec::new(),
         }
+    }
+
+    #[test]
+    fn installed_language_plugins_are_offered_by_default() {
+        let mut d = defaults();
+        d.plugin_languages = vec!["fr".into(), "es".into()];
+        let p = platform_view(&json!({}), &d);
+        assert_eq!(get(&p, "lang.enabled").value, json!(["en", "it", "fr", "es"]));
+        // an explicit list (stored or from the distribution) is respected
+        let p = platform_view(&json!({ "cfg": { "lang.enabled": ["en", "it"] } }), &d);
+        assert_eq!(get(&p, "lang.enabled").value, json!(["en", "it"]));
+        d.product.insert("lang.enabled".into(), json!(["it"]));
+        let p = platform_view(&json!({}), &d);
+        assert_eq!(get(&p, "lang.enabled").value, json!(["it"]));
     }
 
     fn get<'a>(l: &'a [Setting], key: &str) -> &'a Setting {

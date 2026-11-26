@@ -15,6 +15,7 @@ test.describe.serial('03-notifications', () => {
     await d.getByLabel('Display name').fill('Bruno Bianchi')
     await d.getByLabel('Email', { exact: true }).fill('bruno@example.org')
     await d.getByLabel('Initial password').fill(PASSWORD)
+    await d.getByLabel('Repeat the password').fill(PASSWORD)
     await d.getByRole('button', { name: 'Create user' }).click()
     await expect(mgr.getByRole('row', { name: /Bruno Bianchi/ })).toBeVisible()
     await logout(mgr)

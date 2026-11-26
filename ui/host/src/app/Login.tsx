@@ -18,7 +18,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { setLanguageContext, setLang, t, useLang, useLanguages, type Lang } from './i18n.ts'
+import { setLanguageContext, setLang, languageLabel, t, useLang, useLanguages, type Lang } from './i18n.ts'
 import { go, to } from './router.ts'
 import { AppMark } from './Shell.tsx'
 import { registerThemes, setDefaultMode, setPreset, setTheme, useTheme, type CustomTheme, type Mode } from './theme.ts'
@@ -250,7 +250,7 @@ function LanguageSelect() {
       <SelectContent align="end">
         {langs.map((l) => (
           <SelectItem key={l.id} value={l.id}>
-            {l.name}
+            {languageLabel(l, lang)}
           </SelectItem>
         ))}
       </SelectContent>

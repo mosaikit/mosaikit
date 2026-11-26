@@ -213,41 +213,62 @@ function Preview({ d }: { d: Draft }) {
   return null
 }
 
-/** The style: corners, density, font, tabs, main buttons and the image under the band. */
-export function StylePanel({ level }: { level: Level }) {
+/** The image under the band (the platform shows it in the Top bar tab, a tenant in Style). */
+export function BandImagePanel({ level }: { level: Level }) {
   const q = useLevelSettings(level)
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t('Band image')}</CardTitle>
+        <CardDescription>
+          {t('A PNG under the band, at most 512 KB. The band colour darkens it as much as needed for the texts of the band to read at 4.5:1 over its brightest part; an image too bright even then is refused. Without one, the image of the layout, if it has one.')}
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <ImageSlot level={level} slot="band" label={t('Band image')} hint={t('Covers the band, centred')} setting={q.data?.find((x: Setting) => x.key === 'style.band_image')} accept="image/png" wide />
+      </CardContent>
+    </Card>
+  )
+}
+
+/** The image under the band as one more row of the list of the Top bar items. */
+export function BandImageRow({ level }: { level: Level }) {
+  const q = useLevelSettings(level)
+  return (
+    <div className="grid gap-2 border-b py-2 last:border-0">
+      <span className="min-w-0">
+        <b className="block text-sm">{t('Band image')}</b>
+        <span className="text-xs text-muted-foreground">{t('A PNG under the band, up to 512 KB; the band colour keeps its texts readable.')}</span>
+      </span>
+      <ImageSlot level={level} slot="band" label={t('Band image')} hint="" setting={q.data?.find((x: Setting) => x.key === 'style.band_image')} accept="image/png" wide bare />
+    </div>
+  )
+}
+
+/** The style: corners, density, font, tabs and main buttons (and, for a tenant, the image under the band). */
+export function StylePanel({ level, bandImage = true }: { level: Level; bandImage?: boolean }) {
   const names = optionLabels()
   return (
     <div className="grid gap-6">
       <Panel
         level={level}
         keys={STYLE_KEYS.map((k) => `style.${k}`)}
-        title={t('Style')}
-        description={t('Shapes, density, font, tabs and main buttons, with every layout and theme. No value: the default of the layout in use. The page shows the changes before they are saved.')}
       >
         {(d, s) => (
           <>
             <Preview d={d} />
-            {STYLE_KEYS.map((k) => {
-              const set = s(`style.${k}`)
-              if (!set) return null
-              return <StyleRow key={k} level={level} d={d} s={set} options={(STYLE_OPTIONS[k] as string[]).map((o): [string, string] => [o, names[o] ?? o])} />
-            })}
             <StyleSample />
+            <div className="grid gap-x-8 gap-y-5 md:grid-cols-2">
+              {STYLE_KEYS.map((k) => {
+                const set = s(`style.${k}`)
+                if (!set) return null
+                return <StyleRow key={k} level={level} d={d} s={set} options={(STYLE_OPTIONS[k] as string[]).map((o): [string, string] => [o, names[o] ?? o])} />
+              })}
+            </div>
           </>
         )}
       </Panel>
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('Band image')}</CardTitle>
-          <CardDescription>
-            {t('A PNG under the band, at most 512 KB. The band colour darkens it as much as needed for the texts of the band to read at 4.5:1 over its brightest part; an image too bright even then is refused. Without one, the image of the layout, if it has one.')}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ImageSlot level={level} slot="band" label={t('Band image')} hint={t('Covers the band, centred')} setting={q.data?.find((x: Setting) => x.key === 'style.band_image')} accept="image/png" wide />
-        </CardContent>
-      </Card>
+      {bandImage && <BandImagePanel level={level} />}
     </div>
   )
 }
@@ -279,8 +300,11 @@ function StyleRow({ level, d, s, options }: { level: Level; d: Draft; s: Setting
 /** A sample of what the style changes: a tab bar and the main button. */
 function StyleSample() {
   return (
-    <div className="grid gap-3 rounded-lg border p-3" aria-label={t('Sample')} role="group">
-      <span className="text-xs text-muted-foreground">{t('Sample')}</span>
+    <div className="grid gap-3 rounded-lg border p-3" aria-label={t('Preview')} role="group">
+      <div className="grid gap-1">
+        <b className="text-sm">{t('Preview')}</b>
+        <span className="text-xs text-muted-foreground">{t('Shapes, density, font, tabs and main buttons, with every layout and theme. No value: the default of the layout in use. The page shows the changes before they are saved.')}</span>
+      </div>
       <nav aria-label={t('Sample tabs')} className="flex gap-1 border-b">
         {[t('Details'), t('People'), t('Log')].map((x, i) => (
           <span key={x} aria-current={i === 0 ? 'page' : undefined} className={cn('msk-tab relative flex h-9 items-center px-3 text-sm text-muted-foreground', i === 0 && "font-medium text-foreground after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:rounded-full after:bg-primary after:content-['']")}>
