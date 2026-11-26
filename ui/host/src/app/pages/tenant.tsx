@@ -48,7 +48,7 @@ import { EmbeddingPanel, IdentityPanel, KeysPanel, LanguagesPanel, ManagedPanel,
 import { UsageAlerts, UsageConsumers, UsagePanel, UsageQuotas, UsageTrend } from '../Quotas.tsx'
 import { totals, trashHint } from '../usage.ts'
 import { plainText } from '../plaintext.ts'
-import { LayoutPanel, StylePanel } from '../LayoutSettings.tsx'
+import { BandImagePanel, LayoutPanel, StylePanel } from '../LayoutSettings.tsx'
 
 const enc = encodeURIComponent
 const ROLE: Record<string, string> = {
@@ -1727,6 +1727,7 @@ export function TenantSettingsPage({ session, slug, section }: { session: Sessio
     { id: 'style', label: t('Style') },
     { id: 'navigation', label: t('Navigation') },
     { id: 'languages', label: t('Languages and formats') },
+    { id: 'topbar', label: t('Top bar') },
   ]
   // before: Sign-in (now in Managed by the platform)
   const sec = section === 'sign-in' ? 'platform' : section
@@ -1760,7 +1761,8 @@ export function TenantSettingsPage({ session, slug, section }: { session: Sessio
               </div>
             )}
             {tab === 'layout' && <LayoutPanel level={level} />}
-            {tab === 'style' && <StylePanel level={level} />}
+            {tab === 'style' && <StylePanel level={level} bandImage={false} />}
+            {tab === 'topbar' && <BandImagePanel level={level} />}
             {tab === 'languages' && <LanguagesPanel level={level} />}
           </div>
         )}
