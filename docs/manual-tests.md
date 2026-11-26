@@ -391,7 +391,7 @@ cannot sign in. At the end put it back to local accounts (P8-14).
 | P10-12 | Look for a layout choice in Account or the person menu | There is none: the layout is not personal |
 | P10-13 | System › Style: set Corners Round, Density Compact, Font Humanist, Tabs Pill, Buttons Outline | The page previews each change before Save; after Save the whole shell and the sign-in page follow |
 | P10-14 | Tenant settings › Style: customize Corners | Only the tenant changes; the other styles stay inherited |
-| P10-15 | Top bar › Band image (platform; for a tenant: Style › Band image): upload a dark PNG | It shows under the band, texts readable |
+| P10-15 | Top bar › Band image (platform and organization settings): upload a dark PNG | It shows under the band, texts readable |
 | P10-16 | Upload a very bright PNG | Refused with the message about the contrast (WCAG 4.5:1) when even the strongest darkening cannot make the band texts read; with the light texts of the default theme the band darkens any image and it is accepted |
 | P10-17 | Upload a medium bright PNG | Accepted, the band darkens it as needed |
 | P10-18 | In Project (image from the package) set a band image in Style | The image of the Style wins; remove it: the one of the layout returns |
