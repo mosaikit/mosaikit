@@ -94,8 +94,8 @@ Apri l'elemento nella sua app e scegli **Condividi**.
    - **Modifica**: modifica il contenuto.
    - **Gestione**: condivide, sposta, elimina.
 2. **Con chi è condiviso** elenca chi ha accesso; cambia il livello o **Revoca**.
-3. **Link pubblico (sola lettura)**: un link che chiunque può aprire senza accedere. Facoltativi **Scadenza
-   (giorni)** e **Password (facoltativa)**, poi **Crea link**. *Il link si vede solo adesso*: copialo
+3. **Link pubblico (sola lettura)**: un link che chiunque può aprire senza accedere. Il link è **Permanente** di default; disattiva l’opzione per scegliere la **Scadenza
+   (giorni)** (al massimo la durata fissata dal Gestore, se c’è) e, facoltativa, la **Password**, poi **Crea link**. *Il link si vede solo adesso*: copialo
    subito. L'elenco **Link pubblici** mostra quando è stato creato, quando scade e le visite; **Revoca** lo
    chiude. Se l'organizzazione ha spento i link pubblici, la finestra lo dice.
 4. **Proprietà**: cedi l'elemento a un'altra persona (**Trasferisci**).

@@ -34,7 +34,7 @@ import { t } from '../i18n.ts'
 import { AdminWidgets, KpiRow } from '../Overview.tsx'
 import { Hero, HeroLink, KpiCard } from '../OverviewKit.tsx'
 import { greeting } from '../overviewdata.ts'
-import { LayoutPanel, StylePanel } from '../LayoutSettings.tsx'
+import { BandImageRow, LayoutPanel, StylePanel } from '../LayoutSettings.tsx'
 import { TenantContact, TenantIdentity } from '../TenantContact.tsx'
 
 
@@ -48,7 +48,7 @@ export function AdminOverview({ session }: { session: Session }) {
   const refresh = useAction(() => api<GlobalKpi>('GET', '/api/admin/kpi?refresh=true'), {})
   return (
     <>
-      <PageHeader title={t('Platform overview')} sub={t('Hello {name} · Administrator', { name: session.user.display_name || session.user.username })} />
+      <h1 className="sr-only">{t('Platform overview')}</h1>
       <div className="grid gap-6 p-6 max-[620px]:p-4">
         {q.error && <ErrorBox error={q.error} />}
         <Hero
@@ -447,7 +447,7 @@ function TenantUsers({ id, q }: { id: string; q: { data?: Member[]; isLoading: b
           { name: 'username', label: t('Username'), required: true },
           { name: 'display_name', label: t('Name') },
           { name: 'email', label: t('Email'), type: 'email', required: true, hint: t('Required: the password is recovered at this address.') },
-          { name: 'password', label: t('Initial password'), type: 'password', required: true, hint: t('At least {n} characters', { n: pwMin }) },
+          { name: 'password', label: t('Initial password'), type: 'password', required: true, min: pwMin, repeat: true, hint: t('At least {n} characters', { n: pwMin }) },
         ]}
         submit={t('Create')}
         onSubmit={(v) => newManager.mutateAsync(v)}
@@ -456,7 +456,7 @@ function TenantUsers({ id, q }: { id: string; q: { data?: Member[]; isLoading: b
         open={!!dlg && dlg !== 'manager'}
         onOpenChange={(o) => !o && setDlg(null)}
         title={t('New password for {v}', { v: dlg && dlg !== 'manager' ? dlg.username : '' })}
-        fields={[{ name: 'password', label: t('New password'), type: 'password', required: true, hint: t('At least {n} characters', { n: pwMin }) }]}
+        fields={[{ name: 'password', label: t('New password'), type: 'password', required: true, min: pwMin, repeat: true, hint: t('At least {n} characters', { n: pwMin }) }]}
         submit={t('Reset')}
         onSubmit={(v) => resetPw.mutateAsync({ uid: (dlg as Member).user_id, password: v.password })}
       />
@@ -519,7 +519,7 @@ export function AdminSystem({ session, section }: { session: Session; section?: 
               </div>
             )}
             {tab === 'layout' && <LayoutPanel level={PLATFORM} />}
-            {tab === 'style' && <StylePanel level={PLATFORM} />}
+            {tab === 'style' && <StylePanel level={PLATFORM} bandImage={false} />}
             {tab === 'languages' && <LanguagesPanel level={PLATFORM} />}
             {tab === 'topbar' && <BandSettings session={session} />}
           </div>
@@ -549,8 +549,8 @@ function BandSettings({ session }: { session: Session }) {
   const save = useAction((x: ShellBand) => api('PUT', '/api/admin/band', x), { ok: t('Top bar updated for everybody'), invalidate: [['session']] })
   const dirty = !!v && JSON.stringify(v) !== JSON.stringify(saved)
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)] gap-6">
-      <Card>
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-4">
+      <Card className="gap-3 py-4">
         <CardHeader>
           <CardTitle>{t('Preview')}</CardTitle>
           <CardDescription>{t('The same for every tenant.')}</CardDescription>
@@ -559,14 +559,14 @@ function BandSettings({ session }: { session: Session }) {
           <BandPreview band={b} />
         </CardContent>
       </Card>
-      <Card>
+      <Card className="gap-3 py-4">
         <CardHeader>
           <CardTitle>{t('Items')}</CardTitle>
           <CardDescription>{t('Bell, person menu and tenant switcher always stay.')}</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-1">
           {bandItems().map((it) => (
-            <label key={it.key} className="flex items-center justify-between gap-4 border-b py-3 last:border-0">
+            <label key={it.key} className="flex items-center justify-between gap-4 border-b py-2 last:border-0">
               <span className="min-w-0">
                 <b className="block text-sm">{it.label}</b>
                 <span className="text-xs text-muted-foreground">{t('If it is off: {what}', { what: it.off })}</span>
@@ -574,6 +574,7 @@ function BandSettings({ session }: { session: Session }) {
               <Switch checked={b[it.key]} onCheckedChange={(x) => setV({ ...b, [it.key]: x })} />
             </label>
           ))}
+          <BandImageRow level={PLATFORM} />
         </CardContent>
       </Card>
       <SaveBar
@@ -759,7 +760,7 @@ function Admins({ me }: { me: string }) {
           { name: 'username', label: t('Username'), required: true },
           { name: 'display_name', label: t('Name') },
           { name: 'email', label: t('Email'), type: 'email', required: true },
-          { name: 'password', label: t('Initial password'), type: 'password', required: true, hint: t('At least {n} characters', { n: pwMin }) },
+          { name: 'password', label: t('Initial password'), type: 'password', required: true, min: pwMin, repeat: true, hint: t('At least {n} characters', { n: pwMin }) },
         ]}
         submit={t('Create')}
         onSubmit={(v) => create.mutateAsync(v)}
@@ -781,7 +782,7 @@ function Admins({ me }: { me: string }) {
         open={!!dlg && dlg !== 'new'}
         onOpenChange={(o) => !o && setDlg(null)}
         title={t('New password for {v}', { v: dlg && dlg !== 'new' ? dlg.username : '' })}
-        fields={[{ name: 'password', label: t('New password'), type: 'password', required: true, hint: t('At least {n} characters', { n: pwMin }) }]}
+        fields={[{ name: 'password', label: t('New password'), type: 'password', required: true, min: pwMin, repeat: true, hint: t('At least {n} characters', { n: pwMin }) }]}
         submit={t('Reset')}
         onSubmit={(v) => pw.mutateAsync({ id: (dlg as AdminUser).user_id, password: v.password })}
       />

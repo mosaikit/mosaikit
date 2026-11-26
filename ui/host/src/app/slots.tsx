@@ -8,7 +8,7 @@ import { useHoverMenu, type HoverMenu } from './hoverMenu.ts'
 import { backFromActiveEntry } from './contextband.ts'
 import { useQueryClient } from '@tanstack/react-query'
 import { Badge } from '@/components/ui/badge'
-import { Bell, Check, ChevronDown, ChevronRight, CircleHelp, Contrast, Info, KeyRound, LogOut, Settings, ShieldCheck, Trash2, UserRound } from 'lucide-react'
+import { Bell, Check, ChevronDown, ChevronRight, CircleHelp, Contrast, KeyRound, LogOut, Settings, ShieldCheck, Trash2, UserRound } from 'lucide-react'
 import { api } from '../api.ts'
 import { useBrand } from '../brand.ts'
 import type { Session, ShellBand } from '../types.ts'
@@ -24,7 +24,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 import SearchBox from './SearchBox.tsx'
 import { initials, useTenantCtx } from './core.ts'
@@ -32,7 +31,7 @@ import { PersonPicture } from './picture.tsx'
 import { navGroupOpen, setNavGroupOpen, useRailLabels } from './prefs.ts'
 import { allItems } from './navgroups.ts'
 import { bandIcon, hasActive, searchGroups, type Nav, type NavGroup, type NavItem } from './nav.tsx'
-import { setLang, t, useLang, useLanguages, type Lang } from './i18n.ts'
+import { setLang, t, translatedName, useLang, useLanguages, type Lang } from './i18n.ts'
 import { NotificationsBell } from './notifications.tsx'
 import { useUnread, useUnreadSources } from './notes.ts'
 import { go, personal, to, type Route } from './router.ts'
@@ -321,7 +320,7 @@ export function Brand({ compact }: { compact?: boolean }) {
   const brand = useBrand()
   return (
     <span className="msk-brand flex min-w-0 items-center gap-2.5">
-      <AppMark variant="negative" />
+      <AppMark />
       {!compact && <span className="truncate text-[17px] font-bold">{brand.name}</span>}
     </span>
   )
@@ -447,12 +446,21 @@ function LanguageMenu() {
       <DropdownMenuTrigger className={cn(bandIcon, 'font-mono text-xs font-semibold')} aria-label={`${lang.toUpperCase()} · ${t('Language: {name}', { name })}`} title={t('Language: {name}', { name })}>
         {lang.toUpperCase()}
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-48">
+      <DropdownMenuContent align="end" className="w-auto min-w-40">
         <DropdownMenuLabel className="text-xs uppercase text-muted-foreground">{t('Language')}</DropdownMenuLabel>
         <DropdownMenuRadioGroup value={lang} onValueChange={(v) => setLang(v as Lang)}>
           {langs.map((l) => (
             <DropdownMenuRadioItem key={l.id} value={l.id}>
-              {l.name}
+              {translatedName(l, lang) ? (
+                <span className="flex flex-col leading-tight">
+                  <span>{translatedName(l, lang)}</span>
+                  <span lang={l.id} className="font-serif text-xs italic text-muted-foreground">
+                    {l.name}
+                  </span>
+                </span>
+              ) : (
+                l.name
+              )}
             </DropdownMenuRadioItem>
           ))}
         </DropdownMenuRadioGroup>
@@ -463,7 +471,6 @@ function LanguageMenu() {
 
 /** The items of the help, as in the mockup: in the bar (? menu) or, if the help is off, in the menu of the person. */
 function HelpMenu({ session, route }: { session: Session; route: Route }) {
-  const brand = useBrand()
   const items = useHelpItems(session, route)
   const fresh = useFreshTour(session, route)
   return (
@@ -480,13 +487,6 @@ function HelpMenu({ session, route }: { session: Session; route: Route }) {
             {x.fresh && <span className="rounded-full bg-primary px-1.5 text-[10px] font-semibold text-primary-foreground">{t('new')}</span>}
           </DropdownMenuItem>
         ))}
-        <DropdownMenuSeparator />
-        <div className="flex items-center gap-2.5 px-2 py-1.5">
-          <AppMark className="size-[18px]" />
-          <span className="text-xs font-semibold">
-            {brand.name || 'Mosaikit'} {brand.version}
-          </span>
-        </div>
       </DropdownMenuContent>
     </DropdownMenu>
   )
@@ -517,7 +517,6 @@ function UserMenu({ session, route, band }: { session: Session; route: Route; ba
     if (endSession) window.location.assign(endSession)
     else go(u.is_system_admin ? '#/admin' : '#/')
   }
-  const [aboutOpen, setAboutOpen] = useState(false)
   const role = u.is_system_admin ? t('Administrator') : roleOf(session, route)
   const tenant = route.area === 'tenant' ? session.memberships.find((m) => m.slug === route.tenant)?.name : t('Platform')
   return (
@@ -588,45 +587,13 @@ function UserMenu({ session, route, band }: { session: Session; route: Route; ba
           </>
         )}
         <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={() => setAboutOpen(true)}>
-          <Info />
-          {t('About')}
-        </DropdownMenuItem>
         <DropdownMenuItem onSelect={() => void logout()}>
           <LogOut />
           {t('Sign out')}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
-    <AboutDialog open={aboutOpen} onOpenChange={setAboutOpen} />
     </>
-  )
-}
-
-/** About: the product (its name and version, licence and text from `[about]` of the distribution) and the base it runs on. */
-function AboutDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
-  const brand = useBrand()
-  const a = brand.about
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>{a?.product || brand.name}</DialogTitle>
-          <DialogDescription>{a?.version ? t('Version {v}', { v: a.version }) : t('Version of the product')}</DialogDescription>
-        </DialogHeader>
-        <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-sm">
-          {a?.licence && (
-            <>
-              <dt className="text-muted-foreground">{t('Licence')}</dt>
-              <dd>{a.licence}</dd>
-            </>
-          )}
-          <dt className="text-muted-foreground">{t('Base')}</dt>
-          <dd>{t('Powered by Mosaikit {v}', { v: a?.base ?? brand.kernel_version })}</dd>
-        </dl>
-        {a?.text && <p className="text-sm whitespace-pre-line">{a.text}</p>}
-      </DialogContent>
-    </Dialog>
   )
 }
 

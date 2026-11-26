@@ -12,6 +12,9 @@ export const BAND_MAX_NAME = 80
 export const BAND_MAX_INITIALS = 3
 export const BAND_MAX_COUNT = 9999
 export const BAND_MAX_BACK = 80
+/** the logo of the identity block: a small picture as a `data:` address, at most this many characters */
+export const BAND_MAX_LOGO = 150_000
+const LOGO = /^data:image\/(?:png|jpeg|webp|gif);base64,[A-Za-z0-9+/]+={0,2}$/
 const BAND_MAX_ID = 64
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -30,6 +33,8 @@ export interface BandView {
   comments: { open: boolean; count: number | null; resource: string | null } | null
   /** an arrow-left button next to the tenant: the label is its accessible name and tooltip */
   back: { label: string } | null
+  /** the block that takes the place of the search bar: the back button, a logo and the name of the open resource (a site) */
+  identity: { name: string; logo: string | null } | null
 }
 
 type Args = Record<string, unknown>
@@ -59,7 +64,7 @@ export function initialsOf(name: string): string {
  *  that is too long is cut to the first 50 people; an empty back label is refused; a count above 9999 is shown as 9999. */
 export function sanitizeBand(raw: unknown): BandView {
   const a = plain(raw ?? {})
-  const view: BandView = { hideSearch: false, mode: null, presence: [], comments: null, back: null }
+  const view: BandView = { hideSearch: false, mode: null, presence: [], comments: null, back: null, identity: null }
   if (a.search !== undefined) {
     if (typeof a.search !== 'boolean') throw new OpError('invalid band search')
     view.hideSearch = a.search === false
@@ -104,6 +109,20 @@ export function sanitizeBand(raw: unknown): BandView {
     const label = cleanText(b.label, BAND_MAX_BACK, 'back label')
     if (!label) throw new OpError('invalid band back label')
     view.back = { label }
+  }
+  if (a.identity !== undefined && a.identity !== null) {
+    const i = plain(a.identity)
+    const name = cleanText(i.name, BAND_MAX_NAME, 'identity name')
+    if (!name) throw new OpError('invalid band identity name')
+    let logo: string | null = null
+    if (i.logo !== undefined && i.logo !== null && i.logo !== '') {
+      // a picture only, as a data: address: the shell never loads an address the iframe names
+      if (typeof i.logo !== 'string' || i.logo.length > BAND_MAX_LOGO || !LOGO.test(i.logo)) throw new OpError('invalid band identity logo')
+      logo = i.logo
+    }
+    view.identity = { name, logo }
+    // the identity takes the place of the search bar
+    view.hideSearch = true
   }
   return view
 }

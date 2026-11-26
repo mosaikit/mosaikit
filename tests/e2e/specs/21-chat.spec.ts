@@ -51,6 +51,7 @@ test.describe.serial('Chat', () => {
       await d.getByLabel('Display name').fill(name)
       await d.getByLabel('Email', { exact: true }).fill(`${user}@example.org`)
       await d.getByLabel('Initial password').fill(PASSWORD)
+      await d.getByLabel('Repeat the password').fill(PASSWORD)
       await d.getByRole('button', { name: 'Create user' }).click()
       await expect(a.getByRole('row', { name: new RegExp(name) })).toBeVisible()
     }

@@ -5,6 +5,8 @@ version and is removed in the next.
 
 ## Unreleased
 
+- `msk.band.set({ identity: { name, logo? } })` (type `BandIdentity`): the name of the open resource and a small logo (`data:` picture, png/jpeg/webp/gif) in the middle of the top band, in the place of the search bar, with the back button next to them; without a logo the shell draws a default one. Additive.
+
 - `msk.publicLink.get(id)`, `create(id, { expires_in_days?, password? })`, `revoke(id)` (type `PublicLinkState`): the public link of an item, for a page that replaces the share dialog. The rules of the dialog (manage the item, `share` permission, policy of the tenant, rate limit); the address is given once by `create`. Not in public links or runs. Additive; needs a Mosaikit with `[requires] mosaikit = ">=1.3"`.
 - `popover` and `menu` open above their anchor when there is no room below (a button at the bottom of the page, like the composer of a chat). Visual only.
 

@@ -169,6 +169,7 @@ test.describe.serial('08-shares-quotas', () => {
     await d.getByLabel('Display name').fill('Carla Bianchi')
     await d.getByLabel('Email', { exact: true }).fill('carla@example.org')
     await d.getByLabel('Initial password').fill(PASSWORD)
+    await d.getByLabel('Repeat the password').fill(PASSWORD)
     await d.getByRole('button', { name: 'Create user' }).click()
     await expect(page.getByText('The tenant has reached one of its quotas').first()).toBeVisible()
     await page.keyboard.press('Escape')

@@ -616,6 +616,18 @@ export interface BandBack {
 }
 
 /**
+ * The identity block of the contextual top band: it takes the place of the search bar, in the middle of the band,
+ * and shows the back button (see `BandState.back`), a logo and a name. For a page that is a whole application of its
+ * own, such as a published site.
+ */
+export interface BandIdentity {
+  /** plain text, at most 80 characters */
+  name: string
+  /** a small picture (png, jpeg, webp or gif) as a `data:` address, at most 150 000 characters; without it the shell draws a default logo */
+  logo?: string | null
+}
+
+/**
  * The state of the top band while a full-page resource (a map, a dashboard, a process) is open. What the
  * plugin leaves out stays as the shell draws it; the controls of the shell itself (tenant, language, theme,
  * help, notifications, the person) are never affected.
@@ -629,6 +641,8 @@ export interface BandState {
   comments?: BandComments
   /** a back button next to the tenant (for example, back to the list of the plugin) */
   back?: BandBack
+  /** logo and name in the middle of the band, instead of the search bar; the back button moves next to them */
+  identity?: BandIdentity
 }
 
 export interface BandApi {

@@ -35,14 +35,14 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
-import { useAction, useApi, useConfirm, usePaged, useTenantCtx, type PageOf } from '../core.ts'
+import { passwordMin, useAction, useApi, useConfig, useConfirm, usePaged, useTenantCtx, type PageOf } from '../core.ts'
 import { t } from '../i18n.ts'
 import { levelName } from '../levels.ts'
 import { PersonPicture } from '../picture.tsx'
 import { BulkBar, FilterColumn, ListPage } from '../listkit.tsx'
 import { ListTable } from '../ListTable.tsx'
 import { sortParams, type Sort } from '../tableutil.ts'
-import { Empty, ErrorBox, FillBody, FillPage, FormDialog, Loading, PageHeader, SaveBar, SelectAllRows, StatusBadge, Sliced, Tabs } from '../kit.tsx'
+import { Empty, ErrorBox, FillBody, FillPage, FormDialog, Loading, PageHeader, PasswordStrength, SaveBar, SelectAllRows, StatusBadge, Sliced, Tabs } from '../kit.tsx'
 import { go, to } from '../router.ts'
 import AppIcon from '../AppIcon.tsx'
 import { AppMark } from '../Shell.tsx'
@@ -1267,13 +1267,19 @@ function TenantProfiles({ tenant, value, onChange, id }: { tenant: string; value
 }
 
 /** A person in a tenant: tenant, role and profile (new person, add to a tenant). */
-function MembershipFields({ tenants, value, onChange, prefix }: { tenants: TenantInfo[]; value: { tenant: string; role: string; profile: string }; onChange: (v: { tenant: string; role: string; profile: string }) => void; prefix: string }) {
+function MembershipFields({ tenants, value, onChange, prefix, tenantError }: { tenants: TenantInfo[]; value: { tenant: string; role: string; profile: string }; onChange: (v: { tenant: string; role: string; profile: string }) => void; prefix: string; tenantError?: string }) {
   return (
     <>
       <div className="grid gap-1.5">
-        <Label htmlFor={`${prefix}-tenant`}>{t('Tenant')}</Label>
+        <Label htmlFor={`${prefix}-tenant`}>
+          {t('Tenant')}
+          <span aria-hidden="true" className="text-destructive">
+            {' '}
+            *
+          </span>
+        </Label>
         <Select value={value.tenant} onValueChange={(x) => onChange({ ...value, tenant: x, profile: DEFAULT })}>
-          <SelectTrigger id={`${prefix}-tenant`} className="w-full">
+          <SelectTrigger id={`${prefix}-tenant`} name="tenant" aria-required aria-invalid={tenantError ? true : undefined} className="w-full">
             <SelectValue placeholder={t('Choose the tenant…')} />
           </SelectTrigger>
           <SelectContent>
@@ -1284,6 +1290,11 @@ function MembershipFields({ tenants, value, onChange, prefix }: { tenants: Tenan
             ))}
           </SelectContent>
         </Select>
+        {tenantError && (
+          <p role="alert" className="text-xs text-destructive">
+            {tenantError}
+          </p>
+        )}
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div className="grid gap-1.5">
@@ -1310,10 +1321,18 @@ function MembershipFields({ tenants, value, onChange, prefix }: { tenants: Tenan
 const membershipBody = (v: { tenant: string; role: string; profile: string }) => ({ tenant: v.tenant, role: v.role, profile: v.profile === DEFAULT ? null : v.profile })
 
 function NewPersonDialog({ open, onClose, tenants, onCreated }: { open: boolean; onClose: () => void; tenants: TenantInfo[]; onCreated: (p: PersonRow, link: ResetLink | null) => void }) {
-  const blank = { username: '', display_name: '', email: '', password: '', m: { tenant: '', role: 'user', profile: DEFAULT } }
+  const blank = { username: '', display_name: '', email: '', password: '', password2: '', m: { tenant: '', role: 'user', profile: DEFAULT } }
+  const pwMin = passwordMin(useConfig())
   const [v, setV] = useState(blank)
+  // fields the person has left, and whether the button was pressed: only then an error is shown
+  const [touched, setTouched] = useState<Set<string>>(new Set())
+  const [tried, setTried] = useState(false)
   useEffect(() => {
-    if (open) setV(blank)
+    if (open) {
+      setV(blank)
+      setTouched(new Set())
+      setTried(false)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
   const create = useAction(
@@ -1329,13 +1348,42 @@ function NewPersonDialog({ open, onClose, tenants, onCreated }: { open: boolean;
       }),
     { ok: t('Person created'), invalidate: [['people']] },
   )
+  const required = t('This field is required')
+  const errs: Record<string, string> = {}
+  if (!v.username.trim()) errs.username = required
+  if (!v.email.trim()) errs.email = required
+  else if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v.email.trim())) errs.email = t('Enter a valid email address, like name@example.org')
+  if (!v.m.tenant) errs.tenant = t('Choose the tenant')
+  if (v.password && v.password.length < pwMin) errs.password = t('Use at least {n} characters', { n: pwMin })
+  if (v.password && v.password2 !== v.password) errs.password2 = v.password2 ? t('The two passwords are not the same') : required
+  const shown = (k: string) => (errs[k] && (tried || touched.has(k)) ? errs[k] : undefined)
+  const touch = (k: string) => setTouched((x) => new Set(x).add(k))
+  const star = (
+    <span aria-hidden="true" className="text-destructive">
+      {' '}
+      *
+    </span>
+  )
+  const msg = (k: string) =>
+    shown(k) && (
+      <p role="alert" className="text-xs text-destructive">
+        {shown(k)}
+      </p>
+    )
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent>
         <form
           className="grid gap-4"
+          noValidate
           onSubmit={(e) => {
             e.preventDefault()
+            const first = Object.keys(errs)[0]
+            if (first) {
+              setTried(true)
+              e.currentTarget.querySelector<HTMLElement>(`[name="${first}"]`)?.focus()
+              return
+            }
             create.mutate(undefined, {
               onSuccess: (r) => {
                 const x = r as { person: PersonRow; reset_link: ResetLink | null }
@@ -1348,10 +1396,15 @@ function NewPersonDialog({ open, onClose, tenants, onCreated }: { open: boolean;
             <DialogTitle>{t('New person')}</DialogTitle>
             <DialogDescription>{t('A local account with its home tenant, where it signs in.')}</DialogDescription>
           </DialogHeader>
+          <p className="text-xs text-muted-foreground">{t('Fields marked with * are required.')}</p>
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-1.5">
-              <Label htmlFor="np-user">{t('Username')}</Label>
-              <Input id="np-user" required value={v.username} onChange={(e) => setV({ ...v, username: e.target.value })} />
+              <Label htmlFor="np-user">
+                {t('Username')}
+                {star}
+              </Label>
+              <Input id="np-user" name="username" aria-required aria-invalid={shown('username') ? true : undefined} onBlur={() => touch('username')} value={v.username} onChange={(e) => setV({ ...v, username: e.target.value })} />
+              {msg('username')}
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="np-name">{t('Display name')}</Label>
@@ -1359,20 +1412,37 @@ function NewPersonDialog({ open, onClose, tenants, onCreated }: { open: boolean;
             </div>
           </div>
           <div className="grid gap-1.5">
-            <Label htmlFor="np-email">{t('Email')}</Label>
-            <Input id="np-email" type="email" required value={v.email} onChange={(e) => setV({ ...v, email: e.target.value })} />
+            <Label htmlFor="np-email">
+              {t('Email')}
+              {star}
+            </Label>
+            <Input id="np-email" name="email" type="email" aria-required aria-invalid={shown('email') ? true : undefined} onBlur={() => touch('email')} value={v.email} onChange={(e) => setV({ ...v, email: e.target.value })} />
+            {msg('email')}
           </div>
-          <MembershipFields prefix="np" tenants={tenants} value={v.m} onChange={(m) => setV({ ...v, m })} />
+          <MembershipFields prefix="np" tenants={tenants} value={v.m} onChange={(m) => setV({ ...v, m })} tenantError={shown('tenant')} />
           <div className="grid gap-1.5">
             <Label htmlFor="np-pw">{t('Initial password (optional)')}</Label>
-            <Input id="np-pw" type="password" autoComplete="new-password" value={v.password} onChange={(e) => setV({ ...v, password: e.target.value })} />
-            <p className="text-xs text-muted-foreground">{t('Empty: you get a link the person uses to choose it.')}</p>
+            <Input id="np-pw" name="password" type="password" autoComplete="new-password" aria-invalid={shown('password') ? true : undefined} onBlur={() => touch('password')} value={v.password} onChange={(e) => setV({ ...v, password: e.target.value })} />
+            {shown('password') ? msg('password') : <p className="text-xs text-muted-foreground">{t('Empty: you get a link the person uses to choose it.')}</p>}
           </div>
+          {v.password && (
+            <>
+              <PasswordStrength value={v.password} />
+              <div className="grid gap-1.5">
+                <Label htmlFor="np-pw2">
+                  {t('Repeat the password')}
+                  {star}
+                </Label>
+                <Input id="np-pw2" name="password2" type="password" autoComplete="new-password" aria-required aria-invalid={shown('password2') ? true : undefined} onBlur={() => touch('password2')} value={v.password2} onChange={(e) => setV({ ...v, password2: e.target.value })} />
+                {msg('password2')}
+              </div>
+            </>
+          )}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>
               {t('Cancel')}
             </Button>
-            <Button type="submit" disabled={create.isPending || !v.m.tenant}>
+            <Button type="submit" disabled={create.isPending}>
               {t('Create')}
             </Button>
           </DialogFooter>

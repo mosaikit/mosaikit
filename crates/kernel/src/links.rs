@@ -284,6 +284,33 @@ pub fn unlock_cookie_value(k: &Kernel, r: &Resolved) -> String {
     hex::encode(sha256(&data))
 }
 
+/// How long the key in the address of an unlocked link works (the same as the unlock cookie).
+pub const UNLOCK_KEY_SECS: i64 = 86_400;
+
+/// A key that carries the unlocking of a password-protected link in the address: `<expiry>.<mac>`. The page of a static
+/// site runs in a frame without an origin of its own, so its css, scripts and images are cross-site requests and the
+/// (`SameSite=Lax`) unlock cookie never goes with them: the site is served under `/p/<token>/~<key>/`, and its
+/// relative addresses keep the key.
+pub fn unlock_key(k: &Kernel, r: &Resolved, expiry: i64) -> String {
+    let mut data = k.cookie_secret.clone();
+    data.extend_from_slice(
+        format!(":key:{}:{}:{expiry}", r.link_id, r.password_hash.as_deref().unwrap_or("")).as_bytes(),
+    );
+    format!("{expiry}.{}", &hex::encode(sha256(&data))[..32])
+}
+
+/// A new key, valid for a day.
+pub fn new_unlock_key(k: &Kernel, r: &Resolved) -> String {
+    unlock_key(k, r, Utc::now().timestamp() + UNLOCK_KEY_SECS)
+}
+
+/// Whether `key` is a key of this link that has not expired (a new password of the link makes the old keys useless).
+pub fn check_unlock_key(k: &Kernel, r: &Resolved, key: &str) -> bool {
+    let Some((exp, _)) = key.split_once('.') else { return false };
+    let Ok(exp) = exp.parse::<i64>() else { return false };
+    exp > Utc::now().timestamp() && unlock_key(k, r, exp) == key
+}
+
 pub async fn count_view(k: &Kernel, r: &Resolved) {
     let _ = mosaikit_db::query("update core.public_links set view_count = view_count + 1 where id = $1")
         .bind(r.link_id)

@@ -67,6 +67,7 @@ test.describe.serial('01-admin-and-manager', () => {
     await d.getByLabel('Display name').fill('Anna Rossi')
     await d.getByLabel('Email', { exact: true }).fill('anna@example.org')
     await d.getByLabel('Initial password').fill(PASSWORD)
+    await d.getByLabel('Repeat the password').fill(PASSWORD)
     await d.getByRole('button', { name: 'Create user' }).click()
     await expect(page.getByRole('row', { name: /Anna Rossi/ })).toBeVisible()
     // the action bar appears only with a selection

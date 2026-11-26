@@ -4,7 +4,7 @@
 // the band in every theme and in dark mode (contextband.test.ts computes it). Texts of the plugin are
 // always React text nodes.
 
-import { ArrowLeft, Lock, MessageSquare } from 'lucide-react'
+import { ArrowLeft, Lock, MessageSquare, Globe } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { t } from './i18n.ts'
 import type { BandView } from './contextband.ts'
@@ -106,5 +106,25 @@ export function BackButton({ back, onBack }: { back: NonNullable<BandView['back'
     >
       <ArrowLeft className="size-[18px]" aria-hidden="true" />
     </button>
+  )
+}
+
+/** The block in the middle of the band while a plugin page declares an identity (a published site): the back button, the
+ *  logo (the picture of the person, else a default one) and the name. It takes the place of the search bar. */
+export function BandIdentity({ identity, back, onBack }: { identity: NonNullable<BandView['identity']>; back: BandView['back']; onBack: () => void }) {
+  return (
+    <div className="msk-band-identity flex min-w-0 items-center justify-center gap-2 max-[900px]:flex-1" data-testid="band-identity">
+      {back && <BackButton back={back} onBack={onBack} />}
+      {identity.logo ? (
+        <img src={identity.logo} alt="" className="msk-band-identity-logo size-8 shrink-0 rounded-md bg-white/10 object-contain" />
+      ) : (
+        <span className="msk-band-identity-logo msk-band-identity-default flex size-8 shrink-0 items-center justify-center rounded-md bg-white/15 text-band-foreground" aria-hidden="true">
+          <Globe className="size-[18px]" />
+        </span>
+      )}
+      <span className="msk-band-identity-name min-w-0 truncate text-sm font-semibold" title={identity.name}>
+        {identity.name}
+      </span>
+    </div>
   )
 }

@@ -1874,7 +1874,12 @@ back with `msk.band.reset()` (`band.reset`). While the state is set the band (th
 5. shows a button that opens and closes the comments of the resource;
 6. shows an arrow-left button on the left, right after the tenant, when the plugin gives `back` (its label is the accessible name
    and the tooltip), for a page that has a way back such as the list of the plugin;
-7. keeps, untouched, language, mode, help, notifications and the person (avatar, name and role).
+7. keeps, untouched, language, mode, help, notifications and the person (avatar, name and role);
+8. with `identity`, shows in the middle, in the place of the search bar, one block made of the back button (it moves here from the left,
+   next to the logo), a logo and a name, for a page that is a whole application of its own, such as a published site. The logo is
+   a small picture the plugin gives as a `data:` address (png, jpeg, webp or gif, at most 150 000 characters; anything else makes the
+   call fail with `invalid band identity logo`: the shell never loads an address that the iframe names, and SVG is not accepted);
+   without it the shell draws a default logo. The name is plain text, at most 80 characters.
 
 ```
 msk.band.set({
@@ -1883,6 +1888,7 @@ msk.band.set({
   presence: [{ id, name, initials? }],
   comments: { resource },            // or { open, count?, onToggle() } to draw the panel yourself
   back: { label, onClick() },
+  identity: { name, logo? },         // logo: data: address of a small picture
 })
 ```
 

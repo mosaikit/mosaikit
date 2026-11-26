@@ -25,6 +25,7 @@ test.describe.serial('09-lifecycle', () => {
     await d.getByLabel('Username of the Tenant Manager').fill('boss')
     await d.getByLabel('Email of the Tenant Manager').fill('boss@example.org')
     await d.getByLabel('Initial password').fill(PASSWORD)
+    await d.getByLabel('Repeat the password').fill(PASSWORD)
     await d.getByRole('button', { name: 'Next' }).click()
     await expect(d).toContainText('The platform prepares by itself')
     await accessible(page, 'new tenant, summary')

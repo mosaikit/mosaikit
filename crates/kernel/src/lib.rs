@@ -124,7 +124,7 @@ impl Role {
 pub struct TenantSettings {
     #[serde(default = "yes")]
     pub public_links_enabled: bool,
-    /// maximum lifetime of public links in days (0 = no limit)
+    /// maximum lifetime of public links in days (0 = permanent links, no limit; the default)
     #[serde(default = "d_link_days")]
     pub public_link_max_days: u32,
     #[serde(default = "yes")]
@@ -139,7 +139,7 @@ fn yes() -> bool {
     true
 }
 fn d_link_days() -> u32 {
-    30
+    0
 }
 
 impl Default for TenantSettings {
