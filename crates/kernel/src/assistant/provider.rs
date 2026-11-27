@@ -110,13 +110,50 @@ async fn openai(
         return Err(upstream(status, &res.text().await.map_err(net)?));
     }
     let Some(on) = on_delta else {
-        return parse_openai(&res.text().await.map_err(net)?);
+        return parse_openai(&res.text().await.map_err(net)?).map(|c| rescue_text_call(c, tools));
     };
     let mut acc = OpenAiStream::default();
     while let Some(chunk) = res.chunk().await.map_err(net)? {
         acc.feed(&String::from_utf8_lossy(&chunk), on);
     }
-    Ok(acc.finish())
+    Ok(rescue_text_call(acc.finish(), tools))
+}
+
+/// Small models behind an OpenAI-compatible server (Llama through Ollama, with many tools) often write the call as the text of the
+/// answer, `{"type":"function","name":"whoami","parameters":{}}`, instead of using the tool-call field. An answer that is only such a
+/// call, naming a tool we offered (exactly, or by the end of its name when that is unambiguous), is taken as the call it means.
+pub(crate) fn rescue_text_call(mut c: Completion, tools: &[ToolSpec]) -> Completion {
+    if !c.tool_calls.is_empty() {
+        return c;
+    }
+    let text = c.text.trim();
+    let text = text.strip_prefix("```json").or_else(|| text.strip_prefix("```")).unwrap_or(text);
+    let text = text.strip_suffix("```").unwrap_or(text).trim();
+    if !text.starts_with('{') {
+        return c;
+    }
+    let Ok(v) = serde_json::from_str::<Value>(text) else { return c };
+    let named = v["name"].as_str().or_else(|| v["function"]["name"].as_str());
+    let Some(name) = named else { return c };
+    let args = [&v["parameters"], &v["arguments"], &v["function"]["arguments"], &v["function"]["parameters"]]
+        .into_iter()
+        .find(|a| !a.is_null())
+        .cloned()
+        .unwrap_or_else(|| json!({}));
+    let args = match args {
+        Value::String(s) => serde_json::from_str(&s).unwrap_or_else(|_| json!({})),
+        a => a,
+    };
+    let exact = tools.iter().find(|t| t.name == name);
+    let by_end: Vec<&ToolSpec> = tools.iter().filter(|t| t.name.ends_with(&format!("__{name}"))).collect();
+    let tool = match (exact, by_end.as_slice()) {
+        (Some(t), _) => t,
+        (None, [one]) => one,
+        _ => return c,
+    };
+    c.tool_calls.push(ToolCall { id: "call-text-1".into(), name: tool.name.clone(), arguments: args });
+    c.text.clear();
+    c
 }
 
 /// The answer of an OpenAI-compatible server read as it arrives (`data: {...}` lines).
@@ -522,6 +559,40 @@ mod tests {
         assert_eq!(*shown.lock().unwrap(), "Hi");
         assert_eq!(c.tool_calls[0].arguments["b"], 2);
         assert_eq!((c.input_tokens, c.output_tokens), (11, 5));
+    }
+
+    #[test]
+    fn a_call_written_as_text_is_taken_as_a_call() {
+        let spec = |n: &str| ToolSpec {
+            name: n.into(),
+            description: String::new(),
+            input_schema: json!({}),
+            write: false,
+        };
+        let tools = [spec("kernel__whoami"), spec("notes__list_notes"), spec("tasks__list_notes")];
+        let said = |t: &str| Completion { text: t.into(), ..Completion::default() };
+        // by the end of the name, when it is only one tool
+        let c = rescue_text_call(said(r#"{"type":"function","name":"whoami","parameters":{}}"#), &tools);
+        assert_eq!((c.tool_calls[0].name.as_str(), c.text.as_str()), ("kernel__whoami", ""));
+        // exact, with the arguments as an object or a string, and in a fenced block
+        let c = rescue_text_call(
+            said("```json\n{\"name\":\"notes__list_notes\",\"arguments\":\"{\\\"q\\\":\\\"x\\\"}\"}\n```"),
+            &tools,
+        );
+        assert_eq!(
+            (c.tool_calls[0].name.as_str(), c.tool_calls[0].arguments["q"].as_str()),
+            ("notes__list_notes", Some("x"))
+        );
+        // ambiguous, unknown, ordinary text, and a real call are left alone
+        assert!(rescue_text_call(said(r#"{"name":"list_notes","parameters":{}}"#), &tools)
+            .tool_calls
+            .is_empty());
+        assert!(rescue_text_call(said(r#"{"name":"nope","parameters":{}}"#), &tools).tool_calls.is_empty());
+        let c = rescue_text_call(said("You are the manager."), &tools);
+        assert!(c.tool_calls.is_empty() && c.text == "You are the manager.");
+        let mut real = said("");
+        real.tool_calls.push(ToolCall { id: "1".into(), name: "x".into(), arguments: json!({}) });
+        assert_eq!(rescue_text_call(real, &tools).tool_calls[0].id, "1");
     }
 
     #[test]
