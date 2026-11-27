@@ -332,6 +332,9 @@ pub struct PluginView {
     pub icon: String,
     /// name of the icon in the set of the shell (Lucide), if the manifest declares it
     pub icon_name: Option<String>,
+    /// name of the illustrated icon (an image of `media/`, `GET /api/plugins/<id>/media/<name>`), if the manifest has one
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub icon_image: Option<String>,
     /// `app`, `service` or `extension`
     pub kind: &'static str,
     /// for an extension: the plugin it extends
@@ -375,6 +378,7 @@ impl PluginView {
             version: m.version.clone(),
             icon: m.contribution.icon.clone(),
             icon_name: m.icon.clone(),
+            icon_image: m.icon_image.clone(),
             kind: m.effective_kind().as_str(),
             extends: m.extends.as_ref().map(|e| e.plugin.clone()),
             label: m.contribution.label.clone(),
@@ -653,7 +657,8 @@ async fn remove(k: &Kernel, id: &str, remember: bool) -> Result<Arc<LoadedPlugin
 /// A picture of the brochure of an installed plugin (`media/<name>` of its package) and its type.
 pub fn media(k: &Kernel, id: &str, name: &str) -> Option<(Vec<u8>, &'static str)> {
     let p = k.plugins.get(id)?;
-    if !p.manifest.screenshots.iter().any(|s| s == name) || !mosaikit_mskp::is_media_name(name) {
+    let listed = p.manifest.screenshots.iter().any(|s| s == name) || p.manifest.icon_image.as_deref() == Some(name);
+    if !listed || !mosaikit_mskp::is_media_name(name) {
         return None;
     }
     // a plugin loaded from a folder (development) has its pictures in `media/` of the folder

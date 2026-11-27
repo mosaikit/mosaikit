@@ -5,6 +5,7 @@
 import type { CSSProperties, ReactNode } from 'react'
 import { Activity, Building2, CalendarClock, Gauge, History, LayoutDashboard, LayoutGrid, Puzzle, Settings, Share2, ShieldCheck, Users } from 'lucide-react'
 import type { PluginView, Session } from '../types.ts'
+import { appUrl } from '../api.ts'
 import AppIcon from './AppIcon.tsx'
 import { useBrand } from '../brand.ts'
 import { allItems, DEFAULT_GROUP_ICON, splitApps, type Grouped } from './navgroups.ts'
@@ -16,6 +17,17 @@ import { to, type Route } from './router.ts'
 
 /** An entry of the navigation: a page of the shell, an app or a page of an app (`[[nav]]` of its
  *  manifest); an entry with children and no address is only a group. */
+/** The address of the illustrated icon of a plugin (its `icon_image`, an image of `media/`); the version keeps it fresh. */
+export function iconImageOf(p: Pick<PluginView, 'id' | 'version' | 'icon_image'>): string | undefined {
+  return p.icon_image ? appUrl(`/api/plugins/${encodeURIComponent(p.id)}/media/${encodeURIComponent(p.icon_image)}?v=${encodeURIComponent(p.version)}`) : undefined
+}
+
+/** The attributes of the icon of an item: `data-icon` always; with an illustrated icon also `data-image` and the
+ *  variable `--msk-icon-image`, which a layout stylesheet may draw in place of the line icon. */
+export function iconAttrs(it: { iconId?: string; iconImage?: string }): Record<string, unknown> {
+  return it.iconImage ? { 'data-icon': it.iconId, 'data-image': '', style: { '--msk-icon-image': `url("${it.iconImage}")` } as CSSProperties } : { 'data-icon': it.iconId }
+}
+
 export interface NavItem {
   label: string
   /** short name under the icon, when the rail is closed */
@@ -23,6 +35,8 @@ export interface NavItem {
   icon?: ReactNode
   /** stable id of the icon, published as `data-icon` so a layout stylesheet can replace it */
   iconId?: string
+  /** address of the illustrated icon of the app, published as `data-image` and `--msk-icon-image` for the layouts that use it */
+  iconImage?: string
   href?: string
   active: boolean
   children?: NavItem[]
@@ -117,6 +131,7 @@ export function useNav(session: Session, route: Route, grouped = false): Nav {
         label: p.label,
         icon: <AppIcon id={p.id} name={p.icon_name} />,
         iconId: p.icon_name || p.id,
+        iconImage: iconImageOf(p),
         href: to.plugin(slug, p.id),
         active: page === 'plugin' && route.id === p.id && !(children ?? []).some(hasActive),
         children,

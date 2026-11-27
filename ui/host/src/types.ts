@@ -141,6 +141,8 @@ export interface PluginView {
   icon: string
   /** name of the icon of the shell (Lucide) declared by the manifest (recent servers) */
   icon_name?: string | null
+  /** name of the illustrated icon (an image of `media/`) declared by the manifest (recent servers) */
+  icon_image?: string | null
   /** recent servers */
   kind?: PluginKind
   /** for an extension: the plugin it extends (recent servers) */

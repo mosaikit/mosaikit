@@ -58,6 +58,7 @@ label = "Notes by tag"
 | `screenshots` | array of strings | up to 8 file names of `media/` (letters, digits, `- _ .`; extension `png`, `jpg`, `jpeg`, `webp`, `svg`); each must be in the package |
 | `kind` | `app`, `service`, `extension`, `layout`, `language` | see Kinds. Absent: `extension` with `[extends]`, else `app` with `[ui]`, else `service` (a rule kept for old manifests) |
 | `icon` | string | icon of the shell |
+| `icon_image` | string | an illustrated icon: the name of an image of `media/` (same rules as `screenshots`). A layout may draw it in place of the line icon (the shell marks the app with `data-image` and publishes the address as `--msk-icon-image`); without one the line icon stays. Needs Mosaikit 1.5 or later |
 | `abi`, `min_kernel` | | **deprecated**, see `[requires]` |
 
 ### Kinds

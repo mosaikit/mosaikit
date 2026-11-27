@@ -1003,6 +1003,7 @@ Paragraphs are separated by a blank line."
 screenshots = ["notes-1.png"]   # images of media/ (png, jpg, webp, svg), at most 8
 kind = "app"             # app | service | extension | layout | language (required in new plugins)
 icon = "notebook-pen"    # icon of the shell (Lucide); unknown names: a default icon
+icon_image = "icon.webp"  # optional: an illustrated icon, an image of media/ (layouts may draw it in place of the line icon)
 
 [contribution]           # kept for older hosts (emoji icon and label); the shell uses name and icon
 icon = "📝"

@@ -51,6 +51,11 @@ pub struct Manifest {
     /// default icon for names it does not know. `contribution.icon` stays for older hosts.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub icon: Option<String>,
+    /// An illustrated icon: the name of an image of `media/` (png, webp, jpg or svg; the same names as `screenshots`).
+    /// A layout may show it in place of the line icon (the shell publishes it for the layouts that ask for it); without
+    /// one, or in a layout that does not use it, the line icon stays. Needs a host that knows the field (1.5 or later).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub icon_image: Option<String>,
     /// Deprecated, optional: emoji icon and label for older hosts. Absent: the label is `name` and the icon a default.
     #[serde(default)]
     pub contribution: Contribution,
@@ -1347,6 +1352,11 @@ impl Manifest {
                 return Err("homepage must be an http:// or https:// address".into());
             }
         }
+        if let Some(n) = &self.icon_image {
+            if !is_media_name(n) {
+                return Err(format!("icon_image '{n}': a file name of letters, digits, - _ . with the extension png, jpg, jpeg, webp or svg"));
+            }
+        }
         if self.screenshots.len() > 8 {
             return Err("at most 8 screenshots".into());
         }
@@ -2216,6 +2226,9 @@ details = \"First paragraph.\"")
         .unwrap();
         assert_eq!(ok.license.as_deref(), Some("MIT"));
         assert_eq!(ok.screenshots.len(), 2);
+        assert_eq!(top("icon_image = \"icon.webp\"").unwrap().icon_image.as_deref(), Some("icon.webp"));
+        assert!(top("icon_image = \"../icon.png\"").is_err());
+        assert!(top("icon_image = \"icon.exe\"").is_err());
         assert!(top("homepage = \"ftp://example.org\"").is_err());
         assert!(top("screenshots = [\"../x.png\"]").is_err());
         assert!(top("screenshots = [\"x.exe\"]").is_err());
