@@ -159,6 +159,7 @@ pub fn router() -> Router<AppState> {
         .route("/api/{*rest}", axum::routing::any(api_not_found))
         .merge(crate::people_api::router())
         .merge(crate::quotas_api::router())
+        .merge(crate::assistant_api::router())
         .merge(crate::qa_api::router())
         .merge(crate::plugins_api::router())
         .merge(crate::history_api::router())
