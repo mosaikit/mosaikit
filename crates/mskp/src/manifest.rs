@@ -1666,7 +1666,9 @@ impl Manifest {
                 }
                 (None, Some(r), Some(_)) => {
                     if !self.resources.iter().any(|d| &d.name == r) {
-                        return Err(format!("assistant_tools '{n}': the resource '{r}' is not declared by the plugin"));
+                        return Err(format!(
+                            "assistant_tools '{n}': the resource '{r}' is not declared by the plugin"
+                        ));
                     }
                 }
                 _ => {
@@ -1683,7 +1685,9 @@ impl Manifest {
             }
             if let Some(s) = &t.input_schema {
                 if s.get("type").and_then(|v| v.as_str()) != Some("object") {
-                    return Err(format!("assistant_tools '{n}': input_schema must be an object schema (type = \"object\")"));
+                    return Err(format!(
+                        "assistant_tools '{n}': input_schema must be an object schema (type = \"object\")"
+                    ));
                 }
                 if s.to_string().len() > 8192 {
                     return Err(format!("assistant_tools '{n}': input_schema is larger than 8 KiB"));
@@ -2755,8 +2759,12 @@ service_keys = { b = { label = \"y\" } }
 
     #[test]
     fn assistant_tools() {
-        let with = |extra: &str| format!("{NOTES}
-{extra}");
+        let with = |extra: &str| {
+            format!(
+                "{NOTES}
+{extra}"
+            )
+        };
         let ok = with(
             "[[assistant_tools]]
 name = \"find\"
@@ -2780,26 +2788,45 @@ prompt = \"Notes are markdown.\"
         assert_eq!(m.assistant_tools[0].input_schema.as_ref().unwrap()["required"][0], "q");
         assert!(m.assistant_tools[1].input_schema.is_none());
         for (bad, what) in [
-            ("name = \"Bad Name\"
+            (
+                "name = \"Bad Name\"
 description = \"x\"
-command = \"c\"", "name"),
-            ("name = \"a\"
+command = \"c\"",
+                "name",
+            ),
+            (
+                "name = \"a\"
 description = \"\"
-command = \"c\"", "description"),
-            ("name = \"a\"
+command = \"c\"",
+                "description",
+            ),
+            (
+                "name = \"a\"
 description = \"x\"
-command = \"C!\"", "command"),
-            ("name = \"a\"
+command = \"C!\"",
+                "command",
+            ),
+            (
+                "name = \"a\"
 description = \"x\"
 command = \"c\"
-input_schema = { type = \"string\" }", "input_schema"),
-            ("name = \"a\"
+input_schema = { type = \"string\" }",
+                "input_schema",
+            ),
+            (
+                "name = \"a\"
 description = \"x\"
 command = \"c\"
-extra = 1", "extra"),
+extra = 1",
+                "extra",
+            ),
         ] {
-            let e = Manifest::from_toml(&with(&format!("[[assistant_tools]]
-{bad}"))).unwrap_err().to_string();
+            let e = Manifest::from_toml(&with(&format!(
+                "[[assistant_tools]]
+{bad}"
+            )))
+            .unwrap_err()
+            .to_string();
             assert!(e.contains(what), "{bad}: {e}");
         }
         // a resource tool: the resource must exist, the action is needed, create and update always write
@@ -2813,17 +2840,21 @@ extra = 1", "extra"),
             "command = \"c\"\nresource = \"notes\"\naction = \"list\"",
             "resource = \"notes\"\naction = \"delete\"",
         ] {
-            let e = Manifest::from_toml(&with(&format!("[[assistant_tools]]\nname = \"a\"\ndescription = \"x\"\n{bad}")));
+            let e = Manifest::from_toml(&with(&format!(
+                "[[assistant_tools]]\nname = \"a\"\ndescription = \"x\"\n{bad}"
+            )));
             assert!(e.is_err(), "{bad}");
         }
-        let dup = with("[[assistant_tools]]
+        let dup = with(
+            "[[assistant_tools]]
 name = \"a\"
 description = \"x\"
 command = \"c\"
 [[assistant_tools]]
 name = \"a\"
 description = \"y\"
-command = \"d\"");
+command = \"d\"",
+        );
         assert!(Manifest::from_toml(&dup).unwrap_err().to_string().contains("duplicate"));
     }
 

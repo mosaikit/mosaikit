@@ -16,9 +16,16 @@ pub const MAX_RESULT_CHARS: usize = 20_000;
 #[derive(Debug, Clone)]
 pub enum Target {
     Kernel,
-    Plugin { plugin: String, command: String },
+    Plugin {
+        plugin: String,
+        command: String,
+    },
     /// the generic CRUD of a resource of a plugin
-    Resource { plugin: String, resource: String, action: AssistantAction },
+    Resource {
+        plugin: String,
+        resource: String,
+        action: AssistantAction,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -52,14 +59,22 @@ fn no_args() -> Value {
 fn kernel_tools(c: &Caller) -> Vec<Tool> {
     let mut v = vec![
         kernel_tool("whoami", "Who is asking: name, role and tenant.", no_args()),
-        kernel_tool("list_plugins", "The apps (plugins) that are on in this tenant, with what each is for.", no_args()),
+        kernel_tool(
+            "list_plugins",
+            "The apps (plugins) that are on in this tenant, with what each is for.",
+            no_args(),
+        ),
         kernel_tool(
             "search",
             "Full-text search over the items the person can see, in every app.",
             json!({ "type": "object", "properties": { "q": { "type": "string", "description": "words to look for" } },
                     "required": ["q"] }),
         ),
-        kernel_tool("quota_usage", "Storage and items used by the person and what is left in the tenant.", no_args()),
+        kernel_tool(
+            "quota_usage",
+            "Storage and items used by the person and what is left in the tenant.",
+            no_args(),
+        ),
     ];
     if c.is_manager() {
         v.push(kernel_tool(
@@ -105,7 +120,12 @@ pub async fn registry(k: &Kernel, c: &Caller) -> Result<Vec<Tool>> {
                 _ => continue,
             };
             tools.push(Tool {
-                spec: ToolSpec { name, description: t.description.clone(), input_schema: schema, write: t.is_write() },
+                spec: ToolSpec {
+                    name,
+                    description: t.description.clone(),
+                    input_schema: schema,
+                    write: t.is_write(),
+                },
                 target,
             });
         }
@@ -204,7 +224,9 @@ pub async fn run(k: &Kernel, c: &Caller, lang: &str, tool: &Tool, args: Value) -
     check_args(&tool.spec.input_schema, &args)?;
     match &tool.target {
         Target::Plugin { plugin, command } => crate::crud::call(k, c, plugin, command, args).await,
-        Target::Resource { plugin, resource, action } => run_resource(k, c, plugin, resource, *action, args).await,
+        Target::Resource { plugin, resource, action } => {
+            run_resource(k, c, plugin, resource, *action, args).await
+        }
         Target::Kernel => run_kernel(k, c, lang, tool.spec.name.trim_start_matches("kernel__"), &args).await,
     }
 }
@@ -226,14 +248,18 @@ async fn run_resource(
             let v = serde_json::to_value(r)?;
             let rows = v["rows"].as_array().cloned().unwrap_or_default();
             let total = rows.len();
-            Ok(json!({ "total": total, "shown": total.min(limit), "rows": rows.into_iter().take(limit).collect::<Vec<_>>() }))
+            Ok(
+                json!({ "total": total, "shown": total.min(limit), "rows": rows.into_iter().take(limit).collect::<Vec<_>>() }),
+            )
         }
         AssistantAction::Create => crate::crud::create(k, c, plugin, resource, &obj, None).await,
         AssistantAction::Update => {
             let id = obj
                 .remove("id")
                 .and_then(|v| v.as_str().and_then(|s| s.parse::<uuid::Uuid>().ok()))
-                .ok_or_else(|| Error::bad("'id' must be the id of an item").with_code("assistant_bad_args"))?;
+                .ok_or_else(|| {
+                    Error::bad("'id' must be the id of an item").with_code("assistant_bad_args")
+                })?;
             crate::crud::update(k, c, plugin, resource, id, &obj).await
         }
     }

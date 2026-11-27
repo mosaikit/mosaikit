@@ -748,6 +748,8 @@ export interface AssistantStatus {
   provider: string | null
   model: string | null
   source: 'platform' | 'tenant' | null
+  /** the address of the MCP server of this tenant */
+  mcp_url: string
 }
 
 export interface AssistantTool {

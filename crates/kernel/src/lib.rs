@@ -6,9 +6,9 @@
 //! See `docs/architecture.md`.
 
 pub mod access;
-pub mod assistant;
 pub mod acl;
 pub mod actions;
+pub mod assistant;
 pub mod blobs;
 pub mod brand;
 pub mod comments;

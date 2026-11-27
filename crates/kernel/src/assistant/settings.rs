@@ -189,14 +189,19 @@ fn check(k: &Kernel, i: &SettingsInput, tenant_row: bool) -> Result<()> {
     let base = i.base_url.as_deref().map(str::trim).filter(|b| !b.is_empty());
     if let Some(b) = base {
         if tenant_row {
-            return Err(Error::bad("a custom address is set by the Administrator only").with_code("base_url_admin_only"));
+            return Err(Error::bad("a custom address is set by the Administrator only")
+                .with_code("base_url_admin_only"));
         }
-        if !(b.starts_with("http://") || b.starts_with("https://")) || b.len() > 500 || b.chars().any(char::is_whitespace)
+        if !(b.starts_with("http://") || b.starts_with("https://"))
+            || b.len() > 500
+            || b.chars().any(char::is_whitespace)
         {
             return Err(Error::bad("base_url: an http or https address"));
         }
     } else if i.provider == "openai_compatible" {
-        return Err(Error::bad("base_url is required for an OpenAI-compatible provider (e.g. http://localhost:11434/v1)"));
+        return Err(Error::bad(
+            "base_url is required for an OpenAI-compatible provider (e.g. http://localhost:11434/v1)",
+        ));
     }
     if let Some(key) = &i.api_key {
         if key.len() > 4096 || key.chars().any(char::is_control) {
@@ -213,7 +218,8 @@ async fn save(k: &Kernel, by: Uuid, id: Uuid, i: &SettingsInput, allow_byok: boo
         Some("") => None,
         Some(v) => Some(k.secrets.seal(aad(id).as_bytes(), v.as_bytes())),
     };
-    let base = i.base_url.as_deref().map(str::trim).filter(|b| !b.is_empty()).map(|b| b.trim_end_matches('/'));
+    let base =
+        i.base_url.as_deref().map(str::trim).filter(|b| !b.is_empty()).map(|b| b.trim_end_matches('/'));
     mosaikit_db::query(
         "insert into core.assistant_settings (tenant_id, provider, base_url, model, secret, enabled, allow_byok, hourly_limit, updated_at)
          values ($1, $2, $3, $4, $5, $6, $7, $8, now())
@@ -257,7 +263,8 @@ pub async fn set_tenant(k: &Kernel, c: &Caller, i: &SettingsInput) -> Result<Set
     c.require_manager()?;
     let allowed = row(k, platform_id()).await?.is_some_and(|p| p.allow_byok);
     if !allowed {
-        return Err(Error::forbidden("the Administrator has not allowed a key of your own").with_code("byok_not_allowed"));
+        return Err(Error::forbidden("the Administrator has not allowed a key of your own")
+            .with_code("byok_not_allowed"));
     }
     check(k, i, true)?;
     save(k, c.user.user_id, c.tenant.tenant_id, i, false).await?;
@@ -271,7 +278,15 @@ pub async fn clear_tenant(k: &Kernel, c: &Caller) -> Result<()> {
         .bind(c.tenant.tenant_id)
         .execute(&k.db)
         .await?;
-    events::record(k, Some(c.tenant.tenant_id), Some(c.user.user_id), None, None, "assistant.settings_cleared", json!({}))
-        .await;
+    events::record(
+        k,
+        Some(c.tenant.tenant_id),
+        Some(c.user.user_id),
+        None,
+        None,
+        "assistant.settings_cleared",
+        json!({}),
+    )
+    .await;
     Ok(())
 }
