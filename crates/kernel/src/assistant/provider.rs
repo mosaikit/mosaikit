@@ -702,6 +702,7 @@ mod tests {
             description: String::new(),
             input_schema: json!({}),
             write: false,
+            ..Default::default()
         };
         let tools = [spec("kernel__whoami"), spec("notes__list_notes"), spec("tasks__list_notes")];
         let said = |t: &str| Completion { text: t.into(), ..Completion::default() };

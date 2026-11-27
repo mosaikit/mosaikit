@@ -430,6 +430,7 @@ mod tests {
             description: d.into(),
             input_schema: json!({}),
             write: w,
+            ..Default::default()
         };
         let mut all = vec![
             spec("kernel__whoami", "Who is asking", false),
