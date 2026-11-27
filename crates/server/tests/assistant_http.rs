@@ -212,6 +212,42 @@ async fn settings_chat_confirmation_tokens_and_mcp_over_http() {
         )
         .await;
     assert!(String::from_utf8_lossy(&bad.body).contains("event: error"));
+    // stop: the page closes the stream of a slow answer and the loop ends there, with no reply and no record of a finished chat
+    let before: i64 =
+        mosaikit_db::query_scalar("select count(*) from core.events where action = 'assistant.chat'")
+            .fetch_one(&app._t.db)
+            .await
+            .unwrap();
+    let slow = app.call(
+        Some(&mgr),
+        None,
+        Method::POST,
+        "/api/t/alfa/assistant/chat/stream",
+        Some(json!({ "messages": [{ "role": "user", "content": "sleep:1500 slow" }] })),
+    );
+    assert!(
+        tokio::time::timeout(std::time::Duration::from_millis(300), slow).await.is_err(),
+        "the answer takes longer"
+    );
+    tokio::time::sleep(std::time::Duration::from_millis(2200)).await;
+    let after: i64 =
+        mosaikit_db::query_scalar("select count(*) from core.events where action = 'assistant.chat'")
+            .fetch_one(&app._t.db)
+            .await
+            .unwrap();
+    assert_eq!(before, after, "a stopped answer is not a finished chat");
+    // and the same question left alone does finish
+    let r = app
+        .call(
+            Some(&mgr),
+            None,
+            Method::POST,
+            "/api/t/alfa/assistant/chat/stream",
+            Some(json!({ "messages": [{ "role": "user", "content": "sleep:100 fast" }] })),
+        )
+        .await;
+    assert!(String::from_utf8_lossy(&r.body).contains("event: done"));
+
     // a mutating call without the CSRF header is refused
     let no_csrf = Session { cookie: mgr.cookie.clone(), csrf: String::new() };
     let r = app

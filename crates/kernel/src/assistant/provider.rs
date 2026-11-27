@@ -28,6 +28,15 @@ pub async fn complete(
         "anthropic" => anthropic(k, cfg, system, messages, tools, on_delta).await,
         "openai" | "openai_compatible" => openai(k, cfg, system, messages, tools, on_delta).await,
         "fake" if super::fake_allowed(k) => {
+            // `sleep:<milliseconds> …` makes the answer slow, to try the stop button
+            if let Some(ms) = messages
+                .last()
+                .and_then(|m| m.content.trim().strip_prefix("sleep:"))
+                .and_then(|r| r.split_whitespace().next())
+                .and_then(|n| n.parse::<u64>().ok())
+            {
+                tokio::time::sleep(Duration::from_millis(ms.min(60_000))).await;
+            }
             let c = fake(messages);
             if let Some(d) = on_delta {
                 // a word at a time, so the streaming of the page can be tried with no model
