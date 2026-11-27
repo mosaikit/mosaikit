@@ -151,6 +151,19 @@ async fn settings_chat_confirmation_tokens_and_mcp_over_http() {
     let msgs = r.json()["messages"].clone();
     assert_eq!(msgs[0]["tool_calls"][0]["name"], "kernel__whoami");
     assert!(msgs[1]["content"].as_str().unwrap().contains("alfa-manager"));
+    // the same chat as a stream: pieces, the messages, then `done`; an error is an event, not a broken answer
+    let r = app
+        .call(Some(&mgr), None, Method::POST, "/api/t/alfa/assistant/chat/stream",
+            Some(json!({ "messages": [{ "role": "user", "content": "hello there my friend" }] })))
+        .await;
+    assert_eq!(r.status, StatusCode::OK);
+    let text = String::from_utf8_lossy(&r.body).to_string();
+    assert!(text.contains("event: delta") && text.contains("event: message") && text.contains("event: done"), "{text}");
+    assert!(text.find("event: delta").unwrap() < text.find("event: done").unwrap());
+    let bad = app
+        .call(Some(&mgr), None, Method::POST, "/api/t/alfa/assistant/chat/stream", Some(json!({ "messages": [] })))
+        .await;
+    assert!(String::from_utf8_lossy(&bad.body).contains("event: error"));
     // a mutating call without the CSRF header is refused
     let no_csrf = Session { cookie: mgr.cookie.clone(), csrf: String::new() };
     let r = app

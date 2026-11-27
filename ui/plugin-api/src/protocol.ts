@@ -109,6 +109,8 @@ export interface HostEvents {
   'band.back': Record<string, never>
   /** something happened on a real-time channel the plugin opened (see `msk.realtime`) */
   'rt.event': RealtimeEvent
+  /** a piece of a streamed chat of the assistant (see `msk.assistant.chatStream`) */
+  'assistant.event': { handle: string; type: string; data: unknown }
   /** the list of people online changed (see `msk.presence`) */
   presence: PresenceSnapshot
 }
@@ -735,6 +737,11 @@ export interface AssistantProposal {
   description: string
 }
 
+export type AssistantStreamEvent =
+  | { type: 'delta'; text: string }
+  | { type: 'message'; message: AssistantMessage }
+  | { type: 'tool'; name: string }
+
 export interface AssistantChatResult {
   /** what the loop added to the chat (assistant and tool messages) */
   messages: AssistantMessage[]
@@ -799,6 +806,12 @@ export interface AssistantApi {
   close(): Promise<void>
   tools(): Promise<AssistantTool[]>
   chat(messages: AssistantMessage[], context?: unknown): Promise<AssistantChatResult>
+  /**
+   * `chat` that tells `onEvent` what happens while it runs: `delta` (a piece of the text being written), `message` (a message
+   * the loop added: the assistant one once complete, the result of each tool), `tool` (a tool is about to run). Resolves with
+   * the same answer as `chat`.
+   */
+  chatStream(messages: AssistantMessage[], onEvent: (e: AssistantStreamEvent) => void, context?: unknown): Promise<AssistantChatResult>
   call(name: string, args: unknown): Promise<{ result: unknown } | { cancelled: true }>
   tokens: {
     list(): Promise<AssistantToken[]>

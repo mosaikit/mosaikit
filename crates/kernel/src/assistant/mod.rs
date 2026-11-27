@@ -80,6 +80,18 @@ pub struct Proposal {
     pub description: String,
 }
 
+/// What a streamed chat tells the page while it runs.
+#[derive(Debug, Clone, Serialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum Event {
+    /// a piece of the text the model is writing
+    Delta { text: String },
+    /// a message the loop added (the assistant one, once complete, and the result of each tool)
+    Message { message: Message },
+    /// a tool is about to run
+    Tool { name: String },
+}
+
 #[derive(Debug, Serialize)]
 pub struct ChatResponse {
     /// the messages the loop added (assistant and tool), to append to the chat
@@ -207,6 +219,18 @@ fn failure(e: &Error) -> String {
 }
 
 pub async fn chat(k: &Kernel, c: &Caller, lang: &str, req: ChatRequest) -> Result<ChatResponse> {
+    chat_with(k, c, lang, req, None).await
+}
+
+/// `chat`, telling `emit` what happens while it runs (the text as it is written, each message, each tool): the page
+/// shows the answer as it grows. The answer at the end is the same.
+pub async fn chat_with(
+    k: &Kernel,
+    c: &Caller,
+    lang: &str,
+    req: ChatRequest,
+    emit: Option<&(dyn Fn(Event) + Send + Sync)>,
+) -> Result<ChatResponse> {
     let cfg = settings::resolve(k, c.tenant.tenant_id)
         .await?
         .ok_or_else(|| Error::bad("the assistant is not configured").with_code("assistant_off"))?;
@@ -226,7 +250,16 @@ pub async fn chat(k: &Kernel, c: &Caller, lang: &str, req: ChatRequest) -> Resul
     let (mut tin, mut tout) = (0u64, 0u64);
     let mut stopped = true;
     for _ in 0..MAX_STEPS {
-        let done = provider::complete(k, &cfg, &system, &history, &specs).await?;
+        let delta = emit.map(|e| move |t: &str| e(Event::Delta { text: t.to_string() }));
+        let done = provider::complete(
+            k,
+            &cfg,
+            &system,
+            &history,
+            &specs,
+            delta.as_ref().map(|d| d as &(dyn Fn(&str) + Send + Sync)),
+        )
+        .await?;
         tin += done.input_tokens;
         tout += done.output_tokens;
         let m = Message {
@@ -236,6 +269,9 @@ pub async fn chat(k: &Kernel, c: &Caller, lang: &str, req: ChatRequest) -> Resul
             tool_call_id: None,
         };
         history.push(m.clone());
+        if let Some(e) = emit {
+            e(Event::Message { message: m.clone() });
+        }
         new.push(m);
         if done.tool_calls.is_empty() {
             stopped = false;
@@ -258,6 +294,9 @@ pub async fn chat(k: &Kernel, c: &Caller, lang: &str, req: ChatRequest) -> Resul
                     continue;
                 }
                 Some(t) => {
+                    if let Some(e) = emit {
+                        e(Event::Tool { name: call.name.clone() });
+                    }
                     let r = tools::run(k, c, lang, t, call.arguments.clone()).await;
                     audit(k, c, &call.name, &call.arguments, r.is_ok(), "chat").await;
                     match r {
@@ -273,6 +312,9 @@ pub async fn chat(k: &Kernel, c: &Caller, lang: &str, req: ChatRequest) -> Resul
                 tool_call_id: Some(call.id.clone()),
             };
             history.push(t.clone());
+            if let Some(e) = emit {
+                e(Event::Message { message: t.clone() });
+            }
             new.push(t);
         }
         if !proposals.is_empty() {

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { ASSISTANT_PLUGIN, channelName, checkPluginApi, errorReply, execute, OpError, routeOp, safePage, SHELL_API, themeVars, toolName, uuid } from '../bridge.ts'
 import type { PluginView, Session, TenantContext } from '../types.ts'
-import { appUrl, enc } from '../api.ts'
+import { apiStream, appUrl, enc } from '../api.ts'
 import { useUi } from '../ui-context.ts'
 import { pickOptions, sharePre } from './sharepre.ts'
 import { pageTextsFor, t } from '../app/i18n.ts'
@@ -245,6 +245,19 @@ export default function PluginFrame({ plugin, session, ctx, reloadKey, ui: shell
             if (!ctx.plugins.some((x) => x.id === target)) throw new OpError('plugin not available', 'not_found')
             ui.open(target, place || undefined)
             reply({ ok: null })
+            return
+          }
+          // the chat as a stream: pieces of the answer reach the page as `assistant.event`, the reply is the final answer
+          case 'assistant.chat.stream': {
+            if (plugin.id !== ASSISTANT_PLUGIN) throw new OpError('this plugin may not use the assistant', 'forbidden')
+            const handle = String(m.args?.handle ?? '')
+            if (!/^[0-9a-f-]{36}$/i.test(handle)) throw new OpError('invalid handle')
+            const msgs = m.args?.messages
+            if (!Array.isArray(msgs) || msgs.length > 120) throw new OpError('invalid messages')
+            const out = await apiStream(`/api/t/${enc(tenant)}/assistant/chat/stream`, { messages: msgs, context: m.args?.context ?? null }, (type, data) =>
+              toBase('assistant.event', { handle, type, data }),
+            )
+            reply({ ok: out })
             return
           }
           // the page of the assistant panel asks to close it (Escape pressed inside the frame)
