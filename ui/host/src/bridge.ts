@@ -345,6 +345,7 @@ export function routeOp(tenant: string, plugin: string, op: string, rawArgs: unk
     // the AI assistant: the kernel runs everything as the person; the host lets only its own plugin in
     case 'assistant.status':
     case 'assistant.tools':
+    case 'assistant.models':
     case 'assistant.chat':
     case 'assistant.call':
     case 'assistant.tokens.list':
@@ -360,9 +361,11 @@ export function routeOp(tenant: string, plugin: string, op: string, rawArgs: unk
           return { method: 'GET', url: `${t}/assistant/status` }
         case 'assistant.tools':
           return { method: 'GET', url: `${t}/assistant/tools` }
+        case 'assistant.models':
+          return { method: 'GET', url: `${t}/assistant/models` }
         case 'assistant.chat': {
           if (!Array.isArray(a.messages) || a.messages.length > 120) throw new OpError('invalid messages')
-          return { method: 'POST', url: `${t}/assistant/chat`, json: { messages: a.messages, context: a.context ?? null } }
+          return { method: 'POST', url: `${t}/assistant/chat`, json: { messages: a.messages, context: a.context ?? null, model: typeof a.model === 'string' ? a.model.slice(0, 200) : null } }
         }
         case 'assistant.call':
           return { method: 'POST', url: `${t}/assistant/tools/${toolName(a.name)}/call`, json: { arguments: a.arguments ?? {} } }

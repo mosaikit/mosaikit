@@ -349,7 +349,7 @@ async fn run_resource(
 async fn run_kernel(k: &Kernel, c: &Caller, lang: &str, name: &str, args: &Value) -> Result<Value> {
     match name {
         "whoami" => Ok(json!({
-            "name": c.user.display_name, "username": c.user.username, "role": c.tenant.role.as_str(),
+            "name": c.user.display_name, "username": c.user.username, "role": c.tenant.role.as_str(), "role_label": c.tenant.role.label(),
             "tenant": c.tenant.name, "tenant_slug": c.tenant.slug,
         })),
         "list_plugins" => {

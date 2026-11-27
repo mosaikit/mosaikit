@@ -1,6 +1,8 @@
 import { useState } from 'react'
+import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { api } from '../api.ts'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -19,6 +21,12 @@ interface AssistantSettings {
   enabled: boolean
   allow_byok: boolean
   hourly_limit: number
+  user_models: string[]
+}
+
+interface ModelInfo {
+  id: string
+  label: string
 }
 
 interface Draft {
@@ -30,6 +38,7 @@ interface Draft {
   enabled: boolean
   allow_byok: boolean
   hourly_limit: string
+  user_models: string[]
 }
 
 /** A model name to suggest, by provider. */
@@ -51,6 +60,7 @@ function draftOf(s: AssistantSettings): Draft {
     enabled: s.configured ? s.enabled : true,
     allow_byok: s.allow_byok,
     hourly_limit: String(s.hourly_limit),
+    user_models: s.user_models ?? [],
   }
 }
 
@@ -58,6 +68,19 @@ function draftOf(s: AssistantSettings): Draft {
 export function PlatformAssistantPanel() {
   const q = useApi<AssistantSettings>(['admin-assistant'], '/api/admin/assistant')
   const [d, setD] = useState<Draft | null>(null)
+  // the models the provider offers, asked on request (it needs the saved provider and key)
+  const [offered, setOffered] = useState<ModelInfo[] | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [filter, setFilter] = useState('')
+  const loadModels = async () => {
+    setLoading(true)
+    try {
+      setOffered(await api<ModelInfo[]>('GET', '/api/admin/assistant/models'))
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e))
+    }
+    setLoading(false)
+  }
   const save = useAction(
     (x: Draft) =>
       api('PUT', '/api/admin/assistant', {
@@ -69,6 +92,7 @@ export function PlatformAssistantPanel() {
         enabled: x.enabled,
         allow_byok: x.allow_byok,
         hourly_limit: Number(x.hourly_limit) || 60,
+        user_models: x.user_models,
       }),
     { ok: t('Assistant settings saved'), invalidate: [['admin-assistant']] },
   )
@@ -140,6 +164,50 @@ export function PlatformAssistantPanel() {
               <span id="as-problem" role="alert" className="text-xs font-medium text-destructive">
                 {problem}
               </span>
+            )}
+          </div>
+          <div className="grid gap-2 rounded-lg border p-3" data-testid="assistant-models">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <Label className="text-sm font-semibold">{t('Models people may choose')}</Label>
+                <p className="text-xs text-muted-foreground">{t('Tenant Managers may use every model of the provider. Everybody else chooses among the default and the ones you tick here.')}</p>
+              </div>
+              <Button type="button" variant="outline" size="sm" onClick={() => void loadModels()} disabled={loading || !q.data!.configured || dirty}>
+                {loading && <Loader2 className="animate-spin" />}
+                {t('Load the models')}
+              </Button>
+            </div>
+            {!q.data!.configured || dirty ? (
+              <p className="text-xs text-muted-foreground">{t('Save the provider and the key first: the models are asked to the provider with them.')}</p>
+            ) : null}
+            {offered && (
+              <>
+                <div className="flex items-center gap-2">
+                  <Input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder={t('Filter the models')} aria-label={t('Filter the models')} className="h-8" />
+                  <Button type="button" variant="ghost" size="sm" onClick={() => set({ user_models: offered.map((m) => m.id).filter((id) => id !== cur.model) })}>{t('All')}</Button>
+                  <Button type="button" variant="ghost" size="sm" onClick={() => set({ user_models: [] })}>{t('None')}</Button>
+                </div>
+                <div className="grid max-h-56 gap-1 overflow-auto">
+                  {offered
+                    .filter((m) => !filter.trim() || m.id.toLowerCase().includes(filter.toLowerCase()) || m.label.toLowerCase().includes(filter.toLowerCase()))
+                    .map((m) => (
+                      <label key={m.id} className="flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={m.id === cur.model || cur.user_models.includes(m.id)}
+                          disabled={m.id === cur.model}
+                          onChange={(e) => set({ user_models: e.target.checked ? [...cur.user_models, m.id] : cur.user_models.filter((x) => x !== m.id) })}
+                        />
+                        <span>{m.label}</span>
+                        {m.label !== m.id && <span className="text-xs text-muted-foreground">{m.id}</span>}
+                        {m.id === cur.model && <span className="text-xs text-muted-foreground">{t('default')}</span>}
+                      </label>
+                    ))}
+                </div>
+              </>
+            )}
+            {!offered && cur.user_models.length > 0 && (
+              <p className="text-xs text-muted-foreground">{t('{n} models allowed', { n: String(cur.user_models.length) })}</p>
             )}
           </div>
           <div className="grid gap-1.5">

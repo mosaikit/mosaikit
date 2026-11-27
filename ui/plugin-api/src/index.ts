@@ -32,6 +32,8 @@ export type {
   EmbedUrl,
   EmbedsApi,
   AssistantApi,
+  AssistantChatOptions,
+  AssistantModels,
   AssistantChatResult,
   AssistantMessage,
   AssistantProposal,

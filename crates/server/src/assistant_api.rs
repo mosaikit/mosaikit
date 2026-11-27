@@ -21,6 +21,8 @@ use crate::{ApiError, ApiResult, AppState};
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/api/admin/assistant", get(a_settings).put(a_set_settings))
+        .route("/api/admin/assistant/models", get(a_models))
+        .route("/api/t/{t}/assistant/models", get(models))
         .route("/api/t/{t}/manage/assistant", get(m_settings).put(m_set_settings).delete(m_clear_settings))
         .route("/api/t/{t}/assistant/status", get(status))
         .route("/api/t/{t}/assistant/tools", get(tools))
@@ -48,6 +50,14 @@ async fn a_set_settings(
     Json(i): Json<settings::SettingsInput>,
 ) -> ApiResult<Json<Value>> {
     Ok(Json(json!(settings::set_platform(&s.k, &u, &i).await?)))
+}
+
+async fn a_models(State(s): State<AppState>, Auth(u): Auth) -> ApiResult<Json<Value>> {
+    Ok(Json(json!(assistant::platform_models(&s.k, &u).await?)))
+}
+
+async fn models(State(s): State<AppState>, Tenant(c): Tenant) -> ApiResult<Json<Value>> {
+    Ok(Json(json!(assistant::model_choices(&s.k, &c).await?)))
 }
 
 async fn m_settings(State(s): State<AppState>, Tenant(c): Tenant) -> ApiResult<Json<Value>> {

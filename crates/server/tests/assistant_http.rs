@@ -136,6 +136,27 @@ async fn settings_chat_confirmation_tokens_and_mcp_over_http() {
         true
     );
 
+    // the models: a Manager may choose every one of the provider; the Administrator reads them for the settings page
+    let m = app.call(Some(&mgr), None, Method::GET, "/api/t/alfa/assistant/models", None).await.json();
+    assert_eq!((m["default"].as_str(), m["all"].as_bool()), (Some("m"), Some(true)));
+    assert_eq!(m["models"].as_array().unwrap().len(), 3);
+    let a = app.call(Some(&admin), None, Method::GET, "/api/admin/assistant/models", None).await;
+    assert_eq!(a.json().as_array().unwrap().len(), 2);
+    assert_eq!(
+        app.call(Some(&mgr), None, Method::GET, "/api/admin/assistant/models", None).await.status,
+        StatusCode::FORBIDDEN
+    );
+    let r = app
+        .call(
+            Some(&mgr),
+            None,
+            Method::POST,
+            "/api/t/alfa/assistant/chat",
+            Some(json!({ "messages": [{ "role": "user", "content": "hi" }], "model": "fake-small" })),
+        )
+        .await;
+    assert_eq!(r.status, StatusCode::OK);
+
     // the chat runs a kernel tool as the person; the answer is never cached
     let r = app
         .call(
