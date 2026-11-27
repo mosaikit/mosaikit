@@ -124,6 +124,27 @@ async fn openai(
     Ok(rescue_text_call(acc.finish(), tools))
 }
 
+/// The name and the arguments of a call written as broken JSON: `{"name": "x", "parameters": {"}}` is the tool `x` with no arguments.
+fn lenient_call(text: &str) -> Option<Value> {
+    let after = |key: &str| -> Option<&str> {
+        let i = text.find(&format!("\"{key}\""))? + key.len() + 2;
+        Some(text[i..].trim_start().strip_prefix(':')?.trim_start())
+    };
+    let name = after("name")?.strip_prefix('"')?;
+    let name = &name[..name.find('"')?];
+    if name.is_empty() {
+        return None;
+    }
+    // the arguments: the first object after the key that parses
+    let params = ["parameters", "arguments"].iter().find_map(|k| {
+        let rest = after(k)?;
+        let start = rest.find('{')?;
+        let body = &rest[start..];
+        body.match_indices('}').find_map(|(end, _)| serde_json::from_str::<Value>(&body[..=end]).ok())
+    });
+    Some(json!({ "name": name, "parameters": params.unwrap_or_else(|| json!({})) }))
+}
+
 /// Small models behind an OpenAI-compatible server (Llama through Ollama, with many tools) often write the call as the text of the
 /// answer, `{"type":"function","name":"whoami","parameters":{}}`, instead of using the tool-call field. An answer that is only such a
 /// call, naming a tool we offered (exactly, or by the end of its name when that is unambiguous), is taken as the call it means.
@@ -137,7 +158,14 @@ pub(crate) fn rescue_text_call(mut c: Completion, tools: &[ToolSpec]) -> Complet
     if !text.starts_with('{') {
         return c;
     }
-    let Ok(v) = serde_json::from_str::<Value>(text) else { return c };
+    let v = match serde_json::from_str::<Value>(text) {
+        Ok(v) => v,
+        // a small model often breaks the JSON (a cut `{"}`): the name is still there, and the arguments when they can be read
+        Err(_) => match lenient_call(text) {
+            Some(v) => v,
+            None => return c,
+        },
+    };
     let named = v["name"].as_str().or_else(|| v["function"]["name"].as_str());
     let Some(name) = named else { return c };
     let args = [&v["parameters"], &v["arguments"], &v["function"]["arguments"], &v["function"]["parameters"]]
@@ -588,6 +616,12 @@ mod tests {
             (c.tool_calls[0].name.as_str(), c.tool_calls[0].arguments["q"].as_str()),
             ("notes__list_notes", Some("x"))
         );
+        // broken JSON: the name is enough
+        let c = rescue_text_call(said(r#"{"name": "kernel__whoami", "parameters": {"}}"#), &tools);
+        assert_eq!((c.tool_calls[0].name.as_str(), c.text.as_str()), ("kernel__whoami", ""));
+        let c =
+            rescue_text_call(said(r#"{"name": "notes__list_notes", "parameters": {"q": "x"}, oops"#), &tools);
+        assert_eq!(c.tool_calls[0].arguments["q"], "x");
         // ambiguous, unknown, ordinary text, and a real call are left alone
         assert!(rescue_text_call(said(r#"{"name":"list_notes","parameters":{}}"#), &tools)
             .tool_calls
