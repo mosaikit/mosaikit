@@ -24,7 +24,7 @@ import { QuotaAlert } from './Quotas.tsx'
 import type { Route } from './router.ts'
 import type { LayoutInfo } from './layouts.ts'
 import { BandActions, BandSearch, Brand, Breadcrumb, FlyoutMenu, NavTree, SkipLink, TenantSwitcher } from './slots.tsx'
-import { bandIcon, bandStyle, flat, hasActive, useCrumbs, useNav, type Nav, type NavGroup, type NavItem } from './nav.tsx'
+import { iconAttrs, bandIcon, bandStyle, flat, hasActive, useCrumbs, useNav, type Nav, type NavGroup, type NavItem } from './nav.tsx'
 
 const MINI_KEY = 'msk_layout_nav_closed'
 function readMini(): boolean {
@@ -94,7 +94,7 @@ function Launcher({ open, onOpenChange, nav }: { open: boolean; onOpenChange: (v
                 <li key={it.label + it.href}>
                   <a
                     href={it.href}
-                    data-icon={it.iconId}
+                    {...iconAttrs(it)}
                     onClick={() => onOpenChange(false)}
                     aria-current={it.active ? 'page' : undefined}
                     className={cn(
@@ -129,7 +129,7 @@ function TabItem({ it }: { it: NavItem }) {
           side="bottom"
           item={it}
           trigger={
-            <button type="button" data-icon={it.iconId} className={cls(hasActive(it))}>
+            <button type="button" {...iconAttrs(it)} className={cls(hasActive(it))}>
               {it.icon}
               {it.label}
               <ChevronDown aria-hidden="true" className="size-3.5" />
@@ -140,7 +140,7 @@ function TabItem({ it }: { it: NavItem }) {
     )
   return (
     <li>
-      <a href={it.href} data-icon={it.iconId} className={cls(it.active)} aria-current={it.active ? 'page' : undefined}>
+      <a href={it.href} {...iconAttrs(it)} className={cls(it.active)} aria-current={it.active ? 'page' : undefined}>
         {it.icon}
         {it.label}
       </a>

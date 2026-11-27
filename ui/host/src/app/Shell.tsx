@@ -45,7 +45,7 @@ import { HelpLayer } from './HelpLayer.tsx'
 import { useTenantCtx } from './core.ts'
 import { applyStyle, bandImageOf, styleOf, useBandImage, useLayoutInUse, useLayoutStylesheet } from './layouts.ts'
 import { AppMark, BandActions, BandSearch, FlyoutMenu, SkipLink, TenantSwitcher } from './slots.tsx'
-import { bandIcon, bandStyle, hasActive, useNav, type NavGroup, type NavItem } from './nav.tsx'
+import { iconAttrs, bandIcon, bandStyle, hasActive, useNav, type NavGroup, type NavItem } from './nav.tsx'
 import Frame from './frames.tsx'
 import { backFromActiveEntry, bandEmit, resetBand, useBand } from './contextband.ts'
 import CommentsController from './CommentsPanel.tsx'
@@ -118,7 +118,7 @@ function RailEntry({ it }: { it: NavItem }) {
         {/* without the names under the icons the long name is the accessible name and the tooltip */}
         <a
           href={it.href}
-          data-icon={it.iconId}
+          {...iconAttrs(it)}
           aria-label={it.short || (rail && !labels) ? it.label : undefined}
           title={(it.short || (rail && !labels)) && !(rail && kids.length > 0) ? it.label : undefined}
           onClick={(e) => {

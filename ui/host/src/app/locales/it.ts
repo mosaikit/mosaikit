@@ -1124,7 +1124,7 @@ export const IT: Record<string, string> = {
   'Reads the files of the person who uses it': 'Legge i file di chi lo usa',
   'Writes in the Files area of the person who uses it': 'Scrive nell’area File di chi lo usa',
   'yes (sensitive: its pages create folders and files in the Files area with the permissions of the caller)': 'sì (sensibile: le sue pagine creano cartelle e file nell’area File con i permessi di chi le usa)',
-  'Schedules': 'Programmazioni',
+  'Schedules': 'Pianificati',
   'Paused by its author': 'Sospesa dall’autore',
   'Paused by a manager': 'Sospesa da un responsabile',
   'Its author left or was suspended': 'L’autore è uscito o è stato sospeso',

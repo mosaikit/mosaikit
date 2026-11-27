@@ -30,7 +30,7 @@ import { initials, useTenantCtx } from './core.ts'
 import { PersonPicture } from './picture.tsx'
 import { navGroupOpen, setNavGroupOpen, useRailLabels } from './prefs.ts'
 import { allItems } from './navgroups.ts'
-import { bandIcon, hasActive, searchGroups, type Nav, type NavGroup, type NavItem } from './nav.tsx'
+import { iconAttrs, bandIcon, hasActive, searchGroups, type Nav, type NavGroup, type NavItem } from './nav.tsx'
 import { setLang, t, translatedName, useLang, useLanguages, type Lang } from './i18n.ts'
 import { NotificationsBell } from './notifications.tsx'
 import { useUnread, useUnreadSources } from './notes.ts'
@@ -157,7 +157,7 @@ function MiniFlyout({ item }: { item: NavItem }) {
   const labels = useRailLabels()
   return (
     <li {...hover.areaProps}>
-      <FlyoutMenu item={item} hover={hover} trigger={<button type="button" className={itemClass(hasActive(item), true, labels)} data-icon={item.iconId} aria-label={item.label}>{item.icon}{labels && <span className="max-w-[56px] truncate text-[11px] leading-none">{item.short ?? item.label}</span>}</button>} />
+      <FlyoutMenu item={item} hover={hover} trigger={<button type="button" className={itemClass(hasActive(item), true, labels)} {...iconAttrs(item)} aria-label={item.label}>{item.icon}{labels && <span className="max-w-[56px] truncate text-[11px] leading-none">{item.short ?? item.label}</span>}</button>} />
     </li>
   )
 }
