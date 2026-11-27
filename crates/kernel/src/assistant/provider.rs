@@ -64,14 +64,22 @@ pub(crate) fn openai_messages(system: &str, messages: &[Message]) -> Vec<Value> 
     out
 }
 
-async fn openai(k: &Kernel, cfg: &Resolved, system: &str, messages: &[Message], tools: &[ToolSpec]) -> Result<Completion> {
+async fn openai(
+    k: &Kernel,
+    cfg: &Resolved,
+    system: &str,
+    messages: &[Message],
+    tools: &[ToolSpec],
+) -> Result<Completion> {
     let base = cfg.base_url.clone().unwrap_or_else(|| "https://api.openai.com/v1".into());
     let mut body = json!({ "model": cfg.model, "messages": openai_messages(system, messages) });
     if !tools.is_empty() {
         body["tools"] = tools
             .iter()
-            .map(|t| json!({ "type": "function",
-                "function": { "name": t.name, "description": t.description, "parameters": t.input_schema } }))
+            .map(|t| {
+                json!({ "type": "function",
+                "function": { "name": t.name, "description": t.description, "parameters": t.input_schema } })
+            })
             .collect();
     }
     let mut req = k.http.post(format!("{base}/chat/completions")).timeout(TIMEOUT).json(&body);
@@ -88,7 +96,8 @@ async fn openai(k: &Kernel, cfg: &Resolved, system: &str, messages: &[Message], 
 }
 
 pub(crate) fn parse_openai(text: &str) -> Result<Completion> {
-    let v: Value = serde_json::from_str(text).map_err(|_| Error::internal("the language model sent an invalid answer"))?;
+    let v: Value = serde_json::from_str(text)
+        .map_err(|_| Error::internal("the language model sent an invalid answer"))?;
     let m = &v["choices"][0]["message"];
     let mut calls = Vec::new();
     for c in m["tool_calls"].as_array().into_iter().flatten() {
@@ -119,7 +128,9 @@ pub(crate) fn anthropic_messages(messages: &[Message]) -> Vec<Value> {
                     blocks.push(json!({ "type": "text", "text": m.content }));
                 }
                 for c in &m.tool_calls {
-                    blocks.push(json!({ "type": "tool_use", "id": c.id, "name": c.name, "input": c.arguments }));
+                    blocks.push(
+                        json!({ "type": "tool_use", "id": c.id, "name": c.name, "input": c.arguments }),
+                    );
                 }
                 out.push(json!({ "role": "assistant", "content": blocks }));
             }
@@ -130,7 +141,9 @@ pub(crate) fn anthropic_messages(messages: &[Message]) -> Vec<Value> {
                 match out.last_mut() {
                     Some(last)
                         if last["role"] == "user"
-                            && last["content"].as_array().is_some_and(|a| a.iter().all(|b| b["type"] == "tool_result")) =>
+                            && last["content"]
+                                .as_array()
+                                .is_some_and(|a| a.iter().all(|b| b["type"] == "tool_result")) =>
                     {
                         last["content"].as_array_mut().expect("array").push(block);
                     }
@@ -143,7 +156,13 @@ pub(crate) fn anthropic_messages(messages: &[Message]) -> Vec<Value> {
     out
 }
 
-async fn anthropic(k: &Kernel, cfg: &Resolved, system: &str, messages: &[Message], tools: &[ToolSpec]) -> Result<Completion> {
+async fn anthropic(
+    k: &Kernel,
+    cfg: &Resolved,
+    system: &str,
+    messages: &[Message],
+    tools: &[ToolSpec],
+) -> Result<Completion> {
     let base = cfg.base_url.clone().unwrap_or_else(|| "https://api.anthropic.com".into());
     let mut body = json!({
         "model": cfg.model, "max_tokens": MAX_TOKENS, "system": system, "messages": anthropic_messages(messages) });
@@ -172,7 +191,8 @@ async fn anthropic(k: &Kernel, cfg: &Resolved, system: &str, messages: &[Message
 }
 
 pub(crate) fn parse_anthropic(text: &str) -> Result<Completion> {
-    let v: Value = serde_json::from_str(text).map_err(|_| Error::internal("the language model sent an invalid answer"))?;
+    let v: Value = serde_json::from_str(text)
+        .map_err(|_| Error::internal("the language model sent an invalid answer"))?;
     let mut out = String::new();
     let mut calls = Vec::new();
     for b in v["content"].as_array().into_iter().flatten() {

@@ -28,6 +28,7 @@ development and release. The choices described here replace the initial PoC
    - [8.9 Extensions](#89-extensions)
    - [8.10 Settings, updates, uninstall](#810-settings-updates-uninstall)
    - [8.12 The developer profile](#812-the-developer-profile)
+   - [8.13 AI assistant and MCP server](#813-ai-assistant-and-mcp-server)
 9. [Web security: origins, cookies, CSP](#9-web-security-origins-cookies-csp)
 10. [Configuration and data dir](#10-configuration-and-data-dir)
    - [10.1 Backup and restore](#101-backup-and-restore)
@@ -2113,6 +2114,56 @@ API 1 (no bump, §8.11; `[requires] mosaikit = ">=1.0"`, a warning of `mosaikit-
 `camera; microphone; display-capture` to the `allow` of the frame of that plugin only; the browser still asks the person, and what
 the embedded page may reach stays what `frame_src` lists (the CSP of the plugin). The Administrator sees a red row «Camera and
 microphone» in «What it asks» and a chip in the brochure. A plugin without the key is unchanged.
+
+### 8.13 AI assistant and MCP server
+
+An assistant the person talks to, and the same tools for outside AI clients. Plan and decisions: [ai-assistant-plan.md](ai-assistant-plan.md).
+
+**Who owns what.** The kernel (`crates/kernel/src/assistant`, REST in `crates/server/src/assistant_api.rs`) owns the agent loop,
+the tools, the providers, the confirmations, the limits, the audit and the MCP server: they are security functions and must see
+every plugin. The official plugin `com.mosaikit.ai-assistant` owns the chat page and the saved chats (a resource `chats`, private to
+the person like any item). The shell shows an icon in the top bar and a side panel that frames the page of the plugin
+(`AssistantDrawer`), only when the plugin is on in the tenant and a provider is set.
+
+**Provider and key.** `core.assistant_settings` has one row for the platform (nil tenant id, set by the system Administrator in
+System › AI assistant) and optionally one per tenant. A tenant row counts only when the platform row has `allow_byok`; the Tenant
+Manager then chooses Anthropic or OpenAI with a key of their own (a custom address is the Administrator's only). Keys are sealed with
+`SecretBox` (the aad names the row) and never reach a UI: the views say `has_key`. Providers: `anthropic`, `openai`,
+`openai_compatible` (OpenAI, Azure, Mistral, Groq, OpenRouter, Ollama, vLLM, LM Studio: an address is required) and `fake`, a
+deterministic provider for tests (`tool:<name> <json>` asks for that tool, anything else is echoed), accepted only in a debug build,
+the developer profile or with `MOSAIKIT_ASSISTANT_FAKE`. Every call to a model uses one canonical message format (OpenAI-like:
+`user`, `assistant` with `tool_calls`, `tool`) converted per provider (`provider.rs`).
+
+**Tools.** The kernel offers read tools (`kernel__whoami`, `list_plugins`, `search`, `quota_usage`, and `kpi_summary` to a Tenant
+Manager). A plugin declares its own in `plugin.toml` (`[[assistant_tools]]`, [devkit/manifest.md](devkit/manifest.md)): either a
+`command` of its logic, or a `resource` with an `action` (`list`, `create`, `update`) that the kernel runs as the generic CRUD, with the
+schema derived from the fields: no code in the plugin. A tool is offered to a person only when the plugin is on in the tenant and the
+person has `use`; it is named `<plugin>__<tool>`. Every tool runs as the person (role, ACL, RLS, tenant, the same checks as a REST
+call): the assistant never has more rights.
+
+**Writes are proposals.** A tool that writes (declared `write`, or `create`/`update`) is never run by the loop. `POST
+/api/t/{t}/assistant/chat` is stateless: the client sends the messages, the loop calls the model up to 8 times, runs the read tools and
+returns the new messages; at a write tool it stops and returns a `proposal`. The page of the plugin asks the shell to run it
+(`assistant.call`); **the shell, not the page, shows the confirmation dialog**, then calls `POST .../assistant/tools/{name}/call`
+(session and CSRF). A call nobody answered is closed with a "not run" result before the chat goes on. Tool results and the content of
+items are data: the system prompt says so and the confirmation is the defence against injected text.
+
+**Limits and audit.** A person has an hourly request limit (the platform row, default 60). A chat is at most 120 messages and 200,000
+characters; a tool result is cut at 20,000 characters. The audit (`core.events`) records `assistant.chat` (provider, model, tokens),
+`assistant.tool` (tool, outcome, the NAMES of the arguments, never the values), the settings and the tokens.
+
+**MCP server.** `POST /api/t/{t}/mcp` speaks JSON-RPC 2.0 over Streamable HTTP with JSON answers: `initialize`, `ping`, `tools/list`,
+`tools/call` (a notification gets 202, `GET` 405). The credential is a personal access token (`mska_…`, `core.api_tokens`: the hash,
+one person, one tenant, an optional expiry, `allow_write` off by default, at most 20 live, 600 calls a minute), made by the person in
+the plugin and shown once. A token opens only its tenant, never has Administrator powers, and a tool that writes is refused to a
+read-only token (the tools carry `readOnlyHint` and `destructiveHint`). There is no cookie, so no CSRF. Claude Desktop connects to a
+remote server as a connector, or through the `mcp-remote` bridge: the plugin writes the `claude_desktop_config.json` snippet.
+
+**Bridge.** `msk.assistant` in the plugin API; the host lets only the plugin `com.mosaikit.ai-assistant` use the operations
+(`ASSISTANT_PLUGIN` in `ui/host/src/bridge.ts`).
+
+**Not yet.** Streaming of the answer (the loop answers when done), OAuth for MCP (a token only), a token budget per tenant (a request
+limit only), tools on `delete`.
 
 ## 9. Web security: origins, cookies, CSP
 

@@ -115,7 +115,11 @@ struct NewToken {
     days: Option<u32>,
 }
 
-async fn token_create(State(s): State<AppState>, Tenant(c): Tenant, Json(b): Json<NewToken>) -> ApiResult<Response> {
+async fn token_create(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Json(b): Json<NewToken>,
+) -> ApiResult<Response> {
     let t = tokens::create(&s.k, &c, &b.name, b.allow_write, b.days).await?;
     Ok(no_store(Json(json!(t)).into_response()))
 }
@@ -137,7 +141,12 @@ fn bearer(h: &HeaderMap) -> Option<&str> {
 
 /// The endpoint of the MCP server of a tenant: JSON-RPC over HTTP (Streamable HTTP, answers as JSON). The credential is a
 /// personal access token, no cookie, so there is no CSRF: a page of another origin cannot know the token.
-async fn mcp_post(State(s): State<AppState>, Path(t): Path<String>, h: HeaderMap, body: Bytes) -> ApiResult<Response> {
+async fn mcp_post(
+    State(s): State<AppState>,
+    Path(t): Path<String>,
+    h: HeaderMap,
+    body: Bytes,
+) -> ApiResult<Response> {
     let token = bearer(&h).ok_or_else(|| {
         ApiError(Error::unauthorized("a personal access token is required (Authorization: Bearer mska_...)"))
     })?;
@@ -162,7 +171,7 @@ async fn mcp_post(State(s): State<AppState>, Path(t): Path<String>, h: HeaderMap
                     out.push(r);
                 }
             }
-            (!out.is_empty()).then(|| Value::Array(out))
+            (!out.is_empty()).then_some(Value::Array(out))
         }
         m => mcp::handle(&s.k, &c, &lang, allow_write, &m).await,
     };

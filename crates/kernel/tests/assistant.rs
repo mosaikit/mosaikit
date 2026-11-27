@@ -11,7 +11,6 @@ use mosaikit_kernel::testing::{start, test_key, TestKernel};
 use mosaikit_kernel::{Caller, Kind};
 use serde_json::{json, Value};
 
-
 fn echo_wasm() -> Vec<u8> {
     wat::parse_str(
         r#"(module
@@ -140,14 +139,21 @@ async fn nothing_is_available_until_the_administrator_configures_a_provider() {
 #[tokio::test]
 async fn tools_are_the_kernel_ones_plus_the_declared_ones_of_the_plugins() {
     let w = world().await;
-    let anna: Vec<String> = assistant::list_tools(&w.t, &w.anna).await.unwrap().into_iter().map(|t| t.name).collect();
+    let anna: Vec<String> =
+        assistant::list_tools(&w.t, &w.anna).await.unwrap().into_iter().map(|t| t.name).collect();
     assert!(anna.contains(&"kernel__whoami".to_string()) && anna.contains(&"assist__read".to_string()));
     assert!(anna.contains(&"assist__make".to_string()));
     // the KPIs of the tenant are for the Manager
     assert!(!anna.contains(&"kernel__kpi_summary".to_string()));
-    let mgr: Vec<String> = assistant::list_tools(&w.t, &w.mgr).await.unwrap().into_iter().map(|t| t.name).collect();
+    let mgr: Vec<String> =
+        assistant::list_tools(&w.t, &w.mgr).await.unwrap().into_iter().map(|t| t.name).collect();
     assert!(mgr.contains(&"kernel__kpi_summary".to_string()));
-    let make = assistant::list_tools(&w.t, &w.anna).await.unwrap().into_iter().find(|t| t.name == "assist__make").unwrap();
+    let make = assistant::list_tools(&w.t, &w.anna)
+        .await
+        .unwrap()
+        .into_iter()
+        .find(|t| t.name == "assist__make")
+        .unwrap();
     assert!(make.write);
 }
 
@@ -164,10 +170,11 @@ async fn a_read_tool_runs_in_the_loop_as_the_person() {
     assert!(r.messages[1].content.contains("read_things") && r.messages[1].content.contains("wood"));
     assert!(r.messages[2].content.starts_with("Tool result:"));
     // the audit keeps the tool and the names of the arguments, not their values
-    let ev: Vec<Value> = mosaikit_db::query_scalar("select detail from core.events where action = 'assistant.tool'")
-        .fetch_all(&w.t.db)
-        .await
-        .unwrap();
+    let ev: Vec<Value> =
+        mosaikit_db::query_scalar("select detail from core.events where action = 'assistant.tool'")
+            .fetch_all(&w.t.db)
+            .await
+            .unwrap();
     assert_eq!(ev.len(), 1);
     assert_eq!(ev[0]["tool"], "assist__read");
     assert!(!ev[0].to_string().contains("wood"));
@@ -192,16 +199,20 @@ async fn a_write_tool_is_proposed_and_runs_only_when_confirmed() {
     assert_eq!(r.proposals[0].tool, "assist__make");
     // nothing ran: the assistant message is there, no tool result
     assert_eq!(r.messages.iter().filter(|m| m.role == "tool").count(), 0);
-    let run: i64 = mosaikit_db::query_scalar("select count(*) from core.events where action = 'assistant.tool'")
-        .fetch_one(&w.t.db)
-        .await
-        .unwrap();
+    let run: i64 =
+        mosaikit_db::query_scalar("select count(*) from core.events where action = 'assistant.tool'")
+            .fetch_one(&w.t.db)
+            .await
+            .unwrap();
     assert_eq!(run, 0);
     // the person confirms: the tool runs
-    let out = assistant::invoke(&w.t, &w.anna, "en", "assist__make", json!({"title": "a"}), true, "confirm").await.unwrap();
+    let out = assistant::invoke(&w.t, &w.anna, "en", "assist__make", json!({"title": "a"}), true, "confirm")
+        .await
+        .unwrap();
     assert!(out.to_string().contains("make_thing"));
     // a token that may not write is refused
-    let e = assistant::invoke(&w.t, &w.anna, "en", "assist__make", json!({}), false, "mcp").await.unwrap_err();
+    let e =
+        assistant::invoke(&w.t, &w.anna, "en", "assist__make", json!({}), false, "mcp").await.unwrap_err();
     assert_eq!(code(&e), "assistant_read_only");
 }
 
@@ -236,9 +247,13 @@ async fn a_bad_chat_is_refused() {
     for messages in [
         vec![],
         vec![Message { role: "system".into(), content: "x".into(), tool_calls: vec![], tool_call_id: None }],
-        vec![user("a"), Message { role: "assistant".into(), content: "b".into(), tool_calls: vec![], tool_call_id: None }],
+        vec![
+            user("a"),
+            Message { role: "assistant".into(), content: "b".into(), tool_calls: vec![], tool_call_id: None },
+        ],
     ] {
-        let e = assistant::chat(&w.t, &w.anna, "en", ChatRequest { messages, context: None }).await.unwrap_err();
+        let e =
+            assistant::chat(&w.t, &w.anna, "en", ChatRequest { messages, context: None }).await.unwrap_err();
         assert_eq!(code(&e), "assistant_bad_chat");
     }
 }
@@ -270,7 +285,10 @@ async fn the_key_is_sealed_and_a_manager_brings_one_only_when_the_administrator_
     // a custom address is for the Administrator
     let mut custom = mine.clone();
     custom.base_url = Some("http://localhost:11434".into());
-    assert_eq!(code(&assistant::settings::set_tenant(&w.t, &w.mgr, &custom).await.unwrap_err()), "base_url_admin_only");
+    assert_eq!(
+        code(&assistant::settings::set_tenant(&w.t, &w.mgr, &custom).await.unwrap_err()),
+        "base_url_admin_only"
+    );
     assistant::settings::set_tenant(&w.t, &w.mgr, &mine).await.unwrap();
     let alfa = assistant::settings::resolve(&w.t, w.mgr.tenant.tenant_id).await.unwrap().unwrap();
     assert_eq!((alfa.source, alfa.key.as_deref()), ("tenant", Some("sk-tenant")));
@@ -279,7 +297,10 @@ async fn the_key_is_sealed_and_a_manager_brings_one_only_when_the_administrator_
     assert_eq!((beta.source, beta.key.as_deref()), ("platform", Some("sk-platform-secret")));
     // the Manager removes theirs: the platform key applies again
     assistant::settings::clear_tenant(&w.t, &w.mgr).await.unwrap();
-    assert_eq!(assistant::settings::resolve(&w.t, w.mgr.tenant.tenant_id).await.unwrap().unwrap().source, "platform");
+    assert_eq!(
+        assistant::settings::resolve(&w.t, w.mgr.tenant.tenant_id).await.unwrap().unwrap().source,
+        "platform"
+    );
     // the provider names are checked
     let e = assistant::settings::set_platform(&w.t, &admin, &fake("nope")).await.unwrap_err();
     assert_eq!(e.kind, Kind::BadRequest);
@@ -300,7 +321,10 @@ async fn tokens_belong_to_one_person_and_one_tenant_and_can_be_revoked() {
     assert!(tokens::list(&w.t, &w.carl).await.unwrap().is_empty());
     assert_eq!(tokens::revoke(&w.t, &w.carl, t.info.id).await.unwrap_err().kind, Kind::NotFound);
     let (c, write, _) = tokens::authenticate(&w.t, &t.token).await.unwrap();
-    assert_eq!((c.user.user_id, c.tenant.tenant_id, write), (w.anna.user.user_id, w.anna.tenant.tenant_id, false));
+    assert_eq!(
+        (c.user.user_id, c.tenant.tenant_id, write),
+        (w.anna.user.user_id, w.anna.tenant.tenant_id, false)
+    );
     assert!(!c.user.is_system_admin);
     assert_eq!(tokens::authenticate(&w.t, "mska_nope").await.unwrap_err().kind, Kind::Unauthorized);
     assert_eq!(tokens::authenticate(&w.t, "not-a-token").await.unwrap_err().kind, Kind::Unauthorized);
@@ -316,9 +340,15 @@ async fn mcp_lists_and_calls_tools_and_keeps_a_read_only_token_from_writing() {
     assert_eq!(init["result"]["protocolVersion"], mcp::PROTOCOL_VERSION);
     assert!(init["result"]["instructions"].as_str().unwrap().contains("read-only"));
     // a notification has no answer
-    assert!(mcp::handle(&w.t, &w.anna, "en", false, &json!({ "jsonrpc": "2.0", "method": "notifications/initialized" }))
-        .await
-        .is_none());
+    assert!(mcp::handle(
+        &w.t,
+        &w.anna,
+        "en",
+        false,
+        &json!({ "jsonrpc": "2.0", "method": "notifications/initialized" })
+    )
+    .await
+    .is_none());
     let list = mcp::handle(&w.t, &w.anna, "en", false, &rpc("tools/list", json!({}))).await.unwrap();
     let tools = list["result"]["tools"].as_array().unwrap();
     let make = tools.iter().find(|t| t["name"] == "assist__make").unwrap();
@@ -356,17 +386,37 @@ async fn a_tool_on_a_resource_needs_no_code_and_runs_as_the_person() {
     let list = tools.iter().find(|t| t.name == "assist__items_list").unwrap();
     assert!(!list.write);
     // a read-only caller cannot add; the person who confirmed can
-    let e = assistant::invoke(&w.t, &w.anna, "en", "assist__items_add", json!({"title": "wood"}), false, "mcp").await.unwrap_err();
+    let e =
+        assistant::invoke(&w.t, &w.anna, "en", "assist__items_add", json!({"title": "wood"}), false, "mcp")
+            .await
+            .unwrap_err();
     assert_eq!(code(&e), "assistant_read_only");
-    let made = assistant::invoke(&w.t, &w.anna, "en", "assist__items_add", json!({"title": "wood"}), true, "confirm").await.unwrap();
+    let made = assistant::invoke(
+        &w.t,
+        &w.anna,
+        "en",
+        "assist__items_add",
+        json!({"title": "wood"}),
+        true,
+        "confirm",
+    )
+    .await
+    .unwrap();
     assert_eq!(made["values"]["title"], "wood");
-    let seen = assistant::invoke(&w.t, &w.anna, "en", "assist__items_list", json!({"q": "wood"}), false, "mcp").await.unwrap();
+    let seen =
+        assistant::invoke(&w.t, &w.anna, "en", "assist__items_list", json!({"q": "wood"}), false, "mcp")
+            .await
+            .unwrap();
     assert_eq!(seen["total"], 1);
     assert_eq!(seen["rows"][0]["values"]["title"], "wood");
     // another tenant sees nothing of it
-    let other = assistant::invoke(&w.t, &w.carl, "en", "assist__items_list", json!({}), false, "mcp").await.unwrap();
+    let other =
+        assistant::invoke(&w.t, &w.carl, "en", "assist__items_list", json!({}), false, "mcp").await.unwrap();
     assert_eq!(other["total"], 0);
     // a bad id is an error for the model, not a crash
-    let tools_update = assistant::invoke(&w.t, &w.anna, "en", "assist__items_add", json!({"title": 5}), true, "confirm").await.unwrap_err();
+    let tools_update =
+        assistant::invoke(&w.t, &w.anna, "en", "assist__items_add", json!({"title": 5}), true, "confirm")
+            .await
+            .unwrap_err();
     assert_eq!(code(&tools_update), "assistant_bad_args");
 }

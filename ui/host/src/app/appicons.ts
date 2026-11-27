@@ -5,7 +5,7 @@ import {
   ChartPie, ClipboardList, Clock, Cloud, Code, Database, FileText, Files, Folder, Gauge, Globe, Image, Inbox,
   Kanban, Landmark, Layers, LayoutDashboard, LayoutGrid, Link, List, ListChecks, Mail, Map, MapPin, MessageSquare,
   NotebookPen, Package, PenTool, Puzzle, Receipt, Route, Server, Settings, Share2, ShieldCheck, ShoppingCart,
-  SquareCheckBig, Star, Table, Tag, Truck, Users, Wallet, Wrench, Bookmark, CalendarDays, ClipboardCheck, FileInput, Languages, Megaphone, MessageCircle, Hash, Presentation, Video, Vote, type LucideIcon,
+  SquareCheckBig, Star, Table, Tag, Truck, Users, Wallet, Wrench, Bookmark, CalendarDays, ClipboardCheck, FileInput, Languages, Megaphone, MessageCircle, Hash, Presentation, Sparkles, Video, Vote, type LucideIcon,
 } from 'lucide-react'
 
 /** The names a manifest may use. */
@@ -68,6 +68,7 @@ export const ICONS: Record<string, LucideIcon> = {
   wrench: Wrench,
   megaphone: Megaphone,
   bookmark: Bookmark,
+  sparkles: Sparkles,
   'calendar-days': CalendarDays,
   'message-circle': MessageCircle,
   hash: Hash,

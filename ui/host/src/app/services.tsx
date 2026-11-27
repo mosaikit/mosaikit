@@ -53,7 +53,7 @@ export function UiServices({ children }: { children: ReactNode }) {
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>{t('Confirm')}</AlertDialogTitle>
-              <AlertDialogDescription>{ask?.message}</AlertDialogDescription>
+              <AlertDialogDescription className="break-words whitespace-pre-wrap">{ask?.message}</AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel onClick={() => close(false)}>{t('Cancel')}</AlertDialogCancel>

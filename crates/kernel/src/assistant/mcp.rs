@@ -64,8 +64,14 @@ pub async fn handle(k: &Kernel, c: &Caller, lang: &str, allow_write: bool, msg: 
             }
             // a failed tool is a result with `isError`, not a protocol error: the model can read it and go on
             match super::invoke(k, c, lang, name, args, allow_write, "mcp").await {
-                Ok(v) => rpc_ok(&id, json!({ "content": [{ "type": "text", "text": super::tools::clip(&v) }], "isError": false })),
-                Err(e) => rpc_ok(&id, json!({ "content": [{ "type": "text", "text": e.to_string() }], "isError": true })),
+                Ok(v) => rpc_ok(
+                    &id,
+                    json!({ "content": [{ "type": "text", "text": super::tools::clip(&v) }], "isError": false }),
+                ),
+                Err(e) => rpc_ok(
+                    &id,
+                    json!({ "content": [{ "type": "text", "text": e.to_string() }], "isError": true }),
+                ),
             }
         }
         other => rpc_err(&id, -32601, &format!("method not found: {other}")),

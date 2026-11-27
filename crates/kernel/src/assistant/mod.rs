@@ -96,12 +96,21 @@ pub struct Status {
     pub model: Option<String>,
     /// `platform` or `tenant`
     pub source: Option<&'static str>,
+    /// the address of the MCP server of this tenant, with the base path of the installation
+    pub mcp_url: String,
 }
 
 pub async fn status(k: &Kernel, c: &Caller) -> Result<Status> {
+    let mcp_url = format!("{}/api/t/{}/mcp", k.cfg.url.trim_end_matches('/'), c.tenant.slug);
     Ok(match settings::resolve(k, c.tenant.tenant_id).await? {
-        Some(r) => Status { available: true, provider: Some(r.provider), model: Some(r.model), source: Some(r.source) },
-        None => Status { available: false, provider: None, model: None, source: None },
+        Some(r) => Status {
+            available: true,
+            provider: Some(r.provider),
+            model: Some(r.model),
+            source: Some(r.source),
+            mcp_url,
+        },
+        None => Status { available: false, provider: None, model: None, source: None, mcp_url },
     })
 }
 
@@ -122,7 +131,11 @@ fn validate(messages: &[Message]) -> Result<Vec<Message>> {
     for m in messages {
         match m.role.as_str() {
             "user" | "assistant" | "tool" => {}
-            _ => return Err(Error::bad("a message role is user, assistant or tool").with_code("assistant_bad_chat")),
+            _ => {
+                return Err(
+                    Error::bad("a message role is user, assistant or tool").with_code("assistant_bad_chat")
+                )
+            }
         }
         let mut m = m.clone();
         if m.role != "assistant" {
@@ -136,7 +149,8 @@ fn validate(messages: &[Message]) -> Result<Vec<Message>> {
     }
     repair(&mut out);
     if out.last().is_some_and(|m| m.role == "assistant" && m.tool_calls.is_empty()) {
-        return Err(Error::bad("the last message must be from the person or a tool result").with_code("assistant_bad_chat"));
+        return Err(Error::bad("the last message must be from the person or a tool result")
+            .with_code("assistant_bad_chat"));
     }
     Ok(out)
 }
@@ -198,8 +212,11 @@ pub async fn chat(k: &Kernel, c: &Caller, lang: &str, req: ChatRequest) -> Resul
         .ok_or_else(|| Error::bad("the assistant is not configured").with_code("assistant_off"))?;
     let mut history = validate(&req.messages)?;
     if !k.limiter.hit(&format!("assistant:{}", c.user.user_id), cfg.hourly_limit, Duration::from_secs(3600)) {
-        return Err(Error::new(Kind::TooMany, "you reached the hourly limit of the assistant: try again later")
-            .with_code("assistant_rate_limited"));
+        return Err(Error::new(
+            Kind::TooMany,
+            "you reached the hourly limit of the assistant: try again later",
+        )
+        .with_code("assistant_rate_limited"));
     }
     let registry = tools::registry(k, c).await?;
     let specs: Vec<ToolSpec> = registry.iter().map(|t| t.spec.clone()).collect();
@@ -227,9 +244,10 @@ pub async fn chat(k: &Kernel, c: &Caller, lang: &str, req: ChatRequest) -> Resul
         for call in &done.tool_calls {
             let tool = registry.iter().find(|t| t.spec.name == call.name);
             let content = match tool {
-                None => {
-                    failure(&Error::not_found(format!("unknown tool '{}': use only the tools you are given", call.name)))
-                }
+                None => failure(&Error::not_found(format!(
+                    "unknown tool '{}': use only the tools you are given",
+                    call.name
+                ))),
                 Some(t) if t.spec.write => {
                     proposals.push(Proposal {
                         call_id: call.id.clone(),
@@ -248,7 +266,12 @@ pub async fn chat(k: &Kernel, c: &Caller, lang: &str, req: ChatRequest) -> Resul
                     }
                 }
             };
-            let t = Message { role: "tool".into(), content, tool_calls: Vec::new(), tool_call_id: Some(call.id.clone()) };
+            let t = Message {
+                role: "tool".into(),
+                content,
+                tool_calls: Vec::new(),
+                tool_call_id: Some(call.id.clone()),
+            };
             history.push(t.clone());
             new.push(t);
         }
@@ -306,12 +329,12 @@ pub async fn invoke(
     via: &str,
 ) -> Result<Value> {
     let registry = tools::registry(k, c).await?;
-    let tool = registry
-        .iter()
-        .find(|t| t.spec.name == name)
-        .ok_or_else(|| Error::not_found(format!("unknown tool '{name}'")).with_code("assistant_unknown_tool"))?;
+    let tool = registry.iter().find(|t| t.spec.name == name).ok_or_else(|| {
+        Error::not_found(format!("unknown tool '{name}'")).with_code("assistant_unknown_tool")
+    })?;
     if tool.spec.write && !allow_write {
-        return Err(Error::forbidden("this tool changes data and this token is read-only").with_code("assistant_read_only"));
+        return Err(Error::forbidden("this tool changes data and this token is read-only")
+            .with_code("assistant_read_only"));
     }
     let r = tools::run(k, c, lang, tool, args.clone()).await;
     audit(k, c, name, &args, r.is_ok(), via).await;

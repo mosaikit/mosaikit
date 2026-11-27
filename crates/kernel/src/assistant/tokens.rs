@@ -45,7 +45,7 @@ fn info(r: &mosaikit_db::Row) -> TokenInfo {
 const COLUMNS: &str = "id, name, allow_write, expires_at, last_used_at, created_at";
 
 pub async fn list(k: &Kernel, c: &Caller) -> Result<Vec<TokenInfo>> {
-    let rows = mosaikit_db::query(&format!(
+    let rows = mosaikit_db::query(format!(
         "select {COLUMNS} from core.api_tokens
          where user_id = $1 and tenant_id = $2 and revoked_at is null and (expires_at is null or expires_at > now())
          order by created_at desc"
@@ -73,11 +73,13 @@ pub async fn create(
     }
     let alive = list(k, c).await?.len() as i64;
     if alive >= MAX_ACTIVE {
-        return Err(Error::new(Kind::TooMany, "too many tokens: revoke some").with_code("assistant_too_many_tokens"));
+        return Err(
+            Error::new(Kind::TooMany, "too many tokens: revoke some").with_code("assistant_too_many_tokens")
+        );
     }
     let token = format!("{PREFIX}{}", random_token(24));
     let id = Uuid::new_v4();
-    let row = mosaikit_db::query(&format!(
+    let row = mosaikit_db::query(format!(
         "insert into core.api_tokens (id, token_hash, user_id, tenant_id, name, allow_write, expires_at)
          values ($1, $2, $3, $4, $5, $6, case when $7::int is null then null else now() + make_interval(days => $7::int) end)
          returning {COLUMNS}"
@@ -146,9 +148,11 @@ pub async fn authenticate(k: &Kernel, token: &str) -> Result<(Caller, bool, Uuid
     .fetch_optional(&k.db)
     .await?
     .ok_or_else(bad)?;
-    let (id, user, tenant, write): (Uuid, Uuid, Uuid, bool) = (row.get(0), row.get(1), row.get(2), row.get(3));
+    let (id, user, tenant, write): (Uuid, Uuid, Uuid, bool) =
+        (row.get(0), row.get(1), row.get(2), row.get(3));
     if !k.limiter.hit(&format!("mcp:{id}"), 600, std::time::Duration::from_secs(60)) {
-        return Err(Error::new(Kind::TooMany, "too many requests: try again in a minute").with_code("assistant_rate_limited"));
+        return Err(Error::new(Kind::TooMany, "too many requests: try again in a minute")
+            .with_code("assistant_rate_limited"));
     }
     let c = crate::run_tickets::caller_for(k, user, tenant).await.map_err(|_| bad())?;
     let _ = mosaikit_db::query("update core.api_tokens set last_used_at = now() where id = $1")
