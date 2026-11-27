@@ -5,6 +5,7 @@
 //! never run by the loop: it comes back as a proposal and the person confirms it (`invoke`).
 
 pub mod mcp;
+pub mod oauth;
 pub mod provider;
 pub mod settings;
 pub mod tokens;
@@ -21,6 +22,11 @@ use crate::{events, Caller, Error, Kernel, Kind, Result};
 pub const MAX_MESSAGES: usize = 120;
 pub const MAX_CHARS: usize = 200_000;
 pub const MAX_STEPS: usize = 8;
+
+/// A fixed-window limit on `key` (the public endpoints of OAuth count by address); `false` once `max` uses are spent.
+pub fn rate_limit(k: &Kernel, key: &str, max: u32, window: Duration) -> bool {
+    k.limiter.hit(key, max, window)
+}
 
 /// The fake provider answers without a model: development and tests only.
 pub fn fake_allowed(k: &Kernel) -> bool {

@@ -13,6 +13,7 @@ mod comments_api;
 mod dev_api;
 pub mod fake_idp;
 mod history_api;
+mod oauth_mcp_api;
 mod oidc_api;
 mod ops_api;
 mod pages;

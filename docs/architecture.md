@@ -2157,13 +2157,31 @@ characters; a tool result is cut at 20,000 characters. The audit (`core.events`)
 one person, one tenant, an optional expiry, `allow_write` off by default, at most 20 live, 600 calls a minute), made by the person in
 the plugin and shown once. A token opens only its tenant, never has Administrator powers, and a tool that writes is refused to a
 read-only token (the tools carry `readOnlyHint` and `destructiveHint`). There is no cookie, so no CSRF. Claude Desktop connects to a
-remote server as a connector, or through the `mcp-remote` bridge: the plugin writes the `claude_desktop_config.json` snippet.
+remote server as a connector (OAuth, below), or through the `mcp-remote` bridge with a token: the plugin writes the
+`claude_desktop_config.json` snippet.
+
+**OAuth for MCP.** A client that knows only the address of the server connects without a token made by hand (OAuth 2.1, one
+authorization server per tenant, `oauth_mcp_api.rs` and `assistant/oauth.rs`). A `401` of the MCP endpoint carries
+`WWW-Authenticate: Bearer resource_metadata="…"` (RFC 9728); the metadata names the authorization server (RFC 8414:
+`/.well-known/oauth-protected-resource/api/t/{t}/mcp` and `/.well-known/oauth-authorization-server/api/t/{t}/oauth`; under a base
+path the proxy must also answer them at the root of the host). The client registers itself (`POST .../oauth/register`, RFC 7591:
+public client, `https` or local `http` addresses only, at most 30 registrations an hour per address), sends the person to
+`.../oauth/authorize` (PKCE `S256` required) and exchanges the code at `.../oauth/token`. Because the session cookie is
+`SameSite=Strict`, `/authorize` needs no session: it shows who asks and a link, and the click (same site) brings the cookie to the
+page where the person chooses *Allow* or *Deny* and whether the client may change data (a form with the CSRF token of the session,
+no script, no framing). The code lives five minutes and works once, also when the verifier is wrong. The access token is a row of
+`core.api_tokens` named «<client> (OAuth)», one hour long, with a refresh token of 30 days replaced at every use; the person sees and
+revokes it with the others (revoking ends the refresh). Tables: `core.oauth_clients`, `core.oauth_grants`.
 
 **Bridge.** `msk.assistant` in the plugin API; the host lets only the plugin `com.mosaikit.ai-assistant` use the operations
 (`ASSISTANT_PLUGIN` in `ui/host/src/bridge.ts`).
 
-**Not yet.** Streaming of the answer (the loop answers when done), OAuth for MCP (a token only), a token budget per tenant (a request
-limit only), tools on `delete`.
+**Streaming.** `POST .../assistant/chat/stream` answers with server-sent events: `delta` (a piece of the text), `message` (a message
+the loop added), `tool` (a tool is about to run), then `done` (the body of `chat`) or `error`. The shell reads the stream
+(`apiStream`) and hands the events to the page (`assistant.event`); `msk.assistant.chatStream` in the plugin API. Anthropic and
+OpenAI-compatible servers are read as they send (`OpenAiStream`, `AnthropicStream`); the test provider writes a word at a time.
+
+**Not yet.** A token budget per tenant (a request limit only), tools on `delete`, translated texts in the pages of the OAuth consent.
 
 ## 9. Web security: origins, cookies, CSP
 

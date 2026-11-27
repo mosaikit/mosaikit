@@ -185,10 +185,28 @@ async fn mcp_post(
     h: HeaderMap,
     body: Bytes,
 ) -> ApiResult<Response> {
-    let token = bearer(&h).ok_or_else(|| {
-        ApiError(Error::unauthorized("a personal access token is required (Authorization: Bearer mska_...)"))
-    })?;
-    let (c, allow_write, _) = tokens::authenticate(&s.k, token).await?;
+    // a client that is not signed in is told where to find the authorization server (RFC 9728), so it can start the OAuth flow
+    let challenge = |msg: &str| {
+        let mut res =
+            (StatusCode::UNAUTHORIZED, Json(json!({ "error": msg, "code": "assistant_bad_token" })))
+                .into_response();
+        let v =
+            format!("Bearer resource_metadata=\"{}\"", crate::oauth_mcp_api::resource_metadata_url(&s, &t));
+        if let Ok(v) = header::HeaderValue::from_str(&v) {
+            res.headers_mut().insert(header::WWW_AUTHENTICATE, v);
+        }
+        res
+    };
+    let Some(token) = bearer(&h) else {
+        return Ok(challenge(
+            "a personal access token or an OAuth token is required (Authorization: Bearer ...)",
+        ));
+    };
+    let (c, allow_write, _) = match tokens::authenticate(&s.k, token).await {
+        Ok(x) => x,
+        Err(e) if e.kind == Kind::Unauthorized => return Ok(challenge("invalid or expired token")),
+        Err(e) => return Err(e.into()),
+    };
     // a token opens the tenant it was made in, whatever the address says
     if c.tenant.slug != t {
         return Err(ApiError(Error::new(Kind::Forbidden, "this token is for another tenant")));
