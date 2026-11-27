@@ -2274,4 +2274,6 @@ export const IT: Record<string, string> = {
   'Write the name of the model (for example {name}).': 'Scrivi il nome del modello (per esempio {name}).',
   'Write the address of the server (for example {name}).': 'Scrivi l’indirizzo del server (per esempio {name}).',
   'e.g. {name}': 'es. {name}',
+  'Choose the provider.': 'Scegli il provider.',
+  'Choose the provider': 'Scegli il provider',
 }
