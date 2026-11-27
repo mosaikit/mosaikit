@@ -302,6 +302,29 @@ A failed push, a failed run or a timeout counts as a failure: the next run is br
 when that is sooner than the timetable, and after 5 failures in a row the schedule is paused. A run that is missed because the kernel was
 down is skipped, unless the schedule was registered with `catch_up_once`: then it runs once.
 
+## `[[assistant_tools]]` and `[assistant]`
+
+Tools the AI assistant and the MCP server may call for the plugin (at most 16). A tool points to a command of the
+plugin logic and runs with the rights of the person (role, ACL, RLS), never more. The texts are for the model: write
+them in English, they are not translated. Offered to the model as `<plugin short name>__<name>`.
+
+```toml
+[[assistant_tools]]
+name = "search"                      # identifier, unique in the plugin
+description = "Finds notes by text"  # what it does and when to use it (at most 600 characters)
+command = "search_notes"             # a command of the plugin logic
+input_schema = { type = "object", properties = { q = { type = "string" } }, required = ["q"] }
+
+[[assistant_tools]]
+name = "create"
+description = "Creates a note"
+command = "create_note"
+write = true                         # the person confirms before it runs; an MCP token needs writes turned on
+
+[assistant]
+prompt = "Notes are markdown; tags are lower case."   # domain context, at most 2000 characters
+```
+
 ## `[search]`
 
 `command = "<name>"`: a command of the logic (a plain identifier, no dots) that adds results to the search of the

@@ -23,7 +23,7 @@ through an MCP server.
 
 Each phase ends with its checks and a commit.
 
-**P1. Manifest.** `[[assistant_tools]]` (name, description, command, input_schema, write, i18n) and `[assistant] prompt`
+**P1. Manifest.** `[[assistant_tools]]` (name, description, command, input_schema, write; the texts are for the model, English, not translated) and `[assistant] prompt`
 in `crates/mskp`; limits (16 tools, name pattern, schema is a JSON object); docs in `docs/devkit/manifest.md`.
 
 **P2. Kernel core.** Migrations (Postgres and SQLite) for `assistant_settings` and `api_tokens`. Module
