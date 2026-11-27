@@ -181,6 +181,56 @@ pub fn resource_schema(d: &ResourceDecl, action: AssistantAction) -> Value {
     json!({ "type": "object", "properties": props, "required": required })
 }
 
+/// Tools a small model (the OpenAI-compatible servers: Ollama, vLLM, LM Studio) is given at once: with fifty it invents names and
+/// forgets the arguments.
+pub const MAX_LOCAL_TOOLS: usize = 14;
+
+fn stems(text: &str) -> std::collections::HashSet<String> {
+    text.to_lowercase()
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|w| w.chars().count() >= 3)
+        // the first three letters: «nota» finds «note», «crea» finds «create», in the language of the person or in English
+        .map(|w| w.chars().take(3).collect())
+        .collect()
+}
+
+/// The tools to offer for this chat: all of them when they are few; otherwise the ones of the kernel, the ones already used in the
+/// chat, and the ones whose name or description share words with the last question (the first three letters count), best first.
+/// The loop still runs any tool of the registry that the model names.
+pub fn select(all: &[ToolSpec], last_question: &str, used: &[String], max: usize) -> Vec<ToolSpec> {
+    if all.len() <= max {
+        return all.to_vec();
+    }
+    let want = stems(last_question);
+    let mut keep: Vec<usize> = (0..all.len())
+        .filter(|&i| all[i].name.starts_with("kernel__") || used.contains(&all[i].name))
+        .collect();
+    let mut scored: Vec<(usize, usize)> = (0..all.len())
+        .filter(|i| !keep.contains(i))
+        .map(|i| {
+            let have = stems(&format!(
+                "{} {}",
+                all[i].name.replace("__", " ").replace('_', " "),
+                all[i].description
+            ));
+            (want.intersection(&have).count(), i)
+        })
+        .collect();
+    // most shared words first; the same score keeps the order of the registry
+    scored.sort_by(|a, b| b.0.cmp(&a.0).then(a.1.cmp(&b.1)));
+    for (score, i) in scored {
+        if keep.len() >= max {
+            break;
+        }
+        // with no word in common a tool is only a guess: reads come first, so the model can look before it writes
+        if score > 0 || !all[i].write {
+            keep.push(i);
+        }
+    }
+    keep.sort_unstable();
+    keep.into_iter().map(|i| all[i].clone()).collect()
+}
+
 /// Checks the arguments against the simple parts of the schema (an object, the required keys, the basic types).
 /// The command of the plugin validates the rest.
 pub fn check_args(schema: &Value, args: &Value) -> Result<()> {
@@ -312,6 +362,35 @@ mod tests {
         assert!(check_args(&s, &json!({ "n": 2 })).is_err());
         assert!(check_args(&s, &json!({ "q": 1 })).is_err());
         assert!(check_args(&s, &json!("x")).is_err());
+    }
+
+    #[test]
+    fn a_small_model_gets_the_tools_of_the_question() {
+        let spec = |n: &str, d: &str, w: bool| ToolSpec {
+            name: n.into(),
+            description: d.into(),
+            input_schema: json!({}),
+            write: w,
+        };
+        let mut all = vec![
+            spec("kernel__whoami", "Who is asking", false),
+            spec("kernel__search", "Full-text search", false),
+        ];
+        for p in ["notes", "tasks", "contacts", "polls", "forms", "maps", "meet", "snippets"] {
+            all.push(spec(&format!("{p}__list_{p}"), &format!("Lists the {p}"), false));
+            all.push(spec(&format!("{p}__create_{p}"), &format!("Creates an item of {p}"), true));
+        }
+        // few tools: all of them
+        assert_eq!(select(&all, "x", &[], 100).len(), all.len());
+        // «crea una nota» (Italian) finds the notes tools through «not» and «cre»
+        let got = select(&all, "crea una nota con il verbale", &[], 6);
+        let names: Vec<&str> = got.iter().map(|t| t.name.as_str()).collect();
+        assert!(names.contains(&"notes__create_notes") && names.contains(&"kernel__whoami"), "{names:?}");
+        assert!(got.len() <= 6);
+        // what the chat already used stays, and a write with no word in common is not a guess
+        let got = select(&all, "tutto bene?", &["polls__create_polls".to_string()], 6);
+        assert!(got.iter().any(|t| t.name == "polls__create_polls"));
+        assert!(!got.iter().any(|t| t.write && t.name != "polls__create_polls"));
     }
 
     #[test]

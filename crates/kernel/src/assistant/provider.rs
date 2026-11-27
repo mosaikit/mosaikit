@@ -9,7 +9,8 @@ use super::settings::Resolved;
 use super::{Completion, Message, ToolCall, ToolSpec};
 use crate::{Error, Kernel, Result};
 
-const TIMEOUT: Duration = Duration::from_secs(120);
+/// A local model on a CPU can take minutes for a long answer.
+const TIMEOUT: Duration = Duration::from_secs(300);
 const MAX_TOKENS: u32 = 4096;
 
 /// Where the pieces of the answer go as they arrive (a streamed answer); `None`: the answer comes whole.
@@ -46,6 +47,10 @@ fn upstream(status: reqwest::StatusCode, body: &str) -> Error {
 }
 
 fn net(e: reqwest::Error) -> Error {
+    if e.is_timeout() {
+        return Error::internal("the language model did not answer in time (5 minutes): try a smaller model or a shorter question")
+            .with_code("assistant_timeout");
+    }
     Error::internal(format!("the language model is not reachable: {e}")).with_code("assistant_unreachable")
 }
 

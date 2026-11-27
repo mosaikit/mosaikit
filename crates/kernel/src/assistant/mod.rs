@@ -250,6 +250,10 @@ pub async fn chat_with(
     }
     let registry = tools::registry(k, c).await?;
     let specs: Vec<ToolSpec> = registry.iter().map(|t| t.spec.clone()).collect();
+    // a small model (OpenAI-compatible servers) is given the tools of the question, not fifty: the registry still runs any it names
+    let narrow = cfg.provider == "openai_compatible";
+    let question =
+        history.iter().rev().find(|m| m.role == "user").map(|m| m.content.clone()).unwrap_or_default();
     let system = system_prompt(k, c, &req.context).await?;
     let mut new: Vec<Message> = Vec::new();
     let mut proposals: Vec<Proposal> = Vec::new();
@@ -257,12 +261,19 @@ pub async fn chat_with(
     let mut stopped = true;
     for _ in 0..MAX_STEPS {
         let delta = emit.map(|e| move |t: &str| e(Event::Delta { text: t.to_string() }));
+        let offered = if narrow {
+            let used: Vec<String> =
+                history.iter().flat_map(|m| m.tool_calls.iter().map(|c| c.name.clone())).collect();
+            tools::select(&specs, &question, &used, tools::MAX_LOCAL_TOOLS)
+        } else {
+            specs.clone()
+        };
         let done = provider::complete(
             k,
             &cfg,
             &system,
             &history,
-            &specs,
+            &offered,
             delta.as_ref().map(|d| d as &(dyn Fn(&str) + Send + Sync)),
         )
         .await?;
