@@ -2,7 +2,7 @@
 // `com.mosaikit.ai-assistant`. The icon is there only when the plugin is on in the tenant and the Administrator
 // has set a provider. The state (open or not) is kept outside React, like the comments, so the icon and the panel share it.
 
-import { useEffect, useSyncExternalStore } from 'react'
+import { useEffect } from 'react'
 import { Sparkles, X } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { api, enc } from '../api.ts'
@@ -11,25 +11,12 @@ import PluginFrame from '../components/PluginFrame.tsx'
 import type { Route } from './router.ts'
 import type { Session } from '../types.ts'
 import { cn } from '@/lib/utils'
+import { closeAssistant, toggleAssistant, useAssistantOpen } from './assistant-state.ts'
 import { useTenantCtx } from './core.ts'
 import { t, useLang } from './i18n.ts'
 import { effectiveMode, useTheme } from './theme.ts'
 
 export const ASSISTANT_PANEL_ID = 'msk-assistant-panel'
-
-let open = false
-const listeners = new Set<() => void>()
-const publish = (v: boolean) => {
-  open = v
-  listeners.forEach((l) => l())
-}
-export const toggleAssistant = () => publish(!open)
-export const closeAssistant = () => publish(false)
-const subscribe = (l: () => void) => {
-  listeners.add(l)
-  return () => void listeners.delete(l)
-}
-export const useAssistantOpen = () => useSyncExternalStore(subscribe, () => open)
 
 /** The assistant is offered in a tenant when its plugin is on there and a provider is set. */
 function useAssistantAvailable(route: Route) {
