@@ -8,6 +8,7 @@ import { pickOptions, sharePre } from './sharepre.ts'
 import { pageTextsFor, t } from '../app/i18n.ts'
 import { timed } from '../app/devlog.ts'
 import { pluginInput, watchPresence } from '../app/presence.ts'
+import { closeAssistant } from '../app/assistant-state.ts'
 import { NAV_RESELECT, resetBand, sanitizeBand, setBand } from '../app/contextband.ts'
 import ExtensionTab, { type TabState } from './ExtensionTab.tsx'
 
@@ -246,6 +247,12 @@ export default function PluginFrame({ plugin, session, ctx, reloadKey, ui: shell
             reply({ ok: null })
             return
           }
+          // the page of the assistant panel asks to close it (Escape pressed inside the frame)
+          case 'assistant.close':
+            if (plugin.id !== ASSISTANT_PLUGIN) throw new OpError('this plugin may not use the assistant', 'forbidden')
+            closeAssistant()
+            reply({ ok: null })
+            return
           // a tool of the assistant that changes data: the HOST asks the person, whatever the page of the plugin showed
           case 'assistant.call': {
             if (plugin.id !== ASSISTANT_PLUGIN) throw new OpError('this plugin may not use the assistant', 'forbidden')

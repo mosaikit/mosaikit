@@ -377,6 +377,7 @@ export class Msk {
   /** The AI assistant of the kernel (see `AssistantApi`); only the plugin `com.mosaikit.ai-assistant` may use it. */
   readonly assistant: AssistantApi = {
     status: () => this.bridge.call<AssistantStatus>('assistant.status', {}),
+    close: () => this.bridge.call<void>('assistant.close', {}),
     tools: () => this.bridge.call<AssistantTool[]>('assistant.tools', {}),
     chat: (messages: AssistantMessage[], context?: unknown) =>
       this.bridge.call<AssistantChatResult>('assistant.chat', { messages, context }),

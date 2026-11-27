@@ -795,6 +795,8 @@ export interface AssistantSettingsInput {
  */
 export interface AssistantApi {
   status(): Promise<AssistantStatus>
+  /** Closes the side panel of the shell that shows this page (for Escape pressed inside the frame). */
+  close(): Promise<void>
   tools(): Promise<AssistantTool[]>
   chat(messages: AssistantMessage[], context?: unknown): Promise<AssistantChatResult>
   call(name: string, args: unknown): Promise<{ result: unknown } | { cancelled: true }>
