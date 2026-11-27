@@ -99,7 +99,10 @@ test.describe.serial('AI assistant', () => {
     await expect(frame.locator('.as-msg.bot').last()).toContainText('AIA note')
     // the note exists, as the person
     await page.getByTestId('assistant-panel').getByRole('button', { name: 'Close the assistant' }).click()
-    await page.locator('[data-sidebar="sidebar"]').getByRole('link', { name: 'Notes', exact: true }).click()
+    // by the address: after the specs on the navigation the link of the app may sit in a group that is folded
+    await page.evaluate(() => {
+      window.location.hash = '#/t/alfa/p/com.mosaikit.notes'
+    })
     await expect(page.frameLocator('#main iframe.plugin-frame').getByText('AIA note').first()).toBeVisible()
   })
 
