@@ -50,7 +50,7 @@ label = "Информация"
 id = "work"
 label = "Work"
 icon = "briefcase"
-plugins = ["com.mosaikit.tasks", "com.mosaikit.projects", "com.mosaikit.calendar", "com.mosaikit.dashboard", "com.mosaikit.maps", "com.mosaikit.ai-assistant"]
+plugins = ["com.mosaikit.tasks", "com.mosaikit.projects", "com.mosaikit.calendar", "com.mosaikit.dashboard", "com.mosaikit.maps"]
 [nav_groups.i18n.it]
 label = "Lavoro"
 [nav_groups.i18n.es]
