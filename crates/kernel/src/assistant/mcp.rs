@@ -39,7 +39,7 @@ pub async fn handle(k: &Kernel, c: &Caller, lang: &str, allow_write: bool, msg: 
             }),
         ),
         "ping" => rpc_ok(&id, json!({})),
-        "tools/list" => match super::list_tools(k, c).await {
+        "tools/list" => match super::list_tools(k, c, lang).await {
             Ok(tools) => {
                 let list: Vec<Value> = tools
                     .iter()

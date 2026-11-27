@@ -303,7 +303,7 @@ export default function PluginFrame({ plugin, session, ctx, reloadKey, ui: shell
               /* the preview then has the names of the fields */
             }
             const short = name.split('__')[0] ?? ''
-            const appName = ctx.plugins.find((p) => p.id.endsWith(`.${short}`))?.name ?? (short ? short[0]!.toUpperCase() + short.slice(1) : '')
+            const appName = tool?.app || ctx.plugins.find((p) => p.id.endsWith(`.${short}`))?.name || (short ? short[0]!.toUpperCase() + short.slice(1) : '')
             const pv = previewOf(tool, name, m.args?.arguments, shell?.lang ?? 'en', appName)
             if (!(await ui.confirmAction({ title: pv.title, lead: pv.lead, app: pv.app, rows: pv.rows, confirm: t('Confirm') }))) {
               reply({ ok: { cancelled: true } })

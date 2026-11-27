@@ -7,7 +7,7 @@ use serde_json::{json, Value};
 
 use mosaikit_mskp::{AssistantAction, FieldKind, ResourceDecl};
 
-use super::ToolSpec;
+use super::{FieldLabel, ToolSpec};
 use crate::{Caller, Error, Kernel, Result};
 
 /// Longest result given back to the model, in characters.
@@ -46,6 +46,7 @@ fn kernel_tool(name: &str, description: &str, schema: Value) -> Tool {
             description: description.to_string(),
             input_schema: schema,
             write: false,
+            ..Default::default()
         },
         target: Target::Kernel,
     }
@@ -87,7 +88,7 @@ fn kernel_tools(c: &Caller) -> Vec<Tool> {
 }
 
 /// Every tool the person may use now, with the name the model sees.
-pub async fn registry(k: &Kernel, c: &Caller) -> Result<Vec<Tool>> {
+pub async fn registry(k: &Kernel, c: &Caller, lang: &str) -> Result<Vec<Tool>> {
     let mut tools = kernel_tools(c);
     let on: HashSet<String> = crate::plugins::tenants::on_in(k, c.tenant.tenant_id).await?;
     let mut seen: HashSet<String> = tools.iter().map(|t| t.spec.name.clone()).collect();
@@ -104,6 +105,29 @@ pub async fn registry(k: &Kernel, c: &Caller) -> Result<Vec<Tool>> {
             let name = format!("{}__{}", short_name(&p.id), t.name);
             if !seen.insert(name.clone()) {
                 continue;
+            }
+            // the names the person reads, in their language (the manifest the way the shell shows it)
+            let shown = p.manifest.localized(lang);
+            let mut display = (shown.name.clone(), String::new(), String::new(), Vec::new());
+            if let (Some(res), Some(action)) = (&t.resource, t.action) {
+                if let Some(d) = shown.resources.iter().find(|d| &d.name == res) {
+                    display.1 = if d.label.is_empty() { d.name.clone() } else { d.label.clone() };
+                    display.3 = d
+                        .fields
+                        .iter()
+                        .filter(|f| !f.hidden)
+                        .map(|f| FieldLabel {
+                            key: f.key.clone(),
+                            label: if f.label.is_empty() { f.key.clone() } else { f.label.clone() },
+                        })
+                        .collect();
+                }
+                display.2 = match action {
+                    AssistantAction::List => "list",
+                    AssistantAction::Create => "create",
+                    AssistantAction::Update => "update",
+                }
+                .to_string();
             }
             let (target, schema) = match (&t.command, &t.resource, t.action) {
                 (Some(command), _, _) => (
@@ -125,6 +149,10 @@ pub async fn registry(k: &Kernel, c: &Caller) -> Result<Vec<Tool>> {
                     description: t.description.clone(),
                     input_schema: schema,
                     write: t.is_write(),
+                    app: display.0,
+                    subject: display.1,
+                    verb: display.2,
+                    fields: display.3,
                 },
                 target,
             });

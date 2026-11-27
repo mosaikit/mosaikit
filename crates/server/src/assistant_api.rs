@@ -84,8 +84,8 @@ async fn status(State(s): State<AppState>, Tenant(c): Tenant) -> ApiResult<Json<
     Ok(Json(json!(assistant::status(&s.k, &c).await?)))
 }
 
-async fn tools(State(s): State<AppState>, Tenant(c): Tenant) -> ApiResult<Json<Value>> {
-    Ok(Json(json!(assistant::list_tools(&s.k, &c).await?)))
+async fn tools(State(s): State<AppState>, Tenant(c): Tenant, h: HeaderMap) -> ApiResult<Json<Value>> {
+    Ok(Json(json!(assistant::list_tools(&s.k, &c, &request_lang(&h)).await?)))
 }
 
 async fn chat(
