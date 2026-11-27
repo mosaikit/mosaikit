@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Loader2 } from 'lucide-react'
-import { channelName, checkPluginApi, errorReply, execute, OpError, routeOp, safePage, SHELL_API, themeVars, uuid } from '../bridge.ts'
+import { ASSISTANT_PLUGIN, channelName, checkPluginApi, errorReply, execute, OpError, routeOp, safePage, SHELL_API, themeVars, toolName, uuid } from '../bridge.ts'
 import type { PluginView, Session, TenantContext } from '../types.ts'
 import { appUrl, enc } from '../api.ts'
 import { useUi } from '../ui-context.ts'
@@ -244,6 +244,18 @@ export default function PluginFrame({ plugin, session, ctx, reloadKey, ui: shell
             if (!ctx.plugins.some((x) => x.id === target)) throw new OpError('plugin not available', 'not_found')
             ui.open(target, place || undefined)
             reply({ ok: null })
+            return
+          }
+          // a tool of the assistant that changes data: the HOST asks the person, whatever the page of the plugin showed
+          case 'assistant.call': {
+            if (plugin.id !== ASSISTANT_PLUGIN) throw new OpError('this plugin may not use the assistant', 'forbidden')
+            const name = toolName(m.args?.name)
+            const shown = JSON.stringify(m.args?.arguments ?? {}, null, 2).slice(0, 600)
+            if (!(await ui.confirm(`${t('Run this action of the assistant?')}\n\n${name}\n${shown}`, false))) {
+              reply({ ok: { cancelled: true } })
+              return
+            }
+            reply({ ok: await timed(plugin.id, 'assistant.call', () => execute(routeOp(tenant, plugin.id, 'assistant.call', m.args))) })
             return
           }
           case 'toast':

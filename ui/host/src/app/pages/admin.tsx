@@ -3,7 +3,7 @@
 
 import { useDeferredValue, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Bell, Building2, CircleHelp, Contrast, Frame, Gauge, HardDrive, History, KeyRound, KeySquare, Mail, MoreHorizontal, Palette, PanelLeft, Pencil, Plus, Power, Puzzle, RefreshCw, Search, ShieldCheck, Upload, Users, Wrench } from 'lucide-react'
+import { Bell, Building2, CircleHelp, Contrast, Frame, Gauge, HardDrive, History, KeyRound, KeySquare, Mail, Sparkles, MoreHorizontal, Palette, PanelLeft, Pencil, Plus, Power, Puzzle, RefreshCw, Search, ShieldCheck, Upload, Users, Wrench } from 'lucide-react'
 import { api, fmtBytes, fmtDate } from '../../api.ts'
 import { useBrand } from '../../brand.ts'
 import type { AdminUser, GlobalKpi, Member, Session, ShellBand, SystemOverview, TenantInfo } from '../../types.ts'
@@ -28,6 +28,7 @@ import { EmbeddingPanel, IdentityPanel, KeysPanel, LanguagesPanel, ModePanel, Na
 import { SignInSettings } from '../SignInSettings.tsx'
 import { EmailPanel } from '../EmailPanel.tsx'
 import { TenantPluginsOfAdmin } from './plugins.tsx'
+import { PlatformAssistantPanel } from '../AssistantAdmin.tsx'
 import { PlatformQuotasPanel, TenantQuotasPanel } from '../Quotas.tsx'
 import { BackupPanel, ImportTenantDialog, MaintenancePanel, NewTenantWizard, OverviewOps, TenantLifecycle, TenantState } from './operations.tsx'
 import { t } from '../i18n.ts'
@@ -475,6 +476,7 @@ export function AdminSystem({ session, section }: { session: Session; section?: 
     { id: 'security', label: t('Passwords and sessions'), icon: <KeyRound /> },
     { id: 'quotas', label: t('Quotas'), icon: <Gauge /> },
     { id: 'keys', label: t('Keys of outside services'), icon: <KeySquare /> },
+    { id: 'assistant', label: t('AI assistant'), icon: <Sparkles /> },
     { id: 'embedding', label: t('Embedding'), icon: <Frame /> },
     { id: 'backup', label: t('Backup and restore'), icon: <HardDrive />, group: t('Operation') },
     { id: 'maintenance', label: t('Maintenance'), icon: <Wrench /> },
@@ -503,6 +505,7 @@ export function AdminSystem({ session, section }: { session: Session; section?: 
         {cur === 'security' && <SecurityPanel level={PLATFORM} />}
         {cur === 'quotas' && <PlatformQuotasPanel />}
         {cur === 'keys' && <KeysPanel level={PLATFORM} />}
+        {cur === 'assistant' && <PlatformAssistantPanel />}
         {cur === 'embedding' && <EmbeddingPanel level={PLATFORM} />}
         {cur === 'backup' && <BackupPanel />}
         {cur === 'maintenance' && <MaintenancePanel />}

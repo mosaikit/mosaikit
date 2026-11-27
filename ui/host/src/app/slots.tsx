@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
 import SearchBox from './SearchBox.tsx'
+import { AssistantButton } from './AssistantDrawer.tsx'
 import { initials, useTenantCtx } from './core.ts'
 import { PersonPicture } from './picture.tsx'
 import { navGroupOpen, setNavGroupOpen, useRailLabels } from './prefs.ts'
@@ -604,6 +605,7 @@ export function BandActions({ session, route, band }: { session: Session; route:
       {band.lang && <LanguageMenu />}
       {band.mode && <ModeMenu route={route} />}
       {band.help && <HelpMenu session={session} route={route} />}
+      <AssistantButton route={route} />
       <NotificationsBell session={session} route={route} />
       <UserMenu session={session} route={route} band={band} />
     </div>

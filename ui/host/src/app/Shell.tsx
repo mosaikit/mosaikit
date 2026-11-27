@@ -49,6 +49,7 @@ import { iconAttrs, bandIcon, bandStyle, hasActive, useNav, type NavGroup, type 
 import Frame from './frames.tsx'
 import { backFromActiveEntry, bandEmit, resetBand, useBand } from './contextband.ts'
 import CommentsController from './CommentsPanel.tsx'
+import { AssistantDrawer } from './AssistantDrawer.tsx'
 import { toggleComments, useCommentsState } from './comments.ts'
 import { startPresence } from './presence.ts'
 import { BackButton, BandIdentity, CommentsButton, ModeSwitch, Presence } from './ContextBand.tsx'
@@ -430,6 +431,7 @@ export default function Shell({ session, route, children }: { session: Session; 
   return (
     <div className={cn('msk-shell contents', layout.class)} data-layout={layout.id} data-mode={mode}>
       {route.area === 'tenant' && commentsResource && <CommentsController tenant={route.tenant} resource={commentsResource} />}
+      {route.area === 'tenant' && <AssistantDrawer session={session} route={route} />}
       {layout.decl.pattern === 'rail' ? (
         <RailFrame session={session} route={route} band={band} bandImage={bandImage}>
           {children}
