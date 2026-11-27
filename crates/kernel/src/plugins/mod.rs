@@ -657,7 +657,8 @@ async fn remove(k: &Kernel, id: &str, remember: bool) -> Result<Arc<LoadedPlugin
 /// A picture of the brochure of an installed plugin (`media/<name>` of its package) and its type.
 pub fn media(k: &Kernel, id: &str, name: &str) -> Option<(Vec<u8>, &'static str)> {
     let p = k.plugins.get(id)?;
-    let listed = p.manifest.screenshots.iter().any(|s| s == name) || p.manifest.icon_image.as_deref() == Some(name);
+    let listed =
+        p.manifest.screenshots.iter().any(|s| s == name) || p.manifest.icon_image.as_deref() == Some(name);
     if !listed || !mosaikit_mskp::is_media_name(name) {
         return None;
     }
