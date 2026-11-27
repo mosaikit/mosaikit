@@ -112,7 +112,13 @@ async fn configure(w: &World) {
 }
 
 fn user(text: &str) -> Message {
-    Message { role: "user".into(), content: text.into(), tool_calls: vec![], tool_call_id: None }
+    Message {
+        attachments: vec![],
+        role: "user".into(),
+        content: text.into(),
+        tool_calls: vec![],
+        tool_call_id: None,
+    }
 }
 
 fn ask(text: &str) -> ChatRequest {
@@ -249,10 +255,22 @@ async fn a_bad_chat_is_refused() {
     configure(&w).await;
     for messages in [
         vec![],
-        vec![Message { role: "system".into(), content: "x".into(), tool_calls: vec![], tool_call_id: None }],
+        vec![Message {
+            attachments: vec![],
+            role: "system".into(),
+            content: "x".into(),
+            tool_calls: vec![],
+            tool_call_id: None,
+        }],
         vec![
             user("a"),
-            Message { role: "assistant".into(), content: "b".into(), tool_calls: vec![], tool_call_id: None },
+            Message {
+                attachments: vec![],
+                role: "assistant".into(),
+                content: "b".into(),
+                tool_calls: vec![],
+                tool_call_id: None,
+            },
         ],
     ] {
         let e = assistant::chat(&w.t, &w.anna, "en", ChatRequest { messages, context: None, model: None })
@@ -497,4 +515,55 @@ async fn a_manager_chooses_any_model_and_people_the_ones_the_administrator_allow
     );
     s.user_models = Some(vec![]);
     assert!(assistant::settings::set_platform(&w.t, &admin, &s).await.unwrap().user_models.is_empty());
+}
+
+fn file(kind: &str, mime: &str, name: &str, data: &str) -> mosaikit_kernel::assistant::Attachment {
+    mosaikit_kernel::assistant::Attachment {
+        name: name.into(),
+        kind: kind.into(),
+        mime: mime.into(),
+        data: data.into(),
+    }
+}
+
+#[tokio::test]
+async fn files_are_checked_and_only_the_last_question_carries_them() {
+    let w = world().await;
+    configure(&w).await;
+    let with = |files: Vec<mosaikit_kernel::assistant::Attachment>| {
+        let mut m = user("look");
+        m.attachments = files;
+        ChatRequest { messages: vec![m], context: None, model: None }
+    };
+    // an accepted file reaches the model
+    let ok = assistant::chat(&w.t, &w.anna, "en", with(vec![file("text", "text/plain", "n.txt", "hello")]))
+        .await
+        .unwrap();
+    assert!(ok.messages[0].content.contains("[1 file(s): n.txt]"), "{}", ok.messages[0].content);
+    let bad = |files: Vec<_>| async { assistant::chat(&w.t, &w.anna, "en", with(files)).await.unwrap_err() };
+    // a type that is not accepted, a wrong kind, an empty file, too many, too large, a bad base64
+    for files in [
+        vec![file("text", "application/x-msdownload", "a.exe", "MZ")],
+        vec![file("video", "video/mp4", "a.mp4", "QUJD")],
+        vec![file("text", "text/plain", "e.txt", "")],
+        vec![file("image", "image/svg+xml", "a.svg", "QUJD")],
+        (0..5).map(|i| file("text", "text/plain", &format!("{i}.txt"), "x")).collect(),
+        vec![file("text", "text/plain", "big.txt", &"x".repeat(300 << 10))],
+        vec![file("image", "image/png", "a.png", "not base64!!")],
+        vec![file("text", "text/plain", "bad\nname", "x")],
+    ] {
+        assert_eq!(code(&bad(files).await), "assistant_bad_attachment");
+    }
+    // the files of an earlier question are told as a note and are not sent again
+    let mut first = user("see this");
+    first.attachments = vec![file("text", "text/plain", "old.txt", "secret")];
+    let r = assistant::chat(
+        &w.t,
+        &w.anna,
+        "en",
+        ChatRequest { messages: vec![first, user("and now?")], context: None, model: None },
+    )
+    .await
+    .unwrap();
+    assert_eq!(r.messages[0].content, "fake: and now?", "the last question has no files");
 }

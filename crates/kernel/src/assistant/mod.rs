@@ -42,12 +42,84 @@ pub struct ToolCall {
     pub arguments: Value,
 }
 
+/// Largest file a person may attach, by kind, and how many in a message (the whole request is also limited in size).
+pub const MAX_ATTACHMENTS: usize = 4;
+pub const MAX_IMAGE_BYTES: usize = 5 << 20;
+pub const MAX_PDF_BYTES: usize = 10 << 20;
+pub const MAX_TEXT_BYTES: usize = 200 << 10;
+
+/// A file the person attached to a question. `kind` is `image` or `pdf` (`data` is base64) or `text` (`data` is the text).
+/// Only the last question of a chat carries the data to the model: earlier ones are told as a note.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct Attachment {
+    pub name: String,
+    pub kind: String,
+    pub mime: String,
+    #[serde(default)]
+    pub data: String,
+}
+
+impl Attachment {
+    /// Checks the kind, the type and the size; the name is for the person and the model, so it is plain text.
+    fn check(&self) -> Result<()> {
+        let bad = |m: String| Err(Error::bad(m).with_code("assistant_bad_attachment"));
+        let name_ok = !self.name.trim().is_empty()
+            && self.name.chars().count() <= 120
+            && !self.name.chars().any(char::is_control);
+        if !name_ok {
+            return bad("an attachment needs a name of up to 120 characters".into());
+        }
+        let (limit, mime_ok, decoded) = match self.kind.as_str() {
+            "image" => (
+                MAX_IMAGE_BYTES,
+                matches!(self.mime.as_str(), "image/png" | "image/jpeg" | "image/webp" | "image/gif"),
+                true,
+            ),
+            "pdf" => (MAX_PDF_BYTES, self.mime == "application/pdf", true),
+            "text" => (
+                MAX_TEXT_BYTES,
+                self.mime.starts_with("text/")
+                    || matches!(self.mime.as_str(), "application/json" | "application/xml"),
+                false,
+            ),
+            k => return bad(format!("attachment kind '{k}': image, pdf or text")),
+        };
+        if !mime_ok {
+            return bad(format!(
+                "«{}»: the type {} is not accepted for a {}",
+                self.name, self.mime, self.kind
+            ));
+        }
+        // base64 grows a file by a third
+        let size = if decoded { self.data.len() / 4 * 3 } else { self.data.len() };
+        if size > limit {
+            return bad(format!(
+                "«{}» is too large (at most {} KB for a {})",
+                self.name,
+                limit >> 10,
+                self.kind
+            ));
+        }
+        if self.data.is_empty() {
+            return bad(format!("«{}» is empty", self.name));
+        }
+        if decoded && !self.data.bytes().all(|b| b.is_ascii_alphanumeric() || matches!(b, b'+' | b'/' | b'='))
+        {
+            return bad(format!("«{}» is not valid base64", self.name));
+        }
+        Ok(())
+    }
+}
+
 /// A message of a chat: `user`, `assistant` (with the tool calls it asked for) or `tool` (the result of one call).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Message {
     pub role: String,
     #[serde(default)]
     pub content: String,
+    /// files attached to a question (user messages only)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub attachments: Vec<Attachment>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tool_calls: Vec<ToolCall>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -162,6 +234,7 @@ fn validate(messages: &[Message]) -> Result<Vec<Message>> {
     if messages.is_empty() || messages.len() > MAX_MESSAGES {
         return Err(Error::bad(format!("messages: 1 to {MAX_MESSAGES}")).with_code("assistant_bad_chat"));
     }
+    // the files have limits of their own (`attachments`)
     let chars: usize = messages.iter().map(|m| m.content.chars().count() + m.arguments_len()).sum();
     if chars > MAX_CHARS {
         return Err(Error::bad("the chat is too long: start a new one").with_code("assistant_chat_too_long"));
@@ -180,6 +253,9 @@ fn validate(messages: &[Message]) -> Result<Vec<Message>> {
         if m.role != "assistant" {
             m.tool_calls.clear();
         }
+        if m.role != "user" {
+            m.attachments.clear();
+        }
         // a call nobody answered (the person closed the proposal) is closed here: models refuse an open call
         if m.role != "tool" {
             repair(&mut out);
@@ -187,11 +263,46 @@ fn validate(messages: &[Message]) -> Result<Vec<Message>> {
         out.push(m);
     }
     repair(&mut out);
+    attachments(&mut out)?;
     if out.last().is_some_and(|m| m.role == "assistant" && m.tool_calls.is_empty()) {
         return Err(Error::bad("the last message must be from the person or a tool result")
             .with_code("assistant_bad_chat"));
     }
     Ok(out)
+}
+
+/// The files of the last question go to the model; the ones of the earlier questions are told as a note (the model reads them once).
+fn attachments(messages: &mut [Message]) -> Result<()> {
+    let last = messages.iter().rposition(|m| m.role == "user");
+    let mut total = 0usize;
+    for (i, m) in messages.iter_mut().enumerate() {
+        if m.attachments.is_empty() {
+            continue;
+        }
+        if Some(i) != last {
+            let names: Vec<String> = m.attachments.iter().map(|a| format!("«{}»", a.name)).collect();
+            m.content = format!(
+                "{}\n\n[Files attached to this question, no longer available: {}]",
+                m.content,
+                names.join(", ")
+            );
+            m.attachments.clear();
+            continue;
+        }
+        if m.attachments.len() > MAX_ATTACHMENTS {
+            return Err(Error::bad(format!("at most {MAX_ATTACHMENTS} files in a message"))
+                .with_code("assistant_bad_attachment"));
+        }
+        for a in &m.attachments {
+            a.check()?;
+            total += a.data.len();
+        }
+    }
+    if total > 20 << 20 {
+        return Err(Error::bad("the files are too large together (20 MB at most)")
+            .with_code("assistant_bad_attachment"));
+    }
+    Ok(())
 }
 
 impl Message {
@@ -209,6 +320,7 @@ fn repair(out: &mut Vec<Message>) {
         out[at].tool_calls.iter().map(|c| c.id.clone()).filter(|id| !answered.contains(id)).collect();
     for id in open {
         out.push(Message {
+            attachments: Vec::new(),
             role: "tool".into(),
             content: json!({ "error": "not run: the person did not confirm it" }).to_string(),
             tool_calls: Vec::new(),
@@ -302,6 +414,7 @@ pub async fn chat_with(
         tin += done.input_tokens;
         tout += done.output_tokens;
         let m = Message {
+            attachments: Vec::new(),
             role: "assistant".into(),
             content: done.text,
             tool_calls: done.tool_calls.clone(),
@@ -345,6 +458,7 @@ pub async fn chat_with(
                 }
             };
             let t = Message {
+                attachments: Vec::new(),
                 role: "tool".into(),
                 content,
                 tool_calls: Vec::new(),
@@ -363,6 +477,7 @@ pub async fn chat_with(
     }
     if stopped {
         new.push(Message {
+            attachments: Vec::new(),
             role: "assistant".into(),
             content: format!("I stopped after {MAX_STEPS} steps. Ask me to continue if you want more."),
             tool_calls: Vec::new(),

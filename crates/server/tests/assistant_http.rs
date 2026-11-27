@@ -157,6 +157,19 @@ async fn settings_chat_confirmation_tokens_and_mcp_over_http() {
         .await;
     assert_eq!(r.status, StatusCode::OK);
 
+    // a question with a file of several megabytes goes through (the body limit of the chat is larger than the default)
+    let big = "A".repeat(4 << 20);
+    let r = app
+        .call(Some(&mgr), None, Method::POST, "/api/t/alfa/assistant/chat", Some(json!({ "messages": [{ "role": "user", "content": "see", "attachments": [{ "name": "big.png", "kind": "image", "mime": "image/png", "data": big }] }] })))
+        .await;
+    assert_eq!(
+        r.status,
+        StatusCode::OK,
+        "{}",
+        String::from_utf8_lossy(&r.body).chars().take(200).collect::<String>()
+    );
+    assert!(r.json()["messages"][0]["content"].as_str().unwrap().contains("[1 file(s): big.png]"));
+
     // the chat runs a kernel tool as the person; the answer is never cached
     let r = app
         .call(
