@@ -18,6 +18,7 @@ mod pages;
 mod people_api;
 mod plugins_api;
 mod qa_api;
+mod assistant_api;
 mod quotas_api;
 mod realtime_api;
 mod run_api;
