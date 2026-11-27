@@ -2276,4 +2276,10 @@ export const IT: Record<string, string> = {
   'e.g. {name}': 'es. {name}',
   'Choose the provider.': 'Scegli il provider.',
   'Choose the provider': 'Scegli il provider',
+  'Models people may choose': 'Modelli che le persone possono scegliere',
+  'Tenant Managers may use every model of the provider. Everybody else chooses among the default and the ones you tick here.': 'I Gestori del tenant possono usare tutti i modelli del provider. Tutti gli altri scelgono tra quello predefinito e quelli che spunti qui.',
+  'Load the models': 'Carica i modelli',
+  'Save the provider and the key first: the models are asked to the provider with them.': 'Salva prima il provider e la chiave: i modelli si chiedono al provider con quelli.',
+  'Filter the models': 'Filtra i modelli',
+  '{n} models allowed': '{n} modelli consentiti',
 }

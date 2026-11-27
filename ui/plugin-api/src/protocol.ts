@@ -737,6 +737,13 @@ export interface AssistantProposal {
   description: string
 }
 
+export interface AssistantChatOptions {
+  /** where the person is: text for the model */
+  context?: unknown
+  /** the model to use (one of `models()`); absent: the default */
+  model?: string
+}
+
 export type AssistantStreamEvent =
   | { type: 'delta'; text: string }
   | { type: 'message'; message: AssistantMessage }
@@ -757,6 +764,14 @@ export interface AssistantStatus {
   source: 'platform' | 'tenant' | null
   /** the address of the MCP server of this tenant */
   mcp_url: string
+}
+
+export interface AssistantModels {
+  /** the model the platform uses when none is chosen */
+  default: string
+  /** the models this person may choose (a Tenant Manager: every model of the provider) */
+  models: { id: string; label: string }[]
+  all: boolean
 }
 
 export interface AssistantTool {
@@ -805,13 +820,15 @@ export interface AssistantApi {
   /** Closes the side panel of the shell that shows this page (for Escape pressed inside the frame). */
   close(): Promise<void>
   tools(): Promise<AssistantTool[]>
-  chat(messages: AssistantMessage[], context?: unknown): Promise<AssistantChatResult>
+  chat(messages: AssistantMessage[], options?: AssistantChatOptions): Promise<AssistantChatResult>
+  /** The models this person may choose. */
+  models(): Promise<AssistantModels>
   /**
    * `chat` that tells `onEvent` what happens while it runs: `delta` (a piece of the text being written), `message` (a message
    * the loop added: the assistant one once complete, the result of each tool), `tool` (a tool is about to run). Resolves with
    * the same answer as `chat`.
    */
-  chatStream(messages: AssistantMessage[], onEvent: (e: AssistantStreamEvent) => void, context?: unknown): Promise<AssistantChatResult>
+  chatStream(messages: AssistantMessage[], onEvent: (e: AssistantStreamEvent) => void, options?: AssistantChatOptions): Promise<AssistantChatResult>
   call(name: string, args: unknown): Promise<{ result: unknown } | { cancelled: true }>
   tokens: {
     list(): Promise<AssistantToken[]>

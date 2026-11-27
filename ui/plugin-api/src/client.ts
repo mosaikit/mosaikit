@@ -3,7 +3,7 @@ import { API_VERSION, checkHostApi } from './version.ts'
 import { translate, type Vars } from './text.ts'
 import { setBusy, withBusy } from './busy.ts'
 import { forwardActivity, makePresence, type PresenceApi } from './presence.ts'
-import type { AssistantApi, AssistantChatResult, AssistantMessage, AssistantStreamEvent, AssistantSettings, AssistantStatus, AssistantTool, AssistantToken, RealtimeEvent, RealtimeMessage, RealtimePerson, RealtimeStatus, BandApi, BandState, DirectoryApi, EmbedsApi, Schedule, SchedulesApi, DirectorySearch, ExtensionView, FileEntry, Hello, HostEventName, ListResult, Listing, Notify, NotificationRef, SettingsChange, SettingsView, PublicLinkState, PublicResource, Rect, ResourceMeta, Row, SiteInfo, TabInfo, Unzipped, UploadProgress, FolderSuggestion, FileInfo, FileTicket, UiContext, Values, WebProbe, SharePreselect, SharePrincipal, PickPrincipalsOptions, ShareList } from './protocol.ts'
+import type { AssistantApi, AssistantChatOptions, AssistantChatResult, AssistantModels, AssistantMessage, AssistantStreamEvent, AssistantSettings, AssistantStatus, AssistantTool, AssistantToken, RealtimeEvent, RealtimeMessage, RealtimePerson, RealtimeStatus, BandApi, BandState, DirectoryApi, EmbedsApi, Schedule, SchedulesApi, DirectorySearch, ExtensionView, FileEntry, Hello, HostEventName, ListResult, Listing, Notify, NotificationRef, SettingsChange, SettingsView, PublicLinkState, PublicResource, Rect, ResourceMeta, Row, SiteInfo, TabInfo, Unzipped, UploadProgress, FolderSuggestion, FileInfo, FileTicket, UiContext, Values, WebProbe, SharePreselect, SharePrincipal, PickPrincipalsOptions, ShareList } from './protocol.ts'
 
 /** The extensions of the plugin on a resource (fields and actions other plugins add to its items). */
 export interface ExtensionsClient {
@@ -379,9 +379,10 @@ export class Msk {
     status: () => this.bridge.call<AssistantStatus>('assistant.status', {}),
     close: () => this.bridge.call<void>('assistant.close', {}),
     tools: () => this.bridge.call<AssistantTool[]>('assistant.tools', {}),
-    chat: (messages: AssistantMessage[], context?: unknown) =>
-      this.bridge.call<AssistantChatResult>('assistant.chat', { messages, context }),
-    chatStream: async (messages: AssistantMessage[], onEvent: (e: AssistantStreamEvent) => void, context?: unknown) => {
+    chat: (messages: AssistantMessage[], options?: AssistantChatOptions) =>
+      this.bridge.call<AssistantChatResult>('assistant.chat', { messages, ...options }),
+    models: () => this.bridge.call<AssistantModels>('assistant.models', {}),
+    chatStream: async (messages: AssistantMessage[], onEvent: (e: AssistantStreamEvent) => void, options?: AssistantChatOptions) => {
       const handle = crypto.randomUUID()
       const off = this.bridge.onEvent((event, data) => {
         if (event !== 'assistant.event') return
@@ -392,7 +393,7 @@ export class Msk {
         else if (e.type === 'tool') onEvent({ type: 'tool', name: String(e.data.name ?? '') })
       })
       try {
-        return await this.bridge.call<AssistantChatResult>('assistant.chat.stream', { messages, context, handle })
+        return await this.bridge.call<AssistantChatResult>('assistant.chat.stream', { messages, ...options, handle })
       } finally {
         off()
       }

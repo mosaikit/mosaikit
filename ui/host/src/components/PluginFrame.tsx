@@ -254,7 +254,7 @@ export default function PluginFrame({ plugin, session, ctx, reloadKey, ui: shell
             if (!/^[0-9a-f-]{36}$/i.test(handle)) throw new OpError('invalid handle')
             const msgs = m.args?.messages
             if (!Array.isArray(msgs) || msgs.length > 120) throw new OpError('invalid messages')
-            const out = await apiStream(`/api/t/${enc(tenant)}/assistant/chat/stream`, { messages: msgs, context: m.args?.context ?? null }, (type, data) =>
+            const out = await apiStream(`/api/t/${enc(tenant)}/assistant/chat/stream`, { messages: msgs, context: m.args?.context ?? null, model: typeof m.args?.model === 'string' ? m.args.model.slice(0, 200) : null }, (type, data) =>
               toBase('assistant.event', { handle, type, data }),
             )
             reply({ ok: out })

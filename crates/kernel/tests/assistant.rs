@@ -102,6 +102,7 @@ fn fake(provider: &str) -> SettingsInput {
         enabled: true,
         allow_byok: false,
         hourly_limit: None,
+        user_models: None,
     }
 }
 
@@ -115,7 +116,7 @@ fn user(text: &str) -> Message {
 }
 
 fn ask(text: &str) -> ChatRequest {
-    ChatRequest { messages: vec![user(text)], context: None }
+    ChatRequest { messages: vec![user(text)], context: None, model: None }
 }
 
 fn code(e: &mosaikit_kernel::Error) -> String {
@@ -224,7 +225,9 @@ async fn an_unanswered_proposal_is_closed_when_the_chat_goes_on() {
     let mut messages = vec![user(r#"tool:assist__make {}"#)];
     messages.extend(first.messages);
     messages.push(user("never mind"));
-    let r = assistant::chat(&w.t, &w.anna, "en", ChatRequest { messages, context: None }).await.unwrap();
+    let r = assistant::chat(&w.t, &w.anna, "en", ChatRequest { messages, context: None, model: None })
+        .await
+        .unwrap();
     assert_eq!(r.messages.last().unwrap().content, "fake: never mind");
 }
 
@@ -252,8 +255,9 @@ async fn a_bad_chat_is_refused() {
             Message { role: "assistant".into(), content: "b".into(), tool_calls: vec![], tool_call_id: None },
         ],
     ] {
-        let e =
-            assistant::chat(&w.t, &w.anna, "en", ChatRequest { messages, context: None }).await.unwrap_err();
+        let e = assistant::chat(&w.t, &w.anna, "en", ChatRequest { messages, context: None, model: None })
+            .await
+            .unwrap_err();
         assert_eq!(code(&e), "assistant_bad_chat");
     }
 }
@@ -441,4 +445,56 @@ async fn a_real_local_model_answers_and_calls_a_tool() {
     println!("tools used: {used:?}\nanswer: {}", r.messages.last().unwrap().content);
     assert!(used.contains(&"kernel__whoami"), "the model did not call the tool: {used:?}");
     assert!(r.messages.last().unwrap().content.to_lowercase().contains("alfa"));
+}
+
+#[tokio::test]
+async fn a_manager_chooses_any_model_and_people_the_ones_the_administrator_allowed() {
+    let w = world().await;
+    let admin = w.t.admin().await;
+    let mut s = fake("fake");
+    s.user_models = Some(vec!["fake-large".into()]);
+    let v = assistant::settings::set_platform(&w.t, &admin, &s).await.unwrap();
+    assert_eq!(v.user_models, ["fake-large"]);
+    // the Administrator reads what the provider offers
+    let all: Vec<String> =
+        assistant::platform_models(&w.t, &admin).await.unwrap().into_iter().map(|m| m.id).collect();
+    assert_eq!(all, ["fake-small", "fake-large"]);
+    assert_eq!(assistant::platform_models(&w.t, &w.mgr.user).await.unwrap_err().kind, Kind::Forbidden);
+
+    let ids = |c: assistant::models::Choices| c.models.into_iter().map(|m| m.id).collect::<Vec<_>>();
+    // a Manager: every model of the provider, and the default; a person: the default and the allowed ones
+    let m = assistant::model_choices(&w.t, &w.mgr).await.unwrap();
+    assert!(m.all && m.default == "m");
+    assert_eq!(ids(m), ["m", "fake-small", "fake-large"]);
+    let u = assistant::model_choices(&w.t, &w.anna).await.unwrap();
+    assert!(!u.all);
+    assert_eq!(ids(u), ["m", "fake-large"]);
+
+    let with = |model: Option<&str>| ChatRequest {
+        messages: vec![user("hi")],
+        context: None,
+        model: model.map(str::to_string),
+    };
+    // a person: the default and the allowed model work, another one is refused
+    assert!(assistant::chat(&w.t, &w.anna, "en", with(Some("fake-large"))).await.is_ok());
+    assert!(assistant::chat(&w.t, &w.anna, "en", with(Some("m"))).await.is_ok());
+    let e = assistant::chat(&w.t, &w.anna, "en", with(Some("fake-small"))).await.unwrap_err();
+    assert_eq!((e.kind, code(&e).as_str()), (Kind::Forbidden, "assistant_model_not_allowed"));
+    // a Manager may use any, and the audit says which
+    assert!(assistant::chat(&w.t, &w.mgr, "en", with(Some("fake-small"))).await.is_ok());
+    let used: Vec<Value> = mosaikit_db::query_scalar(
+        "select detail from core.events where action = 'assistant.chat' order by id",
+    )
+    .fetch_all(&w.t.db)
+    .await
+    .unwrap();
+    assert_eq!(used.last().unwrap()["model"], "fake-small");
+    // the list the Administrator keeps can be changed and cleared; absent keeps it
+    s.user_models = None;
+    assert_eq!(
+        assistant::settings::set_platform(&w.t, &admin, &s).await.unwrap().user_models,
+        ["fake-large"]
+    );
+    s.user_models = Some(vec![]);
+    assert!(assistant::settings::set_platform(&w.t, &admin, &s).await.unwrap().user_models.is_empty());
 }

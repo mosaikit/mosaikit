@@ -26,6 +26,8 @@ pub struct SettingsView {
     pub enabled: bool,
     pub allow_byok: bool,
     pub hourly_limit: i32,
+    /// the models, besides the default, that people may choose
+    pub user_models: Vec<String>,
 }
 
 impl SettingsView {
@@ -39,6 +41,7 @@ impl SettingsView {
             enabled: false,
             allow_byok: false,
             hourly_limit: DEFAULT_HOURLY_LIMIT,
+            user_models: Vec::new(),
         }
     }
 }
@@ -58,6 +61,9 @@ pub struct SettingsInput {
     pub allow_byok: bool,
     #[serde(default)]
     pub hourly_limit: Option<i32>,
+    /// the models people may choose besides the default; absent: keep
+    #[serde(default)]
+    pub user_models: Option<Vec<String>>,
 }
 
 fn yes() -> bool {
@@ -72,6 +78,8 @@ pub struct Resolved {
     pub model: String,
     pub key: Option<String>,
     pub hourly_limit: u32,
+    /// the models, besides `model`, that people may choose
+    pub user_models: Vec<String>,
     /// `platform` or `tenant`
     pub source: &'static str,
 }
@@ -84,11 +92,16 @@ struct Row {
     enabled: bool,
     allow_byok: bool,
     hourly_limit: i32,
+    user_models: Vec<String>,
+}
+
+fn models_of(v: Option<serde_json::Value>) -> Vec<String> {
+    v.and_then(|v| serde_json::from_value(v).ok()).unwrap_or_default()
 }
 
 async fn row(k: &Kernel, id: Uuid) -> Result<Option<Row>> {
     Ok(mosaikit_db::query(
-        "select provider, base_url, model, secret, enabled, allow_byok, hourly_limit
+        "select provider, base_url, model, secret, enabled, allow_byok, hourly_limit, user_models
          from core.assistant_settings where tenant_id = $1",
     )
     .bind(id)
@@ -102,6 +115,7 @@ async fn row(k: &Kernel, id: Uuid) -> Result<Option<Row>> {
         enabled: r.get(4),
         allow_byok: r.get(5),
         hourly_limit: r.get(6),
+        user_models: models_of(r.get(7)),
     }))
 }
 
@@ -117,6 +131,7 @@ fn view(r: Option<Row>) -> SettingsView {
             enabled: r.enabled,
             allow_byok: r.allow_byok,
             hourly_limit: r.hourly_limit,
+            user_models: r.user_models,
         },
     }
 }
@@ -153,7 +168,24 @@ pub async fn resolve(k: &Kernel, tenant: Uuid) -> Result<Option<Resolved>> {
         model: chosen.model,
         key,
         hourly_limit: chosen.hourly_limit.max(1) as u32,
+        user_models: chosen.user_models,
         source,
+    }))
+}
+
+/// The settings of the platform row as the loop would use them, whether or not it is switched on (the Administrator asks the
+/// provider for its models before turning it on).
+pub async fn resolve_platform(k: &Kernel) -> Result<Option<Resolved>> {
+    let Some(p) = row(k, platform_id()).await? else { return Ok(None) };
+    let key = open_key(k, platform_id(), &p)?;
+    Ok(Some(Resolved {
+        provider: p.provider,
+        base_url: p.base_url,
+        model: p.model,
+        key,
+        hourly_limit: p.hourly_limit.max(1) as u32,
+        user_models: p.user_models,
+        source: "platform",
     }))
 }
 
@@ -203,6 +235,13 @@ fn check(k: &Kernel, i: &SettingsInput, tenant_row: bool) -> Result<()> {
             "base_url is required for an OpenAI-compatible provider (e.g. http://localhost:11434/v1)",
         ));
     }
+    if let Some(list) = &i.user_models {
+        if list.len() > 200
+            || list.iter().any(|m| m.trim().is_empty() || m.len() > 200 || m.chars().any(char::is_control))
+        {
+            return Err(Error::bad("user_models: at most 200 model names"));
+        }
+    }
     if let Some(key) = &i.api_key {
         if key.len() > 4096 || key.chars().any(char::is_control) {
             return Err(Error::bad("invalid key").with_code("key_invalid"));
@@ -213,6 +252,15 @@ fn check(k: &Kernel, i: &SettingsInput, tenant_row: bool) -> Result<()> {
 
 async fn save(k: &Kernel, by: Uuid, id: Uuid, i: &SettingsInput, allow_byok: bool) -> Result<()> {
     let old = row(k, id).await?;
+    let user_models: Vec<String> = match &i.user_models {
+        Some(list) => {
+            let mut v: Vec<String> = list.iter().map(|m| m.trim().to_string()).collect();
+            v.sort();
+            v.dedup();
+            v
+        }
+        None => old.as_ref().map(|o| o.user_models.clone()).unwrap_or_default(),
+    };
     let secret: Option<Vec<u8>> = match i.api_key.as_deref().map(str::trim) {
         None => old.and_then(|o| o.secret),
         Some("") => None,
@@ -221,11 +269,12 @@ async fn save(k: &Kernel, by: Uuid, id: Uuid, i: &SettingsInput, allow_byok: boo
     let base =
         i.base_url.as_deref().map(str::trim).filter(|b| !b.is_empty()).map(|b| b.trim_end_matches('/'));
     mosaikit_db::query(
-        "insert into core.assistant_settings (tenant_id, provider, base_url, model, secret, enabled, allow_byok, hourly_limit, updated_at)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, now())
+        "insert into core.assistant_settings (tenant_id, provider, base_url, model, secret, enabled, allow_byok, hourly_limit, user_models, updated_at)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, now())
          on conflict (tenant_id) do update set provider = excluded.provider, base_url = excluded.base_url,
             model = excluded.model, secret = excluded.secret, enabled = excluded.enabled,
-            allow_byok = excluded.allow_byok, hourly_limit = excluded.hourly_limit, updated_at = now()",
+            allow_byok = excluded.allow_byok, hourly_limit = excluded.hourly_limit, user_models = excluded.user_models,
+            updated_at = now()",
     )
     .bind(id)
     .bind(&i.provider)
@@ -235,6 +284,7 @@ async fn save(k: &Kernel, by: Uuid, id: Uuid, i: &SettingsInput, allow_byok: boo
     .bind(i.enabled)
     .bind(allow_byok)
     .bind(i.hourly_limit.unwrap_or(DEFAULT_HOURLY_LIMIT))
+    .bind(serde_json::json!(user_models))
     .execute(&k.db)
     .await?;
     events::record(
