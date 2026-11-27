@@ -43,7 +43,7 @@ const PROVIDERS: { id: string; label: string; hint: string }[] = [
 
 function draftOf(s: AssistantSettings): Draft {
   return {
-    provider: s.provider || 'anthropic',
+    provider: s.provider,
     base_url: s.base_url ?? '',
     model: s.model,
     api_key: '',
@@ -80,7 +80,9 @@ export function PlatformAssistantPanel() {
   const set = (p: Partial<Draft>) => setD({ ...cur, ...p })
   const needsAddress = cur.provider === 'openai_compatible'
   // what is missing, said before the server has to refuse it
-  const problem = !cur.model.trim()
+  const problem = !cur.provider
+    ? t('Choose the provider.')
+    : !cur.model.trim()
     ? t('Write the name of the model (for example {name}).', { name: EXAMPLE_MODEL[cur.provider] ?? 'llama3.1' })
     : needsAddress && !cur.base_url.trim()
       ? t('Write the address of the server (for example {name}).', { name: 'http://localhost:11434/v1' })
@@ -103,7 +105,7 @@ export function PlatformAssistantPanel() {
             <Label className="text-sm font-semibold">{t('Provider')}</Label>
             <Select value={cur.provider} onValueChange={(v) => set({ provider: v })}>
               <SelectTrigger aria-label={t('Provider')}>
-                <SelectValue />
+                <SelectValue placeholder={t('Choose the provider')} />
               </SelectTrigger>
               <SelectContent>
                 {PROVIDERS.map((p) => (
