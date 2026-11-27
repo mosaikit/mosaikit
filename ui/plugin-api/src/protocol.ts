@@ -710,3 +710,101 @@ export interface SharePreselect {
   principals: SharePrincipal[]
   level?: 'read' | 'write' | 'manage'
 }
+
+// ---------------------------------------------------------------- AI assistant (only the plugin `com.mosaikit.ai-assistant`)
+
+export interface AssistantToolCall {
+  id: string
+  name: string
+  arguments: unknown
+}
+
+/** A message of a chat: `user`, `assistant` (with the tool calls it asked for) or `tool` (the result of one call). */
+export interface AssistantMessage {
+  role: 'user' | 'assistant' | 'tool'
+  content: string
+  tool_calls?: AssistantToolCall[]
+  tool_call_id?: string
+}
+
+/** A change the assistant wants to make: the person confirms it in a dialog of the host, then `call` runs it. */
+export interface AssistantProposal {
+  call_id: string
+  tool: string
+  arguments: unknown
+  description: string
+}
+
+export interface AssistantChatResult {
+  /** what the loop added to the chat (assistant and tool messages) */
+  messages: AssistantMessage[]
+  proposals: AssistantProposal[]
+  input_tokens: number
+  output_tokens: number
+}
+
+export interface AssistantStatus {
+  available: boolean
+  provider: string | null
+  model: string | null
+  source: 'platform' | 'tenant' | null
+}
+
+export interface AssistantTool {
+  name: string
+  description: string
+  input_schema: unknown
+  write: boolean
+}
+
+export interface AssistantToken {
+  id: string
+  name: string
+  allow_write: boolean
+  expires_at: string | null
+  last_used_at: string | null
+  created_at: string
+}
+
+export interface AssistantSettings {
+  configured: boolean
+  provider: string
+  base_url: string | null
+  model: string
+  has_key: boolean
+  enabled: boolean
+  /** for the Tenant Manager: the Administrator lets a tenant bring its own key */
+  allow_byok: boolean
+  hourly_limit: number
+}
+
+export interface AssistantSettingsInput {
+  provider: string
+  model: string
+  /** absent: keep the key; empty string: remove it */
+  api_key?: string
+  enabled?: boolean
+}
+
+/**
+ * The AI assistant (kernel). Only the plugin `com.mosaikit.ai-assistant` may use it: the host refuses the others. The chat
+ * is stateless: send the messages, get the new ones. A tool that writes comes back as a proposal; `call` asks the person
+ * to confirm in a dialog of the host (`{ cancelled: true }` when they decline) and runs it as them.
+ */
+export interface AssistantApi {
+  status(): Promise<AssistantStatus>
+  tools(): Promise<AssistantTool[]>
+  chat(messages: AssistantMessage[], context?: unknown): Promise<AssistantChatResult>
+  call(name: string, args: unknown): Promise<{ result: unknown } | { cancelled: true }>
+  tokens: {
+    list(): Promise<AssistantToken[]>
+    create(t: { name: string; allow_write?: boolean; days?: number }): Promise<AssistantToken & { token: string }>
+    revoke(id: string): Promise<void>
+  }
+  /** The settings of the tenant (Tenant Manager, when the Administrator allows a key of the tenant). */
+  settings: {
+    get(): Promise<AssistantSettings>
+    set(s: AssistantSettingsInput): Promise<AssistantSettings>
+    clear(): Promise<void>
+  }
+}

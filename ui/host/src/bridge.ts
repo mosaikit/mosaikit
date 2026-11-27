@@ -115,6 +115,15 @@ export function safePage(page: string): string {
 }
 
 /** Operations handled locally by the host (they do not become REST calls). */
+/** The only plugin that may use the assistant operations (they run tools as the person). */
+export const ASSISTANT_PLUGIN = 'com.mosaikit.ai-assistant'
+const TOOL_NAME = /^[A-Za-z0-9_-]{1,64}$/
+
+export function toolName(v: unknown): string {
+  if (typeof v !== 'string' || !TOOL_NAME.test(v)) throw new OpError('invalid tool')
+  return v
+}
+
 export const LOCAL_OPS = new Set(['hello', 'share', 'toast', 'confirm', 'band.set', 'band.reset', 'principals.pick'])
 
 /** Translates an operation of the plugin into a REST call. */
@@ -333,6 +342,50 @@ export function routeOp(tenant: string, plugin: string, op: string, rawArgs: unk
       return { method: 'DELETE', url: `/api/t/${enc(tenant)}/schedules/${uuid(a.id)}?plugin=${enc(plugin)}` }
     case 'schedules.runs':
       return { method: 'GET', url: `/api/t/${enc(tenant)}/schedules/${uuid(a.id)}/runs?plugin=${enc(plugin)}` }
+    // the AI assistant: the kernel runs everything as the person; the host lets only its own plugin in
+    case 'assistant.status':
+    case 'assistant.tools':
+    case 'assistant.chat':
+    case 'assistant.call':
+    case 'assistant.tokens.list':
+    case 'assistant.tokens.create':
+    case 'assistant.tokens.revoke':
+    case 'assistant.settings.get':
+    case 'assistant.settings.set':
+    case 'assistant.settings.clear': {
+      if (plugin !== ASSISTANT_PLUGIN) throw new OpError('this plugin may not use the assistant', 'forbidden')
+      const t = `/api/t/${enc(tenant)}`
+      switch (op) {
+        case 'assistant.status':
+          return { method: 'GET', url: `${t}/assistant/status` }
+        case 'assistant.tools':
+          return { method: 'GET', url: `${t}/assistant/tools` }
+        case 'assistant.chat': {
+          if (!Array.isArray(a.messages) || a.messages.length > 120) throw new OpError('invalid messages')
+          return { method: 'POST', url: `${t}/assistant/chat`, json: { messages: a.messages, context: a.context ?? null } }
+        }
+        case 'assistant.call':
+          return { method: 'POST', url: `${t}/assistant/tools/${toolName(a.name)}/call`, json: { arguments: a.arguments ?? {} } }
+        case 'assistant.tokens.list':
+          return { method: 'GET', url: `${t}/assistant/tokens` }
+        case 'assistant.tokens.create': {
+          const j: Args = { name: str(a.name, 'name', 80), allow_write: a.allow_write === true }
+          if (a.days !== undefined && a.days !== null) j.days = count(a.days, 'days')
+          return { method: 'POST', url: `${t}/assistant/tokens`, json: j }
+        }
+        case 'assistant.tokens.revoke':
+          return { method: 'DELETE', url: `${t}/assistant/tokens/${uuid(a.id)}` }
+        case 'assistant.settings.get':
+          return { method: 'GET', url: `${t}/manage/assistant` }
+        case 'assistant.settings.set': {
+          const j: Args = { provider: str(a.provider, 'provider', 40), model: str(a.model, 'model', 200), enabled: a.enabled !== false }
+          if (typeof a.api_key === 'string') j.api_key = a.api_key.slice(0, 4096)
+          return { method: 'PUT', url: `${t}/manage/assistant`, json: j }
+        }
+        default:
+          return { method: 'DELETE', url: `${t}/manage/assistant` }
+      }
+    }
     case 'notify': {
       const n: Args = { title: str(a.title, 'title', 160) }
       if (a.body !== undefined && a.body !== null && a.body !== '') n.body = str(a.body, 'body', 600)

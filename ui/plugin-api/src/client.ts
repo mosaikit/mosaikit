@@ -3,7 +3,7 @@ import { API_VERSION, checkHostApi } from './version.ts'
 import { translate, type Vars } from './text.ts'
 import { setBusy, withBusy } from './busy.ts'
 import { forwardActivity, makePresence, type PresenceApi } from './presence.ts'
-import type { RealtimeEvent, RealtimeMessage, RealtimePerson, RealtimeStatus, BandApi, BandState, DirectoryApi, EmbedsApi, Schedule, SchedulesApi, DirectorySearch, ExtensionView, FileEntry, Hello, HostEventName, ListResult, Listing, Notify, NotificationRef, SettingsChange, SettingsView, PublicLinkState, PublicResource, Rect, ResourceMeta, Row, SiteInfo, TabInfo, Unzipped, UploadProgress, FolderSuggestion, FileInfo, FileTicket, UiContext, Values, WebProbe, SharePreselect, SharePrincipal, PickPrincipalsOptions, ShareList } from './protocol.ts'
+import type { AssistantApi, AssistantChatResult, AssistantMessage, AssistantSettings, AssistantStatus, AssistantTool, AssistantToken, RealtimeEvent, RealtimeMessage, RealtimePerson, RealtimeStatus, BandApi, BandState, DirectoryApi, EmbedsApi, Schedule, SchedulesApi, DirectorySearch, ExtensionView, FileEntry, Hello, HostEventName, ListResult, Listing, Notify, NotificationRef, SettingsChange, SettingsView, PublicLinkState, PublicResource, Rect, ResourceMeta, Row, SiteInfo, TabInfo, Unzipped, UploadProgress, FolderSuggestion, FileInfo, FileTicket, UiContext, Values, WebProbe, SharePreselect, SharePrincipal, PickPrincipalsOptions, ShareList } from './protocol.ts'
 
 /** The extensions of the plugin on a resource (fields and actions other plugins add to its items). */
 export interface ExtensionsClient {
@@ -372,6 +372,25 @@ export class Msk {
   /** Pages of other plugins to show in a frame of this one (see `EmbedsApi`). */
   readonly embeds: EmbedsApi = {
     url: (a) => this.bridge.call('embed.url', { ...a }),
+  }
+
+  /** The AI assistant of the kernel (see `AssistantApi`); only the plugin `com.mosaikit.ai-assistant` may use it. */
+  readonly assistant: AssistantApi = {
+    status: () => this.bridge.call<AssistantStatus>('assistant.status', {}),
+    tools: () => this.bridge.call<AssistantTool[]>('assistant.tools', {}),
+    chat: (messages: AssistantMessage[], context?: unknown) =>
+      this.bridge.call<AssistantChatResult>('assistant.chat', { messages, context }),
+    call: (name, args) => this.bridge.call('assistant.call', { name, arguments: args }),
+    tokens: {
+      list: () => this.bridge.call<AssistantToken[]>('assistant.tokens.list', {}),
+      create: (t) => this.bridge.call('assistant.tokens.create', { ...t }),
+      revoke: (id) => this.bridge.call<void>('assistant.tokens.revoke', { id }),
+    },
+    settings: {
+      get: () => this.bridge.call<AssistantSettings>('assistant.settings.get', {}),
+      set: (s) => this.bridge.call<AssistantSettings>('assistant.settings.set', { ...s }),
+      clear: () => this.bridge.call<void>('assistant.settings.clear', {}),
+    },
   }
 
   /** The schedules of this plugin (see `SchedulesApi`): the shell runs them with the session of the person. */
