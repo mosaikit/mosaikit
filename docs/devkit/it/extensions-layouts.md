@@ -156,6 +156,8 @@ name = "Français"           # al massimo 60 caratteri
 lang/host.json                      i testi della shell: frase inglese -> traduzione, stessi {segnaposto}
 lang/plugins/<id del plugin>.toml   i testi del manifesto di un altro plugin, nella forma del suo [i18n.<code>]
 lang/ui/<id del plugin>.json        i testi dentro la pagina di un altro plugin: frase inglese -> traduzione
+
+(Un plugin di un altro tipo porta i propri testi nella sua cartella `lang/`: `lang/<codice>.toml` per il manifesto e `lang/<codice>.json` per la sua pagina. Valgono finché un plugin di lingua con quel codice è attivo e hanno la precedenza su quanto il plugin di lingua dice di quel plugin: un plugin nuovo non richiede modifiche ai plugin di lingua.)
 ```
 
 Limiti: `host.json` al massimo 1 MiB e 6000 testi di al massimo 1000 caratteri; al massimo 100 file di plugin da 200 KiB; al

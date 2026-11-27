@@ -157,6 +157,15 @@ lang/plugins/<plugin id>.toml       the texts of another plugin's manifest, in t
 lang/ui/<plugin id>.json            the texts inside the page of another plugin: English phrase -> translation
 ```
 
+A plugin of any other kind carries its own texts in the same way, in its own `lang/` folder, so that it is complete by itself and a new plugin needs no change in the language plugins:
+
+```
+lang/<code>.toml    the texts of its own manifest, in the shape of its [i18n.<code>]
+lang/<code>.json    the texts inside its own page: English phrase -> translation
+```
+
+They count while a language plugin with that `<code>` is active, and they win over what that language plugin says about the plugin. A file that does not check out is logged and left out.
+
 Limits: `host.json` at most 1 MiB and 6000 texts of at most 1000 characters; at most 100 plugin files of 200 KiB; at most
 100 `ui/` files of 512 KiB and 3000 texts each. The texts inside the page of a plugin (its iframe) reach it only if that
 plugin reads them with `msk.t(phrase, vars?)` (the key is the English phrase, `{name}` placeholders; the shell passes the

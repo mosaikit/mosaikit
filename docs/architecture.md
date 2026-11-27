@@ -1102,7 +1102,7 @@ label = "Esportare"
 **service** works behind the scenes (logic, hooks, KPIs); an **extension** adds fields and
 actions to another plugin (§8.9) and needs `[extends]`; a **layout** arranges the slots of the shell
 (`layout/layout.toml`, a style and images: declarative, never code); a **language** brings a language of
-the interface (`[language]` with `code` and `name`, texts in `lang/`: never code: `lang/host.json` for the shell, `lang/plugins/<id>.toml` for the manifests of other plugins and `lang/ui/<id>.json` for the texts inside the page of another plugin, English phrase to translation; `GET /api/languages/{code}` serves them as `strings` and `ui`). People who work see
+the interface (`[language]` with `code` and `name`, texts in `lang/`: never code: `lang/host.json` for the shell, and, for plugins that bring nothing of their own, `lang/plugins/<id>.toml` for the manifest of another plugin and `lang/ui/<id>.json` for the texts inside its page, English phrase to translation; `GET /api/languages/{code}` serves them as `strings` and `ui`). **Every other plugin carries its own texts** in its `lang/` folder: `lang/<code>.toml` (its manifest, in the shape of `[i18n.<code>]`) and `lang/<code>.json` (the texts inside its page); they count while a language plugin with that code is active, and they win over what the language plugin says about the plugin, so a new plugin needs no change in the language plugins. People who work see
 the apps; the Administrator and the Tenant Managers see every plugin with its kind. `icon` names an icon
 of the set of the shell; the shell draws only the names it knows (a manifest cannot load an image).
 New plugins state `kind`; when it is absent the kernel derives it (`extension` with `[extends]`, `app`
@@ -1340,8 +1340,8 @@ to `<html>` (`lang`, `data-mode`, `data-preset`, `data-contrast`, `color-scheme`
 to react, for example changing the labels:
 
 **Texts of the page.** `msk.t(phrase, vars?)` returns the phrase in the language of the host. The key is the
-English phrase, `{name}` is replaced by `vars.name`. The translation comes from the language plugin: the shell
-reads `lang/ui/<plugin id>.json` of the active language (served with the texts of the language), and passes the part
+English phrase, `{name}` is replaced by `vars.name`. The translation comes from the plugin itself (`lang/<code>.json` of its package) or, for what it does not have, from the language plugin (`lang/ui/<plugin id>.json`): the shell
+reads them for the active language (served with the texts of the language, the plugin's own over the others), and passes the part
 of this plugin as `context.texts` at the handshake and at every `context` event. Without it (English, Italian, a language
 with no file for the plugin, an older host) the phrase itself comes back; `msk.ownTexts({ it: {...} })` lets a plugin keep
 its own table for a language (its Italian). Additive and opt-in: a plugin that does not call `msk.t` keeps its texts,
