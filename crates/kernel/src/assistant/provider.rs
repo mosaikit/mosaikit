@@ -334,7 +334,9 @@ impl AnthropicStream {
                     }
                 }
                 Some("input_json_delta") => {
-                    if let (Some(p), Some(last)) = (v["delta"]["partial_json"].as_str(), self.calls.last_mut()) {
+                    if let (Some(p), Some(last)) =
+                        (v["delta"]["partial_json"].as_str(), self.calls.last_mut())
+                    {
                         last.2.push_str(p);
                     }
                 }
@@ -486,7 +488,10 @@ mod tests {
         s.feed("lo\"}}]}\n\ndata: {\"choices\":[{\"delta\":{\"content\":\" you\"}}]}\n", &on);
         s.feed("data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"c1\",\"function\":{\"name\":\"n\",\"arguments\":\"{\\\"a\\\"\"}}]}}]}\n", &on);
         s.feed("data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\":3}\"}}]}}]}\n", &on);
-        s.feed("data: {\"choices\":[],\"usage\":{\"prompt_tokens\":7,\"completion_tokens\":9}}\ndata: [DONE]\n", &on);
+        s.feed(
+            "data: {\"choices\":[],\"usage\":{\"prompt_tokens\":7,\"completion_tokens\":9}}\ndata: [DONE]\n",
+            &on,
+        );
         let c = s.finish();
         assert_eq!(*shown.lock().unwrap(), "Hello you");
         assert_eq!(c.text, "Hello you");

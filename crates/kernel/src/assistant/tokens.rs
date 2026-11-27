@@ -47,7 +47,8 @@ const COLUMNS: &str = "id, name, allow_write, expires_at, last_used_at, created_
 pub async fn list(k: &Kernel, c: &Caller) -> Result<Vec<TokenInfo>> {
     let rows = mosaikit_db::query(format!(
         "select {COLUMNS} from core.api_tokens
-         where user_id = $1 and tenant_id = $2 and revoked_at is null and (expires_at is null or expires_at > now())
+         where user_id = $1 and tenant_id = $2 and revoked_at is null
+           and (expires_at is null or expires_at > now() or refresh_expires_at > now())
          order by created_at desc"
     ))
     .bind(c.user.user_id)

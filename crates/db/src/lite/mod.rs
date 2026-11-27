@@ -68,6 +68,7 @@ const MIGRATIONS: &[(i64, &str, &str)] = &[
     (27, "grant_actions_set", include_str!("0027_grant_actions_set.sql")),
     (28, "plugin_settings", include_str!("0028_plugin_settings.sql")),
     (29, "assistant", include_str!("0029_assistant.sql")),
+    (30, "assistant_oauth", include_str!("0030_assistant_oauth.sql")),
 ];
 
 /// Context of the transaction on the connection (read by `core_ctx_*()`).

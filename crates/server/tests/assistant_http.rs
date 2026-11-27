@@ -153,15 +153,29 @@ async fn settings_chat_confirmation_tokens_and_mcp_over_http() {
     assert!(msgs[1]["content"].as_str().unwrap().contains("alfa-manager"));
     // the same chat as a stream: pieces, the messages, then `done`; an error is an event, not a broken answer
     let r = app
-        .call(Some(&mgr), None, Method::POST, "/api/t/alfa/assistant/chat/stream",
-            Some(json!({ "messages": [{ "role": "user", "content": "hello there my friend" }] })))
+        .call(
+            Some(&mgr),
+            None,
+            Method::POST,
+            "/api/t/alfa/assistant/chat/stream",
+            Some(json!({ "messages": [{ "role": "user", "content": "hello there my friend" }] })),
+        )
         .await;
     assert_eq!(r.status, StatusCode::OK);
     let text = String::from_utf8_lossy(&r.body).to_string();
-    assert!(text.contains("event: delta") && text.contains("event: message") && text.contains("event: done"), "{text}");
+    assert!(
+        text.contains("event: delta") && text.contains("event: message") && text.contains("event: done"),
+        "{text}"
+    );
     assert!(text.find("event: delta").unwrap() < text.find("event: done").unwrap());
     let bad = app
-        .call(Some(&mgr), None, Method::POST, "/api/t/alfa/assistant/chat/stream", Some(json!({ "messages": [] })))
+        .call(
+            Some(&mgr),
+            None,
+            Method::POST,
+            "/api/t/alfa/assistant/chat/stream",
+            Some(json!({ "messages": [] })),
+        )
         .await;
     assert!(String::from_utf8_lossy(&bad.body).contains("event: error"));
     // a mutating call without the CSRF header is refused
@@ -246,5 +260,237 @@ async fn settings_chat_confirmation_tokens_and_mcp_over_http() {
     assert_eq!(
         app.call(None, Some(&token), Method::POST, "/api/t/alfa/mcp", Some(rpc)).await.status,
         StatusCode::UNAUTHORIZED
+    );
+}
+
+async fn raw(app: &App, req: Request<Body>) -> (StatusCode, axum::http::HeaderMap, String) {
+    let res = app.app.clone().oneshot(req).await.unwrap();
+    let (status, headers) = (res.status(), res.headers().clone());
+    let body = res.into_body().collect().await.unwrap().to_bytes();
+    (status, headers, String::from_utf8_lossy(&body).to_string())
+}
+
+fn form(path: &str, s: Option<&Session>, fields: &str) -> Request<Body> {
+    let mut b = Request::builder()
+        .method(Method::POST)
+        .uri(path)
+        .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded");
+    if let Some(s) = s {
+        b = b.header(header::COOKIE, &s.cookie);
+    }
+    b.body(Body::from(fields.to_string())).unwrap()
+}
+
+fn get_req(p: String, s: Option<&Session>) -> Request<Body> {
+    let mut b = Request::builder().uri(p);
+    if let Some(s) = s {
+        b = b.header(header::COOKIE, &s.cookie);
+    }
+    b.body(Body::empty()).unwrap()
+}
+
+/// A parameter of an address the person is sent back to.
+fn param(location: &str, name: &str) -> Option<String> {
+    let q = location.split_once('?')?.1;
+    q.split('&').find_map(|kv| kv.strip_prefix(&format!("{name}=")).map(str::to_string))
+}
+
+async fn token_call(app: &App, fields: String) -> (StatusCode, axum::http::HeaderMap, String) {
+    raw(app, form("/api/t/alfa/oauth/token", None, &fields)).await
+}
+
+fn grant_of(page: &str) -> String {
+    page.split("grant=").nth(1).unwrap().split('"').next().unwrap().to_string()
+}
+
+#[tokio::test]
+async fn an_outside_client_connects_with_oauth_and_the_person_decides_what_it_may_do() {
+    let t = start().await;
+    let _ = t.tenant("alfa").await;
+    let app = App { app: mosaikit_server::app_router(t.k.clone()), _t: t };
+    let mgr = sign_in(
+        &app.app,
+        "/api/auth/login",
+        json!({ "tenant": "alfa", "username": "alfa-manager", "password": PASSWORD }),
+    )
+    .await;
+    // RFC 7636 example: this verifier gives this S256 challenge
+    let (verifier, challenge) =
+        ("dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk", "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM");
+    let redirect = "http://localhost:53682/callback";
+    let rpc = json!({ "jsonrpc": "2.0", "id": 1, "method": "tools/list" });
+
+    // no token: the answer says where the authorization server is
+    let req = Request::builder()
+        .method(Method::POST)
+        .uri("/api/t/alfa/mcp")
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(rpc.to_string()))
+        .unwrap();
+    let (status, h, _) = raw(&app, req).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    let www = h.get(header::WWW_AUTHENTICATE).unwrap().to_str().unwrap().to_string();
+    assert!(
+        www.contains("resource_metadata=")
+            && www.contains("/.well-known/oauth-protected-resource/api/t/alfa/mcp"),
+        "{www}"
+    );
+
+    // the metadata documents
+    let pr = app
+        .call(None, None, Method::GET, "/.well-known/oauth-protected-resource/api/t/alfa/mcp", None)
+        .await
+        .json();
+    assert!(pr["authorization_servers"][0].as_str().unwrap().ends_with("/api/t/alfa/oauth"));
+    let md = app
+        .call(None, None, Method::GET, "/.well-known/oauth-authorization-server/api/t/alfa/oauth", None)
+        .await
+        .json();
+    assert_eq!(md["code_challenge_methods_supported"][0], "S256");
+    assert!(md["registration_endpoint"].as_str().unwrap().ends_with("/oauth/register"));
+
+    // registration: an address that is neither https nor local is refused
+    let r = app
+        .call(
+            None,
+            None,
+            Method::POST,
+            "/api/t/alfa/oauth/register",
+            Some(json!({ "client_name": "X", "redirect_uris": ["http://evil.example/cb"] })),
+        )
+        .await;
+    assert_eq!(
+        (r.status, r.json()["error"].as_str().map(str::to_string)),
+        (StatusCode::BAD_REQUEST, Some("invalid_redirect_uri".to_string()))
+    );
+    let r = app
+        .call(
+            None,
+            None,
+            Method::POST,
+            "/api/t/alfa/oauth/register",
+            Some(json!({ "client_name": "Claude Desktop", "redirect_uris": [redirect] })),
+        )
+        .await;
+    assert_eq!(r.status, StatusCode::CREATED);
+    let client = r.json()["client_id"].as_str().unwrap().to_string();
+
+    // /authorize needs no session: it shows who asks and a link; an address the client did not register is not followed
+    let q = |redir: &str| {
+        format!("/api/t/alfa/oauth/authorize?response_type=code&client_id={client}&redirect_uri={redir}&code_challenge={challenge}&code_challenge_method=S256&state=xyz")
+    };
+    assert_eq!(raw(&app, get_req(q("http://localhost:1/other"), None)).await.0, StatusCode::BAD_REQUEST);
+    let (st, h, page) = raw(&app, get_req(q(redirect), None)).await;
+    assert_eq!(st, StatusCode::OK);
+    assert!(page.contains("Claude Desktop wants to connect") && h.get(header::X_FRAME_OPTIONS).is_some());
+    let grant = grant_of(&page);
+
+    // the approval page needs the session of the person
+    let consent = format!("/api/t/alfa/oauth/consent?grant={grant}");
+    assert_eq!(raw(&app, get_req(consent.clone(), None)).await.0, StatusCode::UNAUTHORIZED);
+    let (st, _, page) = raw(&app, get_req(consent.clone(), Some(&mgr))).await;
+    assert_eq!(st, StatusCode::OK);
+    assert!(page.contains("name=\"csrf\"") && page.contains("May also change data"));
+    // a form without the CSRF token of the session is refused
+    let body = format!("csrf=wrong&grant={grant}&decision=approve");
+    assert_eq!(
+        raw(&app, form("/api/t/alfa/oauth/consent", Some(&mgr), &body)).await.0,
+        StatusCode::FORBIDDEN
+    );
+    // approve, read-only: the person is sent back with the code and the state of the client
+    let body = format!("csrf={}&grant={grant}&decision=approve", mgr.csrf);
+    let (st, h, _) = raw(&app, form("/api/t/alfa/oauth/consent", Some(&mgr), &body)).await;
+    assert_eq!(st, StatusCode::SEE_OTHER);
+    let loc = h.get(header::LOCATION).unwrap().to_str().unwrap().to_string();
+    assert!(
+        loc.starts_with("http://localhost:53682/callback?") && param(&loc, "state").as_deref() == Some("xyz")
+    );
+    let code = param(&loc, "code").unwrap();
+    // the request is used up
+    assert_eq!(raw(&app, get_req(consent, Some(&mgr))).await.0, StatusCode::BAD_REQUEST);
+
+    // the token endpoint: a wrong verifier burns the code; the right one then fails too
+    let ex = |c: &str, v: &str| {
+        format!("grant_type=authorization_code&client_id={client}&code={c}&code_verifier={v}&redirect_uri={redirect}")
+    };
+    let (st, _, b) = token_call(&app, ex(&code, "wrong-verifier-wrong-verifier-wrong-verifier-1")).await;
+    assert_eq!(st, StatusCode::BAD_REQUEST);
+    assert!(b.contains("invalid_grant"));
+    assert!(
+        token_call(&app, ex(&code, verifier)).await.2.contains("invalid_grant"),
+        "a burnt code never works again"
+    );
+
+    // a second approval, now with writes on
+    let (_, _, page) = raw(&app, get_req(q(redirect), None)).await;
+    let grant = grant_of(&page);
+    let body = format!("csrf={}&grant={grant}&decision=approve&allow_write=1", mgr.csrf);
+    let (_, h, _) = raw(&app, form("/api/t/alfa/oauth/consent", Some(&mgr), &body)).await;
+    let code = param(h.get(header::LOCATION).unwrap().to_str().unwrap(), "code").unwrap();
+    let (st, h, b) = token_call(&app, ex(&code, verifier)).await;
+    assert_eq!(st, StatusCode::OK);
+    assert_eq!(h.get(header::CACHE_CONTROL).unwrap(), "no-store");
+    let tok: Value = serde_json::from_str(&b).unwrap();
+    assert_eq!((tok["token_type"].as_str(), tok["expires_in"].as_i64()), (Some("Bearer"), Some(3600)));
+    let (access, refresh) = (
+        tok["access_token"].as_str().unwrap().to_string(),
+        tok["refresh_token"].as_str().unwrap().to_string(),
+    );
+
+    // the access token opens the MCP server, and the person sees it among their tokens
+    let r = app.call(None, Some(&access), Method::POST, "/api/t/alfa/mcp", Some(rpc.clone())).await;
+    assert_eq!(r.status, StatusCode::OK);
+    assert!(r.json()["result"]["tools"].as_array().unwrap().iter().any(|t| t["name"] == "kernel__whoami"));
+    let listed = app.call(Some(&mgr), None, Method::GET, "/api/t/alfa/assistant/tokens", None).await.json();
+    assert!(listed
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|t| t["name"] == "Claude Desktop (OAuth)" && t["allow_write"] == true));
+
+    // refresh: new tokens, the old ones stop
+    let rf = |r: &str| format!("grant_type=refresh_token&client_id={client}&refresh_token={r}");
+    let (st, _, b) = token_call(&app, rf(&refresh)).await;
+    assert_eq!(st, StatusCode::OK);
+    let tok2: Value = serde_json::from_str(&b).unwrap();
+    assert_ne!(tok2["access_token"], tok["access_token"]);
+    assert_eq!(
+        app.call(None, Some(&access), Method::POST, "/api/t/alfa/mcp", Some(rpc.clone())).await.status,
+        StatusCode::UNAUTHORIZED
+    );
+    assert!(token_call(&app, rf(&refresh)).await.2.contains("invalid_grant"));
+    let access2 = tok2["access_token"].as_str().unwrap();
+    assert_eq!(
+        app.call(None, Some(access2), Method::POST, "/api/t/alfa/mcp", Some(rpc.clone())).await.status,
+        StatusCode::OK
+    );
+    // a bad grant type
+    assert!(token_call(&app, "grant_type=password&client_id=x".into())
+        .await
+        .2
+        .contains("unsupported_grant_type"));
+
+    // revoking the token in the list ends the refresh too
+    let id = listed.as_array().unwrap().iter().find(|t| t["name"] == "Claude Desktop (OAuth)").unwrap()["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    assert_eq!(
+        app.call(Some(&mgr), None, Method::DELETE, &format!("/api/t/alfa/assistant/tokens/{id}"), None)
+            .await
+            .status,
+        StatusCode::OK
+    );
+    assert!(token_call(&app, rf(tok2["refresh_token"].as_str().unwrap())).await.2.contains("invalid_grant"));
+
+    // deny: the client gets access_denied and its state
+    let (_, _, page) = raw(&app, get_req(q(redirect), None)).await;
+    let grant = grant_of(&page);
+    let body = format!("csrf={}&grant={grant}&decision=deny", mgr.csrf);
+    let (_, h, _) = raw(&app, form("/api/t/alfa/oauth/consent", Some(&mgr), &body)).await;
+    let loc = h.get(header::LOCATION).unwrap().to_str().unwrap().to_string();
+    assert_eq!(
+        (param(&loc, "error").as_deref(), param(&loc, "state").as_deref()),
+        (Some("access_denied"), Some("xyz"))
     );
 }
