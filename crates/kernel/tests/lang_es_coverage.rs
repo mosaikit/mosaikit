@@ -1,5 +1,7 @@
-//! Every language plugin (`lang-*`) must translate the manifest texts of every shipped plugin that has `[i18n.it]`
-//! (same fields, resources, options, KPI columns...). Skipped when the plugins repository is not next to this one.
+//! The language plugins (`lang-*`) carry the name of a language and the texts of the shell (`lang/host.json`); every
+//! other plugin carries its own texts in its `lang/` folder: `lang/<code>.toml` for its manifest (the fields it has in
+//! `[i18n.it]`) and `lang/<code>.json` for the texts inside its page. A new plugin therefore needs no change in the
+//! language plugins. Skipped when the plugins repository is not next to this one.
 
 use mosaikit_mskp::{Manifest, Translation};
 use serde_json::Value;
@@ -23,63 +25,68 @@ fn shape(t: &Translation) -> Vec<String> {
     out
 }
 
-#[test]
-fn language_plugins_translate_every_plugin_that_has_italian() {
-    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../mosaikit-plugins");
-    let mut langs: Vec<String> = std::fs::read_dir(&root)
+fn placeholders(s: &str) -> Vec<String> {
+    let mut v: Vec<String> = s
+        .match_indices('{')
+        .filter_map(|(i, _)| s[i..].find('}').map(|j| s[i..=i + j].to_string()))
+        .collect();
+    v.sort();
+    v
+}
+
+fn root() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../mosaikit-plugins")
+}
+
+/// The language plugins: (folder, code), sorted.
+fn languages(root: &std::path::Path) -> Vec<(String, String)> {
+    let mut langs: Vec<(String, String)> = std::fs::read_dir(root)
         .map(|d| {
             d.flatten()
                 .map(|e| e.file_name().to_string_lossy().to_string())
-                .filter(|n| n.starts_with("lang-") && root.join(n).join("lang/plugins").is_dir())
+                .filter(|n| n.starts_with("lang-") && root.join(n).join("lang/host.json").is_file())
+                .map(|n| {
+                    let code = n.trim_start_matches("lang-").to_string();
+                    (n, code)
+                })
                 .collect()
         })
         .unwrap_or_default();
     langs.sort();
+    langs
+}
+
+/// The plugins that are not language plugins: (folder, manifest).
+fn plugins(root: &std::path::Path) -> Vec<(PathBuf, Manifest)> {
+    let mut out = Vec::new();
+    for entry in std::fs::read_dir(root).into_iter().flatten().flatten() {
+        let Ok(text) = std::fs::read_to_string(entry.path().join("plugin.toml")) else { continue };
+        let Ok(m) = Manifest::from_toml(&text) else { continue };
+        if m.kind != Some(mosaikit_mskp::PluginKind::Language) {
+            out.push((entry.path(), m));
+        }
+    }
+    out.sort_by(|a, b| a.1.id.cmp(&b.1.id));
+    out
+}
+
+/// The texts of the shell: every language has the same phrases as Spanish, each with a translation and its placeholders;
+/// and the language pack loads as the kernel reads it.
+#[test]
+fn language_plugins_translate_the_shell() {
+    let root = root();
+    let langs = languages(&root);
     if langs.is_empty() {
         eprintln!("mosaikit-plugins not found next to this repository: skipped");
         return;
     }
-    let mut problems = Vec::new();
-    let mut checked = 0;
-    for lang in &langs {
-        let es_dir = root.join(lang).join("lang/plugins");
-        for entry in std::fs::read_dir(&root).unwrap().flatten() {
-            let Ok(text) = std::fs::read_to_string(entry.path().join("plugin.toml")) else { continue };
-            let Ok(m) = Manifest::from_toml(&text) else { continue };
-            // a language plugin is not translated by another language plugin
-            if m.kind == Some(mosaikit_mskp::PluginKind::Language) {
-                continue;
-            }
-            let Some(it) = m.i18n.get("it") else { continue };
-            checked += 1;
-            let file = es_dir.join(format!("{}.toml", m.id));
-            let Ok(es_text) = std::fs::read_to_string(&file) else {
-                problems.push(format!("{lang}: {}.toml is missing", m.id));
-                continue;
-            };
-            let es: Translation =
-                toml::from_str(&es_text).unwrap_or_else(|e| panic!("{}: {e}", file.display()));
-            let (want, got) = (shape(it), shape(&es));
-            for p in want.iter().filter(|p| !got.contains(p)) {
-                problems.push(format!("{lang}: {}: missing: {p}", m.id));
-            }
-        }
-    }
-    // the texts of the shell: every language has the same phrases as the first one, each with a translation and its placeholders
-    let keys = |lang: &str| -> Option<serde_json::Map<String, Value>> {
-        let t = std::fs::read_to_string(root.join(lang).join("lang/host.json")).ok()?;
+    let keys = |dir: &str| -> Option<serde_json::Map<String, Value>> {
+        let t = std::fs::read_to_string(root.join(dir).join("lang/host.json")).ok()?;
         serde_json::from_str(&t).ok()
     };
-    let placeholders = |s: &str| {
-        let mut v: Vec<String> = s
-            .match_indices('{')
-            .filter_map(|(i, _)| s[i..].find('}').map(|j| s[i..=i + j].to_string()))
-            .collect();
-        v.sort();
-        v
-    };
+    let mut problems = Vec::new();
     if let Some(base) = keys("lang-es") {
-        for lang in langs.iter().filter(|l| l.as_str() != "lang-es") {
+        for (lang, _) in langs.iter().filter(|(l, _)| l != "lang-es") {
             let Some(host) = keys(lang) else {
                 problems.push(format!("{lang}: lang/host.json is missing or is not a JSON object"));
                 continue;
@@ -99,129 +106,89 @@ fn language_plugins_translate_every_plugin_that_has_italian() {
             }
         }
     }
-    assert!(checked > 0, "no plugin with [i18n.it] found: is the folder layout changed?");
+    for (lang, code) in &langs {
+        let mut files = std::collections::BTreeMap::new();
+        files.insert("host.json".to_string(), std::fs::read(root.join(lang).join("lang/host.json")).unwrap());
+        if let Err(e) = mosaikit_mskp::language::load_language(code, "x", &files) {
+            problems.push(format!("{lang}: the pack does not load: {e}"));
+        }
+    }
     assert!(problems.is_empty(), "{}", problems.join("\n"));
 }
 
-/// The texts inside the pages of the plugins (`lang/ui/<plugin id>.json`): the plugins that read their texts through
-/// `msk.t` must have a file in every language plugin, with the same phrases, a translation for each and the same
-/// placeholders. The language packs must also pass the check the kernel makes when it installs them.
+/// Every plugin translates itself in every language there is: its manifest (`lang/<code>.toml`, the fields of its
+/// `[i18n.it]`) and, when its page reads its texts through `msk.t`, the page (`lang/<code>.json`: the same phrases in
+/// every language, a translation for each and the same placeholders). The `lang/` folder must pass the check the kernel
+/// makes when it loads the plugin.
 #[test]
-fn language_plugins_have_the_page_texts_of_every_adopted_plugin() {
-    // The plugins whose page reads its texts through `msk.t`. A plugin is only required once lang-es has its file
-    // (`lang/ui/<id>.json`): the two repositories check each other out, so the platform may land before the files.
-    const ADOPTED: [&str; 20] = [
-        "com.mosaikit.files",
-        "com.mosaikit.maps",
-        "com.mosaikit.static-site",
-        "com.mosaikit.note-review",
-        "com.mosaikit.notes",
-        "com.mosaikit.tasks",
-        "com.mosaikit.contacts",
-        "com.mosaikit.chat",
-        "com.mosaikit.meet",
-        "com.mosaikit.announcements",
-        "com.mosaikit.bookmarks",
-        "com.mosaikit.snippets",
-        "com.mosaikit.polls",
-        "com.mosaikit.surveys",
-        "com.mosaikit.approvals",
-        "com.mosaikit.dashboard",
-        "com.mosaikit.forms",
-        "com.mosaikit.projects",
-        "com.mosaikit.calendar",
-        "com.mosaikit.whiteboard",
-    ];
-    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../mosaikit-plugins");
-    let mut langs: Vec<String> = std::fs::read_dir(&root)
-        .map(|d| {
-            d.flatten()
-                .map(|e| e.file_name().to_string_lossy().to_string())
-                .filter(|n| n.starts_with("lang-") && root.join(n).join("lang/host.json").is_file())
-                .collect()
-        })
-        .unwrap_or_default();
-    langs.sort();
+fn every_plugin_translates_itself() {
+    let root = root();
+    let langs = languages(&root);
     if langs.is_empty() {
         eprintln!("mosaikit-plugins not found next to this repository: skipped");
         return;
     }
-    // the platform may land before the language plugins that carry the files (the two repositories check each other out)
-    if !langs.iter().any(|l| root.join(l).join("lang/ui").is_dir()) {
-        eprintln!("no language plugin has lang/ui yet: skipped");
-        return;
-    }
-    let read = |lang: &str, id: &str| -> Option<serde_json::Map<String, Value>> {
-        let t = std::fs::read_to_string(root.join(lang).join(format!("lang/ui/{id}.json"))).ok()?;
-        serde_json::from_str(&t).ok()
-    };
-    let placeholders = |s: &str| {
-        let mut v: Vec<String> = s
-            .match_indices('{')
-            .filter_map(|(i, _)| s[i..].find('}').map(|j| s[i..=i + j].to_string()))
-            .collect();
-        v.sort();
-        v
-    };
     let mut problems = Vec::new();
-    let required: Vec<&str> = ADOPTED
-        .iter()
-        .copied()
-        .filter(|id| root.join("lang-es/lang/ui").join(format!("{id}.json")).is_file())
-        .collect();
-    for id in required.iter().copied() {
-        // the phrases are the ones of the first language: every other one must have the same
-        let Some(base) = read(&langs[0], id) else {
-            problems.push(format!("{}: lang/ui/{id}.json is missing", langs[0]));
-            continue;
-        };
-        for lang in &langs {
-            let Some(m) = read(lang, id) else {
-                problems.push(format!("{lang}: lang/ui/{id}.json is missing or is not a JSON object"));
-                continue;
-            };
-            for k in base.keys().filter(|k| !m.contains_key(*k)) {
-                problems.push(format!("{lang}: {id}: lacks: {k}"));
+    let mut checked = 0;
+    for (dir, m) in plugins(&root) {
+        let lang_dir = dir.join("lang");
+        // the folder as the kernel reads it
+        let mut files = std::collections::BTreeMap::new();
+        for e in std::fs::read_dir(&lang_dir).into_iter().flatten().flatten() {
+            if e.path().is_file() {
+                files.insert(e.file_name().to_string_lossy().to_string(), std::fs::read(e.path()).unwrap());
             }
-            for k in m.keys().filter(|k| !base.contains_key(*k)) {
-                problems.push(format!("{lang}: {id}: unknown phrase: {k}"));
-            }
-            for (k, v) in &m {
-                match v.as_str() {
-                    Some(t) if !t.trim().is_empty() => {
-                        if placeholders(k) != placeholders(t) {
-                            problems.push(format!("{lang}: {id}: placeholders differ: {k}"));
+        }
+        if let Err(e) = mosaikit_mskp::language::load_own(&files) {
+            problems.push(format!("{}: lang/ does not load: {e}", m.id));
+        }
+        for (_, code) in &langs {
+            if let Some(it) = m.i18n.get("it") {
+                checked += 1;
+                let file = lang_dir.join(format!("{code}.toml"));
+                match std::fs::read_to_string(&file) {
+                    Err(_) => problems.push(format!("{}: lang/{code}.toml is missing", m.id)),
+                    Ok(text) => {
+                        let tr: Translation =
+                            toml::from_str(&text).unwrap_or_else(|e| panic!("{}: {e}", file.display()));
+                        let got = shape(&tr);
+                        for p in shape(it).iter().filter(|p| !got.contains(p)) {
+                            problems.push(format!("{}: lang/{code}.toml misses: {p}", m.id));
                         }
                     }
-                    _ => problems.push(format!("{lang}: {id}: no translation: {k}")),
                 }
             }
         }
-    }
-    // the pack as the kernel reads it
-    for lang in &langs {
-        let dir = root.join(lang).join("lang");
-        let mut files = std::collections::BTreeMap::new();
-        for sub in ["ui", "plugins"] {
-            for e in std::fs::read_dir(dir.join(sub)).into_iter().flatten().flatten() {
-                files.insert(
-                    format!("{sub}/{}", e.file_name().to_string_lossy()),
-                    std::fs::read(e.path()).unwrap(),
-                );
-            }
-        }
-        files.insert("host.json".into(), std::fs::read(dir.join("host.json")).unwrap());
-        let code = lang.trim_start_matches("lang-");
-        match mosaikit_mskp::language::load_language(code, "x", &files) {
-            Ok(p) => {
-                for id in required.iter() {
-                    if !p.ui.contains_key(*id) {
-                        problems.push(format!("{lang}: the pack has no page texts for {id}"));
+        // the page: the phrases are the ones of the first language
+        let read = |code: &str| -> Option<serde_json::Map<String, Value>> {
+            serde_json::from_str(&std::fs::read_to_string(lang_dir.join(format!("{code}.json"))).ok()?).ok()
+        };
+        if lang_dir.join(format!("{}.json", langs[0].1)).is_file() {
+            let base = read(&langs[0].1).unwrap_or_default();
+            for (_, code) in &langs {
+                let Some(t) = read(code) else {
+                    problems.push(format!("{}: lang/{code}.json is missing or is not a JSON object", m.id));
+                    continue;
+                };
+                for k in base.keys().filter(|k| !t.contains_key(*k)) {
+                    problems.push(format!("{}: {code}: lacks: {k}", m.id));
+                }
+                for k in t.keys().filter(|k| !base.contains_key(*k)) {
+                    problems.push(format!("{}: {code}: unknown phrase: {k}", m.id));
+                }
+                for (k, v) in &t {
+                    match v.as_str() {
+                        Some(x) if !x.trim().is_empty() => {
+                            if placeholders(k) != placeholders(x) {
+                                problems.push(format!("{}: {code}: placeholders differ: {k}", m.id));
+                            }
+                        }
+                        _ => problems.push(format!("{}: {code}: no translation: {k}", m.id)),
                     }
                 }
             }
-            Err(e) => problems.push(format!("{lang}: the pack does not load: {e}")),
         }
     }
+    assert!(checked > 0, "no plugin with [i18n.it] found: is the folder layout changed?");
     assert!(problems.is_empty(), "{}", problems.join("\n"));
 }

@@ -140,6 +140,7 @@ pub async fn install_package(
             .then(|| pkg.layout().ok().map(std::sync::Arc::new))
             .flatten(),
         language,
+        own_lang: super::load_own_lang_dir(&dir, &m.id),
     });
     events::record(
         k,

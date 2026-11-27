@@ -62,6 +62,8 @@ pub struct LoadedPlugin {
     pub layout: Option<Arc<mosaikit_mskp::layout::Layout>>,
     /// for a language plugin: the texts of the host and of the manifests of other plugins, checked
     pub language: Option<Arc<mosaikit_mskp::language::LanguagePack>>,
+    /// the texts the plugin brings for itself in other languages (`lang/<code>.json` and `.toml`), checked
+    pub own_lang: Arc<mosaikit_mskp::language::OwnLang>,
 }
 
 impl LoadedPlugin {
@@ -131,9 +133,25 @@ impl Plugins {
 
     pub(crate) fn remove(&self, id: &str) {
         let old = self.0.write().expect("lock plugin").remove(id);
+        mosaikit_mskp::language::set_own_texts(id, Default::default());
         if let Some(l) = old.and_then(|p| p.language.clone()) {
             mosaikit_mskp::language::clear_texts(&l.code);
         }
+    }
+
+    /// The texts inside the pages of the active plugins in a language: what a language plugin says about a plugin
+    /// (`lang/ui/<id>.json`), over which the plugin's own texts (`lang/<code>.json`) win.
+    pub fn page_texts(
+        &self,
+        pack: &mosaikit_mskp::language::LanguagePack,
+    ) -> std::collections::BTreeMap<String, std::collections::BTreeMap<String, String>> {
+        let mut out = pack.ui.clone();
+        for p in self.list().iter().filter(|p| p.is_active()) {
+            if let Some(own) = p.own_lang.ui.get(&pack.code) {
+                out.entry(p.id.clone()).or_default().extend(own.iter().map(|(k, v)| (k.clone(), v.clone())));
+            }
+        }
+        out
     }
 
     /// The languages the active language plugins bring (code, name), by code.
@@ -165,6 +183,7 @@ impl Plugins {
                 installed_at: p.installed_at,
                 layout: p.layout.clone(),
                 language: p.language.clone(),
+                own_lang: p.own_lang.clone(),
             };
             let p = Arc::new(p);
             map.insert(id.to_string(), p.clone());
@@ -222,6 +241,7 @@ pub async fn load_installed(k: &Kernel) -> Result<()> {
                     installed_at: r.get(5),
                     layout,
                     language,
+                    own_lang: load_own_lang_dir(&dir, &id),
                 });
             }
             Err(e) => tracing::error!("plugin {id} {version} cannot be loaded from {}: {e}", dir.display()),
@@ -233,11 +253,55 @@ pub async fn load_installed(k: &Kernel) -> Result<()> {
 /// A language plugin on or off: its texts for the manifests of other plugins are in use only while it is
 /// active.
 fn sync_language(p: &LoadedPlugin) {
+    // what the plugin says about itself, in the languages it has: only while it is active
+    mosaikit_mskp::language::set_own_texts(
+        &p.id,
+        if p.is_active() { p.own_lang.manifest.clone() } else { Default::default() },
+    );
     if let Some(l) = &p.language {
         if p.is_active() {
             mosaikit_mskp::language::set_texts(&l.code, l.plugins.clone());
         } else {
             mosaikit_mskp::language::clear_texts(&l.code);
+        }
+    }
+}
+
+/// The files of a `lang/` folder, by path relative to it.
+fn read_lang_files(base: &Path) -> std::io::Result<std::collections::BTreeMap<String, Vec<u8>>> {
+    fn walk(
+        base: &Path,
+        d: &Path,
+        out: &mut std::collections::BTreeMap<String, Vec<u8>>,
+    ) -> std::io::Result<()> {
+        for e in std::fs::read_dir(d)? {
+            let p = e?.path();
+            if p.is_dir() {
+                walk(base, &p, out)?;
+            } else if let Ok(rel) = p.strip_prefix(base) {
+                out.insert(rel.to_string_lossy().replace('\\', "/"), std::fs::read(&p)?);
+            }
+        }
+        Ok(())
+    }
+    let mut files = std::collections::BTreeMap::new();
+    if base.is_dir() {
+        walk(base, base, &mut files)?;
+    }
+    Ok(files)
+}
+
+/// The texts a plugin brings for itself, from its folder (`lang/`); a language plugin brings none this way. Errors are
+/// logged and the plugin loads without them.
+pub(crate) fn load_own_lang_dir(dir: &Path, id: &str) -> Arc<mosaikit_mskp::language::OwnLang> {
+    let loaded = read_lang_files(&dir.join("lang"))
+        .map_err(|e| e.to_string())
+        .and_then(|f| mosaikit_mskp::language::load_own(&f).map_err(|e| e.to_string()));
+    match loaded {
+        Ok(o) => Arc::new(o),
+        Err(e) => {
+            tracing::error!("plugin {id}: the texts of lang/ are not used: {e}");
+            Arc::default()
         }
     }
 }

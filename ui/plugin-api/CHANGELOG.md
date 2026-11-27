@@ -4,6 +4,7 @@ Versions follow the plugin API: see `docs/architecture.md` §8.11 of Mosaikit. A
 version and is removed in the next.
 
 ## Unreleased
+n- Plugins bring their own translations: `lang/<code>.json` (the texts of the page, read through `msk.t`) and `lang/<code>.toml` (the manifest) in the package. They win over what a language plugin says about the plugin; the shell serves the merged texts. Additive.
 n- Plugin manifest `icon_image` (an image of `media/`): an illustrated icon that a layout may draw in place of the line icon. The shell marks the app item with `data-image` and sets `--msk-icon-image: url(...)`. Additive; a host older than 1.5 rejects the field, so a plugin that uses it requires `mosaikit = ">=1.5, <2"`.
 
 - `msk.band.set({ identity: { name, logo? } })` (type `BandIdentity`): the name of the open resource and a small logo (`data:` picture, png/jpeg/webp/gif) in the middle of the top band, in the place of the search bar, with the back button next to them; without a logo the shell draws a default one. Additive.

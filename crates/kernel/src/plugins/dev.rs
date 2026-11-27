@@ -100,6 +100,7 @@ pub async fn load_one(k: &Kernel, dir: &Path) -> Result<String> {
         installed_at: chrono::Utc::now(),
         layout,
         language,
+        own_lang: super::load_own_lang_dir(dir, &id),
     });
     Ok(id)
 }

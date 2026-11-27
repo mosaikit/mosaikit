@@ -14,6 +14,12 @@
 //!   host texts). The shell hands it to the page, which reads it with `msk.t(phrase, vars?)`; a phrase
 //!   without a translation stays in English. A plugin that does not use `msk.t` keeps its own texts.
 //!
+//! A plugin of any other kind can bring its own texts in the same way, in its `lang/` folder: `lang/<code>.json`
+//! (the texts inside its page, as `lang/ui/<plugin id>.json`) and `lang/<code>.toml` (the texts of its manifest, as
+//! `lang/plugins/<plugin id>.toml`). They count only when a language plugin with that code is installed (it brings
+//! the name of the language and the texts of the host), and they win over what that language plugin says about the
+//! plugin: the plugin is complete by itself and a new plugin needs no change in the language plugins.
+//!
 //! `en` and `it` are built into the host and cannot be replaced by a plugin.
 
 use std::collections::BTreeMap;
@@ -138,6 +144,81 @@ pub fn load_language(code: &str, name: &str, files: &BTreeMap<String, Vec<u8>>) 
     Ok(LanguagePack { code: code.to_string(), name: name.trim().to_string(), host, plugins, ui })
 }
 
+// ------------------------------------------------------------------ the texts a plugin brings for itself
+
+/// The texts a plugin brings for itself: by language code, the texts of its page and of its manifest.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct OwnLang {
+    /// code → English phrase → translation (`lang/<code>.json`)
+    pub ui: BTreeMap<String, BTreeMap<String, String>>,
+    /// code → texts of the manifest (`lang/<code>.toml`)
+    pub manifest: BTreeMap<String, Translation>,
+}
+
+/// Reads the files of the `lang/` folder of a plugin that is not a language plugin (names relative to it). A file that
+/// does not check out is an error; the kernel logs it and the plugin loads without its texts.
+pub fn load_own(files: &BTreeMap<String, Vec<u8>>) -> Result<OwnLang> {
+    let mut own = OwnLang::default();
+    for (path, bytes) in files {
+        let (stem, ext) = path.rsplit_once('.').unwrap_or((path.as_str(), ""));
+        if path.contains('/') || !matches!(ext, "json" | "toml") {
+            continue;
+        }
+        // only the files named after a language (host.json of a language plugin and the like are not ours)
+        if !(2..=3).contains(&stem.len()) || !stem.bytes().all(|b| b.is_ascii_lowercase()) {
+            continue;
+        }
+        if own.ui.len() + own.manifest.len() >= 2 * MAX_PLUGIN_FILES || bytes.len() > MAX_UI_FILE_BYTES {
+            return Err(bad(format!("{path}: too many or too large files")));
+        }
+        if ext == "json" {
+            let m: BTreeMap<String, String> =
+                serde_json::from_slice(bytes).map_err(|e| bad(format!("{path}: {e}")))?;
+            if m.len() > MAX_UI_TEXTS {
+                return Err(bad(format!("{path}: at most {MAX_UI_TEXTS} texts")));
+            }
+            if let Some(k) =
+                m.iter().find(|(k, v)| k.is_empty() || !text_ok(k) || !text_ok(v)).map(|(k, _)| k)
+            {
+                return Err(bad(format!(
+                    "{path}: invalid text «{}»",
+                    k.chars().take(40).collect::<String>()
+                )));
+            }
+            own.ui.insert(stem.to_string(), m);
+        } else {
+            let text = std::str::from_utf8(bytes).map_err(|_| bad(format!("{path}: not UTF-8")))?;
+            let tr: Translation = toml::from_str(text).map_err(|e| bad(format!("{path}: {e}")))?;
+            if [&tr.name, &tr.description, &tr.label]
+                .iter()
+                .any(|t| t.as_deref().is_some_and(|t| !text_ok(t)))
+            {
+                return Err(bad(format!("{path}: invalid text")));
+            }
+            own.manifest.insert(stem.to_string(), tr);
+        }
+    }
+    Ok(own)
+}
+
+type OwnTexts = BTreeMap<String, BTreeMap<String, Translation>>;
+static OWN: RwLock<OwnTexts> = RwLock::new(BTreeMap::new());
+
+/// Makes the manifest texts a plugin brings for itself available to [`crate::Manifest::localized`].
+pub fn set_own_texts(plugin: &str, by_code: BTreeMap<String, Translation>) {
+    let mut g = OWN.write().expect("lock own texts");
+    if by_code.is_empty() {
+        g.remove(plugin);
+    } else {
+        g.insert(plugin.to_string(), by_code);
+    }
+}
+
+/// The manifest texts a plugin brings for itself in a language.
+pub fn own_texts_for(code: &str, plugin: &str) -> Option<Translation> {
+    OWN.read().expect("lock own texts").get(plugin).and_then(|m| m.get(code)).cloned()
+}
+
 // ------------------------------------------------------------------ texts of the manifests
 
 type Texts = BTreeMap<String, BTreeMap<String, Translation>>;
@@ -169,6 +250,31 @@ mod tests {
             f.insert(format!("{PLUGINS_DIR}{id}.toml"), toml.as_bytes().to_vec());
         }
         f
+    }
+
+    #[test]
+    fn a_plugin_brings_its_own_texts() {
+        let mut f = BTreeMap::new();
+        f.insert("es.json".to_string(), br#"{"Upload": "Subir"}"#.to_vec());
+        f.insert("es.toml".to_string(), b"name = \"Archivos\"".to_vec());
+        f.insert("fr.json".to_string(), r#"{"Upload": "Téléverser"}"#.as_bytes().to_vec());
+        f.insert("notes.txt".to_string(), b"ignored".to_vec());
+        f.insert("ui/x.json".to_string(), b"ignored".to_vec());
+        let own = load_own(&f).unwrap();
+        assert_eq!(own.ui["es"]["Upload"], "Subir");
+        assert_eq!(own.ui["fr"]["Upload"], "Téléverser");
+        assert_eq!(own.manifest["es"].name.as_deref(), Some("Archivos"));
+        // a file that is not named after a language is not ours; a bad file, a control character
+        for (name, body) in [("es.json", "nope"), ("es.json", r#"{"a": "b\u0007"}"#)] {
+            let mut f = BTreeMap::new();
+            f.insert(name.to_string(), body.as_bytes().to_vec());
+            assert!(load_own(&f).is_err(), "{name} {body}");
+        }
+        assert_eq!(own_texts_for("es", "com.a.b"), None);
+        set_own_texts("com.a.b", own.manifest.clone());
+        assert_eq!(own_texts_for("es", "com.a.b").and_then(|t| t.name).as_deref(), Some("Archivos"));
+        set_own_texts("com.a.b", BTreeMap::new());
+        assert_eq!(own_texts_for("es", "com.a.b"), None);
     }
 
     #[test]
