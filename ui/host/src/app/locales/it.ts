@@ -2288,4 +2288,6 @@ export const IT: Record<string, string> = {
   'Create in {app}': 'Crea in {app}',
   'Change in {app}': 'Modifica in {app}',
   'Run in {app}': 'Esegui in {app}',
+  'Creates an item of «{subject}».': 'Crea un elemento di «{subject}».',
+  'Changes an item of «{subject}».': 'Modifica un elemento di «{subject}».',
 }

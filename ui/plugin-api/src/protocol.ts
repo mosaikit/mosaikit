@@ -795,6 +795,11 @@ export interface AssistantTool {
   description: string
   input_schema: unknown
   write: boolean
+  /** For showing the tool to the person, in their language: the app, the resource, what the tool does and the labels of its fields in the order of the manifest. The model reads the fields above. */
+  app?: string
+  subject?: string
+  verb?: 'list' | 'create' | 'update'
+  fields?: { key: string; label: string }[]
 }
 
 export interface AssistantToken {

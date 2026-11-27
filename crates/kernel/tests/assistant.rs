@@ -68,6 +68,13 @@ action = "create"
 
 [assistant]
 prompt = "Things are made of wood."
+
+[i18n.it]
+name = "Assistente di prova"
+
+[i18n.it.resources.items]
+label = "Elementi"
+fields = { title = "Titolo" }
 "#;
 
 struct World {
@@ -147,15 +154,15 @@ async fn nothing_is_available_until_the_administrator_configures_a_provider() {
 async fn tools_are_the_kernel_ones_plus_the_declared_ones_of_the_plugins() {
     let w = world().await;
     let anna: Vec<String> =
-        assistant::list_tools(&w.t, &w.anna).await.unwrap().into_iter().map(|t| t.name).collect();
+        assistant::list_tools(&w.t, &w.anna, "en").await.unwrap().into_iter().map(|t| t.name).collect();
     assert!(anna.contains(&"kernel__whoami".to_string()) && anna.contains(&"assist__read".to_string()));
     assert!(anna.contains(&"assist__make".to_string()));
     // the KPIs of the tenant are for the Manager
     assert!(!anna.contains(&"kernel__kpi_summary".to_string()));
     let mgr: Vec<String> =
-        assistant::list_tools(&w.t, &w.mgr).await.unwrap().into_iter().map(|t| t.name).collect();
+        assistant::list_tools(&w.t, &w.mgr, "en").await.unwrap().into_iter().map(|t| t.name).collect();
     assert!(mgr.contains(&"kernel__kpi_summary".to_string()));
-    let make = assistant::list_tools(&w.t, &w.anna)
+    let make = assistant::list_tools(&w.t, &w.anna, "en")
         .await
         .unwrap()
         .into_iter()
@@ -400,7 +407,7 @@ async fn mcp_lists_and_calls_tools_and_keeps_a_read_only_token_from_writing() {
 #[tokio::test]
 async fn a_tool_on_a_resource_needs_no_code_and_runs_as_the_person() {
     let w = world().await;
-    let tools = assistant::list_tools(&w.t, &w.anna).await.unwrap();
+    let tools = assistant::list_tools(&w.t, &w.anna, "en").await.unwrap();
     let add = tools.iter().find(|t| t.name == "assist__items_add").unwrap();
     // create always writes, and the schema comes from the fields of the resource
     assert!(add.write);
@@ -566,4 +573,31 @@ async fn files_are_checked_and_only_the_last_question_carries_them() {
     .await
     .unwrap();
     assert_eq!(r.messages[0].content, "fake: and now?", "the last question has no files");
+}
+
+#[tokio::test]
+async fn the_page_gets_the_names_of_the_tools_in_the_language_of_the_person() {
+    let w = world().await;
+    let add =
+        |tools: Vec<assistant::ToolSpec>| tools.into_iter().find(|t| t.name == "assist__items_add").unwrap();
+    let en = add(assistant::list_tools(&w.t, &w.anna, "en").await.unwrap());
+    assert_eq!((en.app.as_str(), en.subject.as_str(), en.verb.as_str()), ("Assist", "items", "create"));
+    assert_eq!(en.fields[0].label, "title");
+    let it = add(assistant::list_tools(&w.t, &w.anna, "it").await.unwrap());
+    assert_eq!(
+        (it.app.as_str(), it.subject.as_str(), it.verb.as_str()),
+        ("Assistente di prova", "Elementi", "create")
+    );
+    assert_eq!((it.fields[0].key.as_str(), it.fields[0].label.as_str()), ("title", "Titolo"));
+    // what the model reads does not change with the language
+    assert_eq!(en.description, it.description);
+    assert_eq!(en.input_schema, it.input_schema);
+    // a command tool has no resource to name
+    let read = assistant::list_tools(&w.t, &w.anna, "it")
+        .await
+        .unwrap()
+        .into_iter()
+        .find(|t| t.name == "assist__read")
+        .unwrap();
+    assert_eq!((read.subject.as_str(), read.verb.as_str(), read.fields.len()), ("", "", 0));
 }

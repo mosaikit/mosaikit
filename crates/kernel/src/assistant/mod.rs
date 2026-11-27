@@ -126,12 +126,29 @@ pub struct Message {
     pub tool_call_id: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+/// A field of the resource a tool works on, in the order of the manifest and in the language of the person.
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct FieldLabel {
+    pub key: String,
+    pub label: String,
+}
+
+#[derive(Debug, Clone, Serialize, Default)]
 pub struct ToolSpec {
     pub name: String,
     pub description: String,
     pub input_schema: Value,
     pub write: bool,
+    /// For the page, in the language of the person (the model reads the English fields above): the name of the app, the name of the
+    /// resource, what the tool does (`list`, `create`, `update`) and the labels of its fields in the order of the manifest.
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub app: String,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub subject: String,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub verb: String,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub fields: Vec<FieldLabel>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -226,8 +243,8 @@ pub async fn platform_models(k: &Kernel, admin: &crate::SessionUser) -> Result<V
 }
 
 /// The tools the person can use now (for the UI and the MCP `tools/list`).
-pub async fn list_tools(k: &Kernel, c: &Caller) -> Result<Vec<ToolSpec>> {
-    Ok(tools::registry(k, c).await?.into_iter().map(|t| t.spec).collect())
+pub async fn list_tools(k: &Kernel, c: &Caller, lang: &str) -> Result<Vec<ToolSpec>> {
+    Ok(tools::registry(k, c, lang).await?.into_iter().map(|t| t.spec).collect())
 }
 
 fn validate(messages: &[Message]) -> Result<Vec<Message>> {
@@ -382,7 +399,7 @@ pub async fn chat_with(
         )
         .with_code("assistant_rate_limited"));
     }
-    let registry = tools::registry(k, c).await?;
+    let registry = tools::registry(k, c, "en").await?;
     let specs: Vec<ToolSpec> = registry.iter().map(|t| t.spec.clone()).collect();
     // a small model (OpenAI-compatible servers) is given the tools of the question, not fifty: the registry still runs any it names
     let narrow = cfg.provider == "openai_compatible";
@@ -524,7 +541,7 @@ pub async fn invoke(
     allow_write: bool,
     via: &str,
 ) -> Result<Value> {
-    let registry = tools::registry(k, c).await?;
+    let registry = tools::registry(k, c, "en").await?;
     let tool = registry.iter().find(|t| t.spec.name == name).ok_or_else(|| {
         Error::not_found(format!("unknown tool '{name}'")).with_code("assistant_unknown_tool")
     })?;

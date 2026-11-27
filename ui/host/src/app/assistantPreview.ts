@@ -24,6 +24,11 @@ export interface ToolInfo {
   name: string
   description: string
   input_schema?: { properties?: Record<string, { description?: string; type?: string }> }
+  /** in the language of the person, from the platform: the app, the resource, what the tool does and the labels of its fields in order */
+  app?: string
+  subject?: string
+  verb?: string
+  fields?: { key: string; label: string }[]
 }
 
 /** `quick_note` → `Quick note` */
@@ -55,18 +60,23 @@ const cleanLabel = (s: string) => s.replace(/\s*\([^)]*\)\s*$/, '').trim()
 export function previewOf(tool: ToolInfo | undefined, name: string, args: unknown, lang: string, appName: string): Preview {
   const obj = args && typeof args === 'object' && !Array.isArray(args) ? (args as Record<string, unknown>) : {}
   const props = tool?.input_schema?.properties ?? {}
-  // the fields in the order of the schema, then what else the model sent
-  const keys = [...Object.keys(props).filter((k) => k in obj), ...Object.keys(obj).filter((k) => !(k in props))]
+  // the fields in the order of the manifest (the schema of the model has them in any order), then what else the model sent
+  const labels = new Map((tool?.fields ?? []).map((f) => [f.key, f.label]))
+  const ordered = (tool?.fields ?? []).map((f) => f.key).filter((k) => k in obj)
+  const keys = [...ordered, ...Object.keys(props).filter((k) => k in obj && !ordered.includes(k)), ...Object.keys(obj).filter((k) => !(k in props) && !ordered.includes(k))]
   const rows: PreviewRow[] = []
   for (const k of keys) {
     const value = formatValue(obj[k], lang)
     if (!value) continue
     // the id of an item to change is for the platform, not for the person
     if (k === 'id') continue
-    const label = props[k]?.description ? cleanLabel(props[k]!.description!) : humanize(k)
+    const label = labels.get(k) ?? (props[k]?.description ? cleanLabel(props[k]!.description!) : humanize(k))
     rows.push({ label, value, long: value.length > 80 || value.includes('\n') })
   }
-  const verb = /create|add|new/.test(name) ? 'create' : /update|edit|change/.test(name) ? 'update' : 'run'
-  const title = verb === 'create' ? t('Create in {app}', { app: appName }) : verb === 'update' ? t('Change in {app}', { app: appName }) : t('Run in {app}', { app: appName })
-  return { app: appName, title, lead: tool?.description ?? '', rows }
+  const verb = tool?.verb || (/create|add|new/.test(name) ? 'create' : /update|edit|change/.test(name) ? 'update' : 'run')
+  const app = tool?.app || appName
+  const title = verb === 'create' ? t('Create in {app}', { app }) : verb === 'update' ? t('Change in {app}', { app }) : t('Run in {app}', { app })
+  // for a change of an item the sentence is the platform's, in the language of the person; a command keeps the words of its plugin
+  const lead = tool?.subject && verb === 'create' ? t('Creates an item of «{subject}».', { subject: tool.subject }) : tool?.subject && verb === 'update' ? t('Changes an item of «{subject}».', { subject: tool.subject }) : (tool?.description ?? '')
+  return { app, title, lead, rows }
 }
