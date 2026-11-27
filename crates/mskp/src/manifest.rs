@@ -74,6 +74,13 @@ pub struct Manifest {
     /// runs later with the rights of the person who registered it. Needs `[requires] mosaikit = ">=1.0"`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub schedules: Vec<ScheduleDecl>,
+    /// Tools the AI assistant and the MCP server may call for this plugin (`[[assistant_tools]]`): at most
+    /// [`MAX_ASSISTANT_TOOLS`]. Each one points to a command of the plugin; the command runs with the rights of the person.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub assistant_tools: Vec<AssistantToolDecl>,
+    /// Domain context for the assistant (`[assistant] prompt`), at most [`MAX_ASSISTANT_PROMPT`] characters.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub assistant: Option<AssistantDecl>,
     /// Permissions of the people in the plugin beyond the standard ones of the kernel (`use`,
     /// `create`, `delete`, `share`), given by the permission profiles of the tenant. The kernel
     /// sends the permissions of the caller to the logic (`ctx.perms`) and to the UI: the plugin
@@ -1011,6 +1018,43 @@ impl ScheduleDecl {
     }
 }
 
+/// Most assistant tools of a plugin, longest description and prompt, in characters.
+pub const MAX_ASSISTANT_TOOLS: usize = 16;
+pub const MAX_ASSISTANT_DESCRIPTION: usize = 600;
+pub const MAX_ASSISTANT_PROMPT: usize = 2000;
+
+/// A tool of the AI assistant (`[[assistant_tools]]`): see docs/architecture.md, "AI assistant".
+/// The texts are for the model, so they are English and are not translated.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct AssistantToolDecl {
+    /// identifier, unique in the plugin; the tool is offered as `<plugin short name>__<name>`
+    pub name: String,
+    /// what the tool does and when to use it
+    pub description: String,
+    /// a command of the plugin logic that the tool calls with the arguments of the model
+    pub command: String,
+    /// JSON Schema (an object) of the arguments
+    #[serde(default = "empty_object_schema")]
+    pub input_schema: serde_json::Value,
+    /// the tool changes data: the assistant proposes it and the person confirms; an MCP token reads only
+    /// unless the person turned writes on for it
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub write: bool,
+}
+
+fn empty_object_schema() -> serde_json::Value {
+    serde_json::json!({ "type": "object", "properties": {} })
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[serde(deny_unknown_fields)]
+pub struct AssistantDecl {
+    /// what the assistant needs to know about the domain of the plugin
+    #[serde(default)]
+    pub prompt: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct KpiDecl {
@@ -1234,6 +1278,7 @@ impl Manifest {
             }
         }
         self.validate_schedules().map_err(Error::Manifest)?;
+        self.validate_assistant().map_err(Error::Manifest)?;
         if let Some(db) = &self.requires.database {
             if db != "postgres" {
                 return bad(format!("requires.database '{db}' invalid (only \"postgres\")"));
@@ -1581,6 +1626,40 @@ impl Manifest {
                         t.key
                     ));
                 }
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_assistant(&self) -> std::result::Result<(), String> {
+        if self.assistant_tools.len() > MAX_ASSISTANT_TOOLS {
+            return Err(format!("assistant_tools: at most {MAX_ASSISTANT_TOOLS} entries"));
+        }
+        let mut names = std::collections::HashSet::new();
+        for t in &self.assistant_tools {
+            let n = &t.name;
+            if !is_identifier(n) || !names.insert(n.as_str()) {
+                return Err(format!("assistant_tools: name '{n}' invalid or duplicate"));
+            }
+            if !is_identifier(&t.command) {
+                return Err(format!("assistant_tools '{n}': command '{}' is not an identifier", t.command));
+            }
+            let d = t.description.trim();
+            if d.is_empty() || d.chars().count() > MAX_ASSISTANT_DESCRIPTION {
+                return Err(format!(
+                    "assistant_tools '{n}': description required, at most {MAX_ASSISTANT_DESCRIPTION} characters"
+                ));
+            }
+            if t.input_schema.get("type").and_then(|v| v.as_str()) != Some("object") {
+                return Err(format!("assistant_tools '{n}': input_schema must be an object schema (type = \"object\")"));
+            }
+            if t.input_schema.to_string().len() > 8192 {
+                return Err(format!("assistant_tools '{n}': input_schema is larger than 8 KiB"));
+            }
+        }
+        if let Some(a) = &self.assistant {
+            if a.prompt.chars().count() > MAX_ASSISTANT_PROMPT {
+                return Err(format!("assistant.prompt: at most {MAX_ASSISTANT_PROMPT} characters"));
             }
         }
         Ok(())
@@ -2639,6 +2718,66 @@ service_keys = { b = { label = \"y\" } }
             let e = Manifest::from_toml(&with(bad)).unwrap_err().to_string();
             assert!(e.contains("run_commands"), "{bad}: {e}");
         }
+    }
+
+    #[test]
+    fn assistant_tools() {
+        let with = |extra: &str| format!("{NOTES}
+{extra}");
+        let ok = with(
+            "[[assistant_tools]]
+name = \"find\"
+description = \"Finds notes\"
+command = \"search\"
+input_schema = { type = \"object\", properties = { q = { type = \"string\" } }, required = [\"q\"] }
+
+[[assistant_tools]]
+name = \"create\"
+description = \"Creates a note\"
+command = \"create_note\"
+write = true
+
+[assistant]
+prompt = \"Notes are markdown.\"
+",
+        );
+        let m = Manifest::from_toml(&ok).unwrap();
+        assert_eq!(m.assistant_tools.len(), 2);
+        assert!(!m.assistant_tools[0].write && m.assistant_tools[1].write);
+        assert_eq!(m.assistant_tools[0].input_schema["required"][0], "q");
+        assert_eq!(m.assistant_tools[1].input_schema["type"], "object");
+        for (bad, what) in [
+            ("name = \"Bad Name\"
+description = \"x\"
+command = \"c\"", "name"),
+            ("name = \"a\"
+description = \"\"
+command = \"c\"", "description"),
+            ("name = \"a\"
+description = \"x\"
+command = \"C!\"", "command"),
+            ("name = \"a\"
+description = \"x\"
+command = \"c\"
+input_schema = { type = \"string\" }", "input_schema"),
+            ("name = \"a\"
+description = \"x\"
+command = \"c\"
+extra = 1", "extra"),
+        ] {
+            let e = Manifest::from_toml(&with(&format!("[[assistant_tools]]
+{bad}"))).unwrap_err().to_string();
+            assert!(e.contains(what), "{bad}: {e}");
+        }
+        let dup = with("[[assistant_tools]]
+name = \"a\"
+description = \"x\"
+command = \"c\"
+[[assistant_tools]]
+name = \"a\"
+description = \"y\"
+command = \"d\"");
+        assert!(Manifest::from_toml(&dup).unwrap_err().to_string().contains("duplicate"));
     }
 
     #[test]
