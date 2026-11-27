@@ -94,8 +94,10 @@ async fn public_links() {
     );
     assert_eq!(crud::list_ctx(&t, &r.ctx(), &p, "notes", None, None).await.unwrap().rows.len(), 1);
 
-    // lifetime beyond the maximum of the tenant (30 days by default)
-    assert_eq!(links::create(&t, &anna, rid, Some(365), None).await.unwrap_err().kind, Kind::BadRequest);
+    // links are permanent by default: any lifetime is allowed; with a maximum of the tenant, a longer one is refused
+    let mut limited = anna.clone();
+    limited.tenant.settings.public_link_max_days = 30;
+    assert_eq!(links::create(&t, &limited, rid, Some(365), None).await.unwrap_err().kind, Kind::BadRequest);
 
     // password
     let lp = links::create(&t, &anna, rid, None, Some("secret1")).await.unwrap();
