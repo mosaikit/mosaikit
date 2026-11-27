@@ -103,7 +103,11 @@ export function PlatformAssistantPanel() {
           </div>
           <div className="grid gap-1.5">
             <Label className="text-sm font-semibold">{t('Provider')}</Label>
-            <Select value={cur.provider} onValueChange={(v) => set({ provider: v })}>
+            <Select
+              value={cur.provider}
+              // an OpenAI-compatible server starts with the address of a local Ollama, so the field is never an empty-looking one
+              onValueChange={(v) => set({ provider: v, base_url: v === 'openai_compatible' && !cur.base_url.trim() ? 'http://localhost:11434/v1' : cur.base_url })}
+            >
               <SelectTrigger aria-label={t('Provider')}>
                 <SelectValue placeholder={t('Choose the provider')} />
               </SelectTrigger>
@@ -118,7 +122,7 @@ export function PlatformAssistantPanel() {
           {(needsAddress || cur.base_url) && (
             <div className="grid gap-1.5">
               <Label htmlFor="as-url" className="text-sm font-semibold">{t('Address of the server')}</Label>
-              <Input id="as-url" value={cur.base_url} placeholder={needsAddress ? 'http://localhost:11434/v1' : ''} onChange={(e) => set({ base_url: e.target.value })} />
+              <Input id="as-url" value={cur.base_url} onChange={(e) => set({ base_url: e.target.value })} />
               <span className="text-xs text-muted-foreground">{t('Only the Administrator sets an address. Leave it empty for Anthropic and OpenAI.')}</span>
             </div>
           )}
