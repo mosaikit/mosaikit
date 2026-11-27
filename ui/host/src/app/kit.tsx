@@ -483,7 +483,7 @@ export interface FieldDef {
 }
 
 /** Strength of a password, 0 (empty) to 4: length and variety of characters, and a penalty for repeated ones. */
-export function passwordScore(p: string): number {
+function passwordScore(p: string): number {
   if (!p) return 0
   let s = 0
   if (p.length >= 8) s++
@@ -599,14 +599,8 @@ export function FormDialog({
           {fields.map((f) => (
             <Fragment key={f.name}>
             <div className="grid gap-1.5">
-              <Label htmlFor={`f-${f.name}`}>
+              <Label htmlFor={`f-${f.name}`} className={f.required ? "after:ml-1 after:text-destructive after:content-['*']" : undefined}>
                 {f.label}
-                {f.required && (
-                  <span aria-hidden="true" className="text-destructive">
-                    {' '}
-                    *
-                  </span>
-                )}
               </Label>
               {f.options ? (
                 <Select value={v[f.name]} onValueChange={(x) => setV({ ...v, [f.name]: x })}>
@@ -646,12 +640,8 @@ export function FormDialog({
               <>
                 <PasswordStrength value={v[f.name] ?? ''} />
                 <div className="grid gap-1.5">
-                  <Label htmlFor={`f-${f.name}${REPEAT}`}>
+                  <Label htmlFor={`f-${f.name}${REPEAT}`} className="after:ml-1 after:text-destructive after:content-['*']">
                     {t('Repeat the password')}
-                    <span aria-hidden="true" className="text-destructive">
-                      {' '}
-                      *
-                    </span>
                   </Label>
                   <Input
                     id={`f-${f.name}${REPEAT}`}

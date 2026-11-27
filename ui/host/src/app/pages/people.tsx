@@ -1271,12 +1271,8 @@ function MembershipFields({ tenants, value, onChange, prefix, tenantError }: { t
   return (
     <>
       <div className="grid gap-1.5">
-        <Label htmlFor={`${prefix}-tenant`}>
+        <Label htmlFor={`${prefix}-tenant`} className="after:ml-1 after:text-destructive after:content-['*']">
           {t('Tenant')}
-          <span aria-hidden="true" className="text-destructive">
-            {' '}
-            *
-          </span>
         </Label>
         <Select value={value.tenant} onValueChange={(x) => onChange({ ...value, tenant: x, profile: DEFAULT })}>
           <SelectTrigger id={`${prefix}-tenant`} name="tenant" aria-required aria-invalid={tenantError ? true : undefined} className="w-full">
@@ -1358,12 +1354,7 @@ function NewPersonDialog({ open, onClose, tenants, onCreated }: { open: boolean;
   if (v.password && v.password2 !== v.password) errs.password2 = v.password2 ? t('The two passwords are not the same') : required
   const shown = (k: string) => (errs[k] && (tried || touched.has(k)) ? errs[k] : undefined)
   const touch = (k: string) => setTouched((x) => new Set(x).add(k))
-  const star = (
-    <span aria-hidden="true" className="text-destructive">
-      {' '}
-      *
-    </span>
-  )
+  const star = "after:ml-1 after:text-destructive after:content-['*']"
   const msg = (k: string) =>
     shown(k) && (
       <p role="alert" className="text-xs text-destructive">
@@ -1399,10 +1390,7 @@ function NewPersonDialog({ open, onClose, tenants, onCreated }: { open: boolean;
           <p className="text-xs text-muted-foreground">{t('Fields marked with * are required.')}</p>
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-1.5">
-              <Label htmlFor="np-user">
-                {t('Username')}
-                {star}
-              </Label>
+              <Label htmlFor="np-user" className={star}>{t('Username')}</Label>
               <Input id="np-user" name="username" aria-required aria-invalid={shown('username') ? true : undefined} onBlur={() => touch('username')} value={v.username} onChange={(e) => setV({ ...v, username: e.target.value })} />
               {msg('username')}
             </div>
@@ -1412,10 +1400,7 @@ function NewPersonDialog({ open, onClose, tenants, onCreated }: { open: boolean;
             </div>
           </div>
           <div className="grid gap-1.5">
-            <Label htmlFor="np-email">
-              {t('Email')}
-              {star}
-            </Label>
+            <Label htmlFor="np-email" className={star}>{t('Email')}</Label>
             <Input id="np-email" name="email" type="email" aria-required aria-invalid={shown('email') ? true : undefined} onBlur={() => touch('email')} value={v.email} onChange={(e) => setV({ ...v, email: e.target.value })} />
             {msg('email')}
           </div>
@@ -1429,10 +1414,7 @@ function NewPersonDialog({ open, onClose, tenants, onCreated }: { open: boolean;
             <>
               <PasswordStrength value={v.password} />
               <div className="grid gap-1.5">
-                <Label htmlFor="np-pw2">
-                  {t('Repeat the password')}
-                  {star}
-                </Label>
+                <Label htmlFor="np-pw2" className={star}>{t('Repeat the password')}</Label>
                 <Input id="np-pw2" name="password2" type="password" autoComplete="new-password" aria-required aria-invalid={shown('password2') ? true : undefined} onBlur={() => touch('password2')} value={v.password2} onChange={(e) => setV({ ...v, password2: e.target.value })} />
                 {msg('password2')}
               </div>

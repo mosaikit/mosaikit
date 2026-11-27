@@ -165,14 +165,8 @@ function slugOf(name: string): string {
 function Field({ id, label, hint, required, error, children }: { id: string; label: string; hint?: ReactNode; required?: boolean; error?: string; children: ReactNode }) {
   return (
     <div className="grid gap-1.5">
-      <Label htmlFor={id}>
+      <Label htmlFor={id} className={required ? "after:ml-1 after:text-destructive after:content-['*']" : undefined}>
         {label}
-        {required && (
-          <span aria-hidden="true" className="text-destructive">
-            {' '}
-            *
-          </span>
-        )}
       </Label>
       {children}
       {error ? (
