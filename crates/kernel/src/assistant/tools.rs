@@ -5,6 +5,8 @@ use std::collections::HashSet;
 
 use serde_json::{json, Value};
 
+use mosaikit_mskp::{AssistantAction, FieldKind, ResourceDecl};
+
 use super::ToolSpec;
 use crate::{Caller, Error, Kernel, Result};
 
@@ -15,6 +17,8 @@ pub const MAX_RESULT_CHARS: usize = 20_000;
 pub enum Target {
     Kernel,
     Plugin { plugin: String, command: String },
+    /// the generic CRUD of a resource of a plugin
+    Resource { plugin: String, resource: String, action: AssistantAction },
 }
 
 #[derive(Debug, Clone)]
@@ -86,14 +90,23 @@ pub async fn registry(k: &Kernel, c: &Caller) -> Result<Vec<Tool>> {
             if !seen.insert(name.clone()) {
                 continue;
             }
+            let (target, schema) = match (&t.command, &t.resource, t.action) {
+                (Some(command), _, _) => (
+                    Target::Plugin { plugin: p.id.clone(), command: command.clone() },
+                    t.input_schema.clone().unwrap_or_else(no_args),
+                ),
+                (None, Some(resource), Some(action)) => {
+                    let Some(d) = p.manifest.resources.iter().find(|d| &d.name == resource) else { continue };
+                    (
+                        Target::Resource { plugin: p.id.clone(), resource: resource.clone(), action },
+                        t.input_schema.clone().unwrap_or_else(|| resource_schema(d, action)),
+                    )
+                }
+                _ => continue,
+            };
             tools.push(Tool {
-                spec: ToolSpec {
-                    name,
-                    description: t.description.clone(),
-                    input_schema: t.input_schema.clone(),
-                    write: t.write,
-                },
-                target: Target::Plugin { plugin: p.id.clone(), command: t.command.clone() },
+                spec: ToolSpec { name, description: t.description.clone(), input_schema: schema, write: t.is_write() },
+                target,
             });
         }
     }
@@ -116,6 +129,36 @@ pub async fn plugin_prompts(k: &Kernel, c: &Caller) -> Result<Vec<(String, Strin
         }
     }
     Ok(out)
+}
+
+/// The schema of the arguments of a tool that works on a resource, from its fields.
+pub fn resource_schema(d: &ResourceDecl, action: AssistantAction) -> Value {
+    if action == AssistantAction::List {
+        return json!({ "type": "object", "properties": {
+            "q": { "type": "string", "description": "words to look for (optional)" },
+            "limit": { "type": "integer", "description": "most items to return (default 20, at most 50)" } } });
+    }
+    let mut props = serde_json::Map::new();
+    let mut required: Vec<Value> = Vec::new();
+    if action == AssistantAction::Update {
+        props.insert("id".into(), json!({ "type": "string", "description": "id of the item to change" }));
+        required.push(json!("id"));
+    }
+    for f in d.fields.iter().filter(|f| !f.hidden) {
+        let label = if f.label.is_empty() { f.key.clone() } else { f.label.clone() };
+        let def = match f.kind {
+            FieldKind::Text => json!({ "type": "string", "description": label }),
+            FieldKind::Number => json!({ "type": "number", "description": label }),
+            FieldKind::Bool => json!({ "type": "boolean", "description": label }),
+            FieldKind::Date => json!({ "type": "string", "description": format!("{label} (YYYY-MM-DD)") }),
+            FieldKind::Choice => json!({ "type": "string", "enum": f.options, "description": label }),
+        };
+        props.insert(f.key.clone(), def);
+        if f.required && action == AssistantAction::Create {
+            required.push(json!(f.key));
+        }
+    }
+    json!({ "type": "object", "properties": props, "required": required })
 }
 
 /// Checks the arguments against the simple parts of the schema (an object, the required keys, the basic types).
@@ -161,7 +204,38 @@ pub async fn run(k: &Kernel, c: &Caller, lang: &str, tool: &Tool, args: Value) -
     check_args(&tool.spec.input_schema, &args)?;
     match &tool.target {
         Target::Plugin { plugin, command } => crate::crud::call(k, c, plugin, command, args).await,
+        Target::Resource { plugin, resource, action } => run_resource(k, c, plugin, resource, *action, args).await,
         Target::Kernel => run_kernel(k, c, lang, tool.spec.name.trim_start_matches("kernel__"), &args).await,
+    }
+}
+
+async fn run_resource(
+    k: &Kernel,
+    c: &Caller,
+    plugin: &str,
+    resource: &str,
+    action: AssistantAction,
+    args: Value,
+) -> Result<Value> {
+    let mut obj = args.as_object().cloned().unwrap_or_default();
+    match action {
+        AssistantAction::List => {
+            let q = obj.get("q").and_then(Value::as_str).map(str::to_string).filter(|q| !q.trim().is_empty());
+            let limit = obj.get("limit").and_then(Value::as_u64).unwrap_or(20).clamp(1, 50) as usize;
+            let r = crate::crud::list(k, c, plugin, resource, q.as_deref(), None).await?;
+            let v = serde_json::to_value(r)?;
+            let rows = v["rows"].as_array().cloned().unwrap_or_default();
+            let total = rows.len();
+            Ok(json!({ "total": total, "shown": total.min(limit), "rows": rows.into_iter().take(limit).collect::<Vec<_>>() }))
+        }
+        AssistantAction::Create => crate::crud::create(k, c, plugin, resource, &obj, None).await,
+        AssistantAction::Update => {
+            let id = obj
+                .remove("id")
+                .and_then(|v| v.as_str().and_then(|s| s.parse::<uuid::Uuid>().ok()))
+                .ok_or_else(|| Error::bad("'id' must be the id of an item").with_code("assistant_bad_args"))?;
+            crate::crud::update(k, c, plugin, resource, id, &obj).await
+        }
     }
 }
 

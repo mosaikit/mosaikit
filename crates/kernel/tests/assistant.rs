@@ -55,6 +55,18 @@ description = "Makes a thing"
 command = "make_thing"
 write = true
 
+[[assistant_tools]]
+name = "items_list"
+description = "Lists items"
+resource = "items"
+action = "list"
+
+[[assistant_tools]]
+name = "items_add"
+description = "Adds an item"
+resource = "items"
+action = "create"
+
 [assistant]
 prompt = "Things are made of wood."
 "#;
@@ -331,4 +343,30 @@ async fn mcp_lists_and_calls_tools_and_keeps_a_read_only_token_from_writing() {
     assert_eq!(r["error"]["code"], -32601);
     let r = mcp::handle(&w.t, &w.anna, "en", false, &call("nope", json!({}))).await.unwrap();
     assert_eq!(r["result"]["isError"], true);
+}
+
+#[tokio::test]
+async fn a_tool_on_a_resource_needs_no_code_and_runs_as_the_person() {
+    let w = world().await;
+    let tools = assistant::list_tools(&w.t, &w.anna).await.unwrap();
+    let add = tools.iter().find(|t| t.name == "assist__items_add").unwrap();
+    // create always writes, and the schema comes from the fields of the resource
+    assert!(add.write);
+    assert_eq!(add.input_schema["properties"]["title"]["type"], "string");
+    let list = tools.iter().find(|t| t.name == "assist__items_list").unwrap();
+    assert!(!list.write);
+    // a read-only caller cannot add; the person who confirmed can
+    let e = assistant::invoke(&w.t, &w.anna, "en", "assist__items_add", json!({"title": "wood"}), false, "mcp").await.unwrap_err();
+    assert_eq!(code(&e), "assistant_read_only");
+    let made = assistant::invoke(&w.t, &w.anna, "en", "assist__items_add", json!({"title": "wood"}), true, "confirm").await.unwrap();
+    assert_eq!(made["values"]["title"], "wood");
+    let seen = assistant::invoke(&w.t, &w.anna, "en", "assist__items_list", json!({"q": "wood"}), false, "mcp").await.unwrap();
+    assert_eq!(seen["total"], 1);
+    assert_eq!(seen["rows"][0]["values"]["title"], "wood");
+    // another tenant sees nothing of it
+    let other = assistant::invoke(&w.t, &w.carl, "en", "assist__items_list", json!({}), false, "mcp").await.unwrap();
+    assert_eq!(other["total"], 0);
+    // a bad id is an error for the model, not a crash
+    let tools_update = assistant::invoke(&w.t, &w.anna, "en", "assist__items_add", json!({"title": 5}), true, "confirm").await.unwrap_err();
+    assert_eq!(code(&tools_update), "assistant_bad_args");
 }
