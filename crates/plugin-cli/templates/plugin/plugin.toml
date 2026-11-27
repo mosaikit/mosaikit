@@ -27,6 +27,30 @@ fields = [
   { key = "status", label = "Status", kind = "choice", options = ["draft", "active", "closed"] },
 ]
 
+# Tools of the AI assistant: it lists, creates and edits the items of the resource above as the person who asks, with no code of
+# yours (a tool that creates or edits is only proposed: the person confirms it). The texts are for the model: write them in English.
+[[assistant_tools]]
+name = "list_{{table}}"
+description = "Lists or searches the {{label}} the person can see. Use q to look for words."
+resource = "{{table}}"
+action = "list"
+
+[[assistant_tools]]
+name = "create_{{table}}"
+description = "Creates an item of {{label}} with a title, notes and a status (draft, active or closed)."
+resource = "{{table}}"
+action = "create"
+
+[[assistant_tools]]
+name = "update_{{table}}"
+description = "Changes an item of {{label}}; give the id found with list_{{table}}."
+resource = "{{table}}"
+action = "update"
+
+# What the assistant needs to know about this domain (optional).
+[assistant]
+prompt = "Describe here what a {{label}} item is and what its statuses mean."
+
 [ui]
 entry = "index.html"
 

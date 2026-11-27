@@ -304,7 +304,7 @@ down is skipped, unless the schedule was registered with `catch_up_once`: then i
 
 ## `[[assistant_tools]]` and `[assistant]`
 
-Tools the AI assistant and the MCP server may call for the plugin (at most 16). A tool points to a command of the
+Tools the AI assistant and the MCP server may call for the plugin (at most 16; `mosaikit-plugin new` writes list, create and update tools for the first resource, and `validate` tells a plugin with resources and no tools). A tool points to a command of the
 plugin logic and runs with the rights of the person (role, ACL, RLS), never more. The texts are for the model: write
 them in English, they are not translated. Offered to the model as `<plugin short name>__<name>`.
 
