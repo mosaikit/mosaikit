@@ -7,8 +7,9 @@ import { useUi } from '../ui-context.ts'
 import { pickOptions, sharePre } from './sharepre.ts'
 import { pageTextsFor, t } from '../app/i18n.ts'
 import { timed } from '../app/devlog.ts'
-import { pluginInput, watchPresence } from '../app/presence.ts'
 import { closeAssistant } from '../app/assistant-state.ts'
+import { previewOf, type ToolInfo } from '../app/assistantPreview.ts'
+import { pluginInput, watchPresence } from '../app/presence.ts'
 import { NAV_RESELECT, resetBand, sanitizeBand, setBand } from '../app/contextband.ts'
 import ExtensionTab, { type TabState } from './ExtensionTab.tsx'
 
@@ -294,8 +295,17 @@ export default function PluginFrame({ plugin, session, ctx, reloadKey, ui: shell
           case 'assistant.call': {
             if (plugin.id !== ASSISTANT_PLUGIN) throw new OpError('this plugin may not use the assistant', 'forbidden')
             const name = toolName(m.args?.name)
-            const shown = JSON.stringify(m.args?.arguments ?? {}, null, 2).slice(0, 600)
-            if (!(await ui.confirm(`${t('Run this action of the assistant?')}\n\n${name}\n${shown}`, false))) {
+            // the host asks the platform what the tool is (the labels of its fields) and says it in words, not as JSON
+            let tool: ToolInfo | undefined
+            try {
+              tool = ((await execute(routeOp(tenant, plugin.id, 'assistant.tools', {}))) as ToolInfo[]).find((x) => x.name === name)
+            } catch {
+              /* the preview then has the names of the fields */
+            }
+            const short = name.split('__')[0] ?? ''
+            const appName = ctx.plugins.find((p) => p.id.endsWith(`.${short}`))?.name ?? (short ? short[0]!.toUpperCase() + short.slice(1) : '')
+            const pv = previewOf(tool, name, m.args?.arguments, shell?.lang ?? 'en', appName)
+            if (!(await ui.confirmAction({ title: pv.title, lead: pv.lead, app: pv.app, rows: pv.rows, confirm: t('Confirm') }))) {
               reply({ ok: { cancelled: true } })
               return
             }
