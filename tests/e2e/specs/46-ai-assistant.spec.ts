@@ -80,7 +80,9 @@ test.describe.serial('AI assistant', () => {
     await expect(proposal).toContainText('Create in Notes')
     await expect(proposal.locator('.as-field dt').first()).toHaveText('Title')
     await expect(proposal).toContainText('made by the assistant')
-    await expect(proposal).not.toContainText('{')
+    await expect(proposal.locator('.as-fields')).not.toContainText('{')
+    // the raw data are behind a link, not on the card
+    await expect(proposal.locator('pre.as-detail')).toBeHidden()
     // declining in the dialog of the host runs nothing
     await proposal.getByTestId('assistant-run').click()
     const dialog = page.getByRole('alertdialog')
