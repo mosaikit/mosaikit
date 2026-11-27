@@ -395,7 +395,11 @@ action = \"list\"
 ";
         plugin(d.path(), &format!("{MIN}{res}{tool}"), None);
         let r = validate(d.path()).unwrap();
-        assert!(r.ok() && !r.findings.iter().any(|f| f.message.contains("[[assistant_tools]]")), "{:?}", r.findings);
+        assert!(
+            r.ok() && !r.findings.iter().any(|f| f.message.contains("[[assistant_tools]]")),
+            "{:?}",
+            r.findings
+        );
         // a tool on a resource the plugin does not have is an error of the manifest
         let bad = tool.replace("resource = \"notes\"", "resource = \"nope\"");
         plugin(d.path(), &format!("{MIN}{res}{bad}"), None);
