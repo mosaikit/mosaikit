@@ -110,7 +110,7 @@ async fn chat_stream(
     let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<SseEvent>();
     let lang = request_lang(&h);
     let k = s.k.clone();
-    tokio::spawn(async move {
+    let task = tokio::spawn(async move {
         let sink = tx.clone();
         let emit = move |e: assistant::Event| {
             let name = match &e {
@@ -128,10 +128,21 @@ async fn chat_stream(
         };
         let _ = tx.send(last);
     });
-    let body = futures_util::stream::unfold(rx, |mut rx| async move {
-        rx.recv().await.map(|e| (Ok::<_, std::convert::Infallible>(e), rx))
+    // the person pressed stop (the page closed the stream): the loop ends there, and the request to the model with it, so a local
+    // model stops computing. Only read tools run in the loop, so nothing is left half done.
+    let body = futures_util::stream::unfold((rx, StopOnDrop(task)), |(mut rx, guard)| async move {
+        rx.recv().await.map(|e| (Ok::<_, std::convert::Infallible>(e), (rx, guard)))
     });
     no_store(Sse::new(body).into_response())
+}
+
+/// Ends a task when it is dropped: the stream of the answer owns it, so it lives as long as someone reads the answer.
+struct StopOnDrop(tokio::task::JoinHandle<()>);
+
+impl Drop for StopOnDrop {
+    fn drop(&mut self) {
+        self.0.abort();
+    }
 }
 
 #[derive(Deserialize)]

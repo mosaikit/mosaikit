@@ -754,6 +754,8 @@ export interface AssistantChatOptions {
   context?: unknown
   /** the model to use (one of `models()`); absent: the default */
   model?: string
+  /** aborting it stops the reply: `chatStream` then resolves with `cancelled: true`, and the server stops asking the model */
+  signal?: AbortSignal
 }
 
 export type AssistantStreamEvent =
@@ -762,6 +764,8 @@ export type AssistantStreamEvent =
   | { type: 'tool'; name: string }
 
 export interface AssistantChatResult {
+  /** the person stopped the reply: nothing else follows */
+  cancelled?: boolean
   /** what the loop added to the chat (assistant and tool messages) */
   messages: AssistantMessage[]
   proposals: AssistantProposal[]

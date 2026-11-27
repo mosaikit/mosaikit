@@ -392,10 +392,15 @@ export class Msk {
         else if (e.type === 'message') onEvent({ type: 'message', message: e.data.message as AssistantMessage })
         else if (e.type === 'tool') onEvent({ type: 'tool', name: String(e.data.name ?? '') })
       })
+      const stop = () => void this.bridge.call<void>('assistant.chat.cancel', { handle }).catch(() => {})
+      options?.signal?.addEventListener('abort', stop, { once: true })
+      if (options?.signal?.aborted) stop()
       try {
-        return await this.bridge.call<AssistantChatResult>('assistant.chat.stream', { messages, ...options, handle })
+        const { signal: _signal, ...sent } = options ?? {}
+        return await this.bridge.call<AssistantChatResult>('assistant.chat.stream', { messages, ...sent, handle })
       } finally {
         off()
+        options?.signal?.removeEventListener('abort', stop)
       }
     },
     call: (name, args) => this.bridge.call('assistant.call', { name, arguments: args }),

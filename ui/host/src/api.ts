@@ -120,13 +120,14 @@ export async function api<T = unknown>(method: string, path: string, body?: unkn
  * A POST whose answer is a stream of server-sent events (`event:` and `data:` lines, JSON data): `onEvent` gets each one as it
  * arrives, the `done` event ends the call and is returned, an `error` event or a refusal throws an `ApiError`.
  */
-export async function apiStream<T = unknown>(path: string, body: unknown, onEvent: (type: string, data: unknown) => void): Promise<T> {
+export async function apiStream<T = unknown>(path: string, body: unknown, onEvent: (type: string, data: unknown) => void, signal?: AbortSignal): Promise<T> {
   const headers: Record<string, string> = { 'X-CSRF-Token': csrf, 'Content-Type': 'application/json', Accept: 'text/event-stream' }
   if (language) headers['Accept-Language'] = language
   let r: Response
   try {
-    r = await fetch(appUrl(path), { method: 'POST', headers, body: JSON.stringify(body), credentials: 'same-origin', cache: 'no-store' })
-  } catch {
+    r = await fetch(appUrl(path), { method: 'POST', headers, body: JSON.stringify(body), credentials: 'same-origin', cache: 'no-store', signal })
+  } catch (e) {
+    if (e instanceof DOMException && e.name === 'AbortError') throw e
     throw unavailable()
   }
   if (!r.ok || !r.body) {

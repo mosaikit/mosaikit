@@ -91,6 +91,10 @@ export default function PluginFrame({ plugin, session, ctx, reloadKey, ui: shell
     [origin],
   )
 
+  // the chats of the assistant that are running, to stop them (`assistant.chat.cancel`)
+  const chats = useRef(new Map<string, AbortController>())
+  useEffect(() => () => chats.current.forEach((c) => c.abort()), [src])
+
   // real-time channels the page opened (`msk.realtime`): one EventSource each, closed with the page or the document
   const streams = useRef(new Map<string, EventSource>())
   const closeStreams = useCallback(() => {
@@ -248,16 +252,36 @@ export default function PluginFrame({ plugin, session, ctx, reloadKey, ui: shell
             return
           }
           // the chat as a stream: pieces of the answer reach the page as `assistant.event`, the reply is the final answer
+          // the person pressed stop: the stream of that chat is closed, and the server ends the loop with it
+          case 'assistant.chat.cancel': {
+            if (plugin.id !== ASSISTANT_PLUGIN) throw new OpError('this plugin may not use the assistant', 'forbidden')
+            chats.current.get(String(m.args?.handle ?? ''))?.abort()
+            reply({ ok: null })
+            return
+          }
           case 'assistant.chat.stream': {
             if (plugin.id !== ASSISTANT_PLUGIN) throw new OpError('this plugin may not use the assistant', 'forbidden')
             const handle = String(m.args?.handle ?? '')
             if (!/^[0-9a-f-]{36}$/i.test(handle)) throw new OpError('invalid handle')
             const msgs = m.args?.messages
             if (!Array.isArray(msgs) || msgs.length > 120) throw new OpError('invalid messages')
-            const out = await apiStream(`/api/t/${enc(tenant)}/assistant/chat/stream`, { messages: msgs, context: m.args?.context ?? null, model: typeof m.args?.model === 'string' ? m.args.model.slice(0, 200) : null }, (type, data) =>
-              toBase('assistant.event', { handle, type, data }),
-            )
-            reply({ ok: out })
+            const ctl = new AbortController()
+            chats.current.set(handle, ctl)
+            try {
+              const out = await apiStream(
+                `/api/t/${enc(tenant)}/assistant/chat/stream`,
+                { messages: msgs, context: m.args?.context ?? null, model: typeof m.args?.model === 'string' ? m.args.model.slice(0, 200) : null },
+                (type, data) => toBase('assistant.event', { handle, type, data }),
+                ctl.signal,
+              )
+              reply({ ok: out })
+            } catch (e) {
+              // stopped by the person: not an error
+              if (e instanceof DOMException && e.name === 'AbortError') reply({ ok: { cancelled: true, messages: [], proposals: [], input_tokens: 0, output_tokens: 0 } })
+              else throw e
+            } finally {
+              chats.current.delete(handle)
+            }
             return
           }
           // the page of the assistant panel asks to close it (Escape pressed inside the frame)
