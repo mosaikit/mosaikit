@@ -382,7 +382,7 @@ export default function PluginFrame({ plugin, session, ctx, reloadKey, ui: shell
     }
     window.addEventListener('message', onMessage)
     return () => window.removeEventListener('message', onMessage)
-  }, [origin, tenant, plugin.id, plugin.version, session, ctx, ui, at, toBase, owner, openStream, closeStreams])
+  }, [origin, tenant, plugin.id, plugin.version, session, ctx, ui, at, toBase, owner, openStream, closeStreams, shell?.lang])
 
   if (!plugin.has_ui) {
     return (
