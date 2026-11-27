@@ -2158,7 +2158,7 @@ one person, one tenant, an optional expiry, `allow_write` off by default, at mos
 the plugin and shown once. A token opens only its tenant, never has Administrator powers, and a tool that writes is refused to a
 read-only token (the tools carry `readOnlyHint` and `destructiveHint`). There is no cookie, so no CSRF. Claude Desktop connects to a
 remote server as a connector (OAuth, below), or through the `mcp-remote` bridge with a token: the plugin writes the
-`claude_desktop_config.json` snippet.
+`claude_desktop_config.json` snippet. On Windows the header goes through an environment variable (`"--header", "Authorization:${MCP_AUTH}"` and `"env": {"MCP_AUTH": "Bearer mska_…"}`): a space in the argument breaks the quoting. Tried with Claude Desktop 6 and `mcp-remote` 0.1.31.
 
 **OAuth for MCP.** A client that knows only the address of the server connects without a token made by hand (OAuth 2.1, one
 authorization server per tenant, `oauth_mcp_api.rs` and `assistant/oauth.rs`). A `401` of the MCP endpoint carries
