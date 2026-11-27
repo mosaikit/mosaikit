@@ -2285,4 +2285,7 @@ export const IT: Record<string, string> = {
   'Default model': 'Modello predefinito',
   'Choose the model': 'Scegli il modello',
   'Used when a person has not chosen another model.': 'Si usa quando una persona non ne ha scelto un altro.',
+  'Create in {app}': 'Crea in {app}',
+  'Change in {app}': 'Modifica in {app}',
+  'Run in {app}': 'Esegui in {app}',
 }

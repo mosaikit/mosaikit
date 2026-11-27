@@ -24,9 +24,21 @@ export interface PickedPrincipal {
   name: string
 }
 
+export interface ConfirmAction {
+  title: string
+  /** what the action does, one sentence */
+  lead?: string
+  /** the app it works in */
+  app?: string
+  rows: { label: string; value: string; long?: boolean }[]
+  confirm?: string
+}
+
 export interface Ui {
   toast: (text: string, error?: boolean) => void
   confirm: (message: string, danger?: boolean) => Promise<boolean>
+  /** A confirmation that shows what is going to be done as a list of «label: value», not a sentence (the changes the assistant proposes). */
+  confirmAction: (a: ConfirmAction) => Promise<boolean>
   /** `pre`: people and groups the dialog starts with, ready to be shared with (the person confirms) */
   share: (resourceId: string, pre?: SharePre) => Promise<void>
   /** a picker of the people and groups of the tenant; empty when the person cancels */
@@ -38,6 +50,7 @@ export interface Ui {
 export const UiContext = createContext<Ui>({
   toast: () => {},
   confirm: async () => false,
+  confirmAction: async () => false,
   share: async () => {},
   pickPrincipals: async () => [],
   open: () => {},
