@@ -420,3 +420,25 @@ async fn a_tool_on_a_resource_needs_no_code_and_runs_as_the_person() {
             .unwrap_err();
     assert_eq!(code(&tools_update), "assistant_bad_args");
 }
+
+/// A real model: Ollama on this machine (`cargo test -p mosaikit-kernel --test assistant -- --ignored`). The model must
+/// support tool calling (e.g. `llama3.1`); name it in `MOSAIKIT_TEST_OLLAMA_MODEL`.
+#[tokio::test]
+#[ignore = "needs Ollama on localhost:11434"]
+async fn a_real_local_model_answers_and_calls_a_tool() {
+    let w = world().await;
+    let admin = w.t.admin().await;
+    let model = std::env::var("MOSAIKIT_TEST_OLLAMA_MODEL").unwrap_or_else(|_| "llama3.1".into());
+    let mut s = fake("openai_compatible");
+    s.model = model;
+    s.base_url = Some("http://localhost:11434/v1".into());
+    assistant::settings::set_platform(&w.t, &admin, &s).await.unwrap();
+    let r = assistant::chat(&w.t, &w.mgr, "en", ask("Who am I and in which tenant? Use your tools."))
+        .await
+        .unwrap();
+    let used: Vec<&str> =
+        r.messages.iter().flat_map(|m| m.tool_calls.iter().map(|c| c.name.as_str())).collect();
+    println!("tools used: {used:?}\nanswer: {}", r.messages.last().unwrap().content);
+    assert!(used.contains(&"kernel__whoami"), "the model did not call the tool: {used:?}");
+    assert!(r.messages.last().unwrap().content.to_lowercase().contains("alfa"));
+}
