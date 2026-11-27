@@ -2181,6 +2181,21 @@ the loop added), `tool` (a tool is about to run), then `done` (the body of `chat
 (`apiStream`) and hands the events to the page (`assistant.event`); `msk.assistant.chatStream` in the plugin API. Anthropic and
 OpenAI-compatible servers are read as they send (`OpenAiStream`, `AnthropicStream`); the test provider writes a word at a time.
 
+**Models.** `GET .../assistant/models` gives the models a person may choose: a Tenant Manager every model the provider lists (Anthropic
+and OpenAI-compatible `GET /models`, kept five minutes; the OpenAI list is filtered of embeddings, speech and images), the others the
+default and the ones in `user_models` of the settings (a JSON array, set by the Administrator in System › AI assistant after
+«Load the models»; `GET /api/admin/assistant/models`). The chat takes an optional `model`; another one is refused to a person
+(`assistant_model_not_allowed`) and the audit records the model used. The page keeps the choice in the browser.
+
+**Files and voice.** A question may carry up to four files: images (png, jpeg, webp, gif, 5 MB), PDF (10 MB) and text (text/*, json,
+xml, 200 KB), 20 MB together (`Attachment`; the chat routes take a 32 MB body). Only the last question sends the data: the earlier
+ones are told to the model as a note, and the saved chat keeps the names, not the content. OpenAI-compatible servers get images as
+`image_url`, Anthropic images and PDF as `image` and `document` blocks; a PDF for an OpenAI-compatible server is told as unreadable;
+text files go inside the question. The microphone uses the speech recognition of the browser (`SpeechRecognition`, in the frame of
+the plugin, which declares `[permissions] media`): the words are sent as a question when the person stops; Chrome and Edge send the
+audio to their own speech service, which the page says. A change asked by voice is still confirmed by the person in the dialog of
+the platform.
+
 **Not yet.** A token budget per tenant (a request limit only), tools on `delete`, translated texts in the pages of the OAuth consent.
 
 ## 9. Web security: origins, cookies, CSP

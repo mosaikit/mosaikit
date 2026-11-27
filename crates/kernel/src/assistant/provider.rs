@@ -56,6 +56,22 @@ fn net(e: reqwest::Error) -> Error {
 
 // ---------------------------------------------------------------- OpenAI and compatible
 
+/// The text of a question with the text files attached to it, and a note for what the provider cannot read.
+fn question_text(m: &Message, reads_pdf: bool) -> String {
+    let mut s = m.content.clone();
+    for a in &m.attachments {
+        match a.kind.as_str() {
+            "text" => s.push_str(&format!("\n\nAttached file «{}»:\n```\n{}\n```", a.name, a.data)),
+            "pdf" if !reads_pdf => s.push_str(&format!(
+                "\n\n[The PDF «{}» is attached, but this provider cannot read PDF files.]",
+                a.name
+            )),
+            _ => {}
+        }
+    }
+    s
+}
+
 pub(crate) fn openai_messages(system: &str, messages: &[Message]) -> Vec<Value> {
     let mut out = vec![json!({ "role": "system", "content": system })];
     for m in messages {
@@ -76,7 +92,14 @@ pub(crate) fn openai_messages(system: &str, messages: &[Message]) -> Vec<Value> 
             }
             "tool" => out.push(json!({
                 "role": "tool", "tool_call_id": m.tool_call_id.clone().unwrap_or_default(), "content": m.content })),
-            _ => out.push(json!({ "role": "user", "content": m.content })),
+            _ if m.attachments.iter().any(|a| a.kind == "image") => {
+                let mut parts = vec![json!({ "type": "text", "text": question_text(m, false) })];
+                for a in m.attachments.iter().filter(|a| a.kind == "image") {
+                    parts.push(json!({ "type": "image_url", "image_url": { "url": format!("data:{};base64,{}", a.mime, a.data) } }));
+                }
+                out.push(json!({ "role": "user", "content": parts }));
+            }
+            _ => out.push(json!({ "role": "user", "content": question_text(m, false) })),
         }
     }
     out
@@ -315,7 +338,15 @@ pub(crate) fn anthropic_messages(messages: &[Message]) -> Vec<Value> {
                     _ => out.push(json!({ "role": "user", "content": [block] })),
                 }
             }
-            _ => out.push(json!({ "role": "user", "content": m.content })),
+            _ if m.attachments.iter().any(|a| matches!(a.kind.as_str(), "image" | "pdf")) => {
+                let mut parts = vec![json!({ "type": "text", "text": question_text(m, true) })];
+                for a in m.attachments.iter().filter(|a| matches!(a.kind.as_str(), "image" | "pdf")) {
+                    let block = if a.kind == "image" { "image" } else { "document" };
+                    parts.push(json!({ "type": block, "source": { "type": "base64", "media_type": a.mime, "data": a.data } }));
+                }
+                out.push(json!({ "role": "user", "content": parts }));
+            }
+            _ => out.push(json!({ "role": "user", "content": question_text(m, true) })),
         }
     }
     out
@@ -476,6 +507,15 @@ pub(crate) fn fake(messages: &[Message]) -> Completion {
             done(format!("Tool result: {c}"))
         }
         Some(m) => {
+            let attached = if m.attachments.is_empty() {
+                String::new()
+            } else {
+                format!(
+                    " [{} file(s): {}]",
+                    m.attachments.len(),
+                    m.attachments.iter().map(|a| a.name.as_str()).collect::<Vec<_>>().join(", ")
+                )
+            };
             let t = text_of(m);
             if let Some(rest) = t.strip_prefix("tool:") {
                 let (name, args) = rest.split_once(' ').unwrap_or((rest, "{}"));
@@ -491,7 +531,7 @@ pub(crate) fn fake(messages: &[Message]) -> Completion {
                     output_tokens: 1,
                 }
             } else {
-                done(format!("fake: {t}"))
+                done(format!("fake: {t}{attached}"))
             }
         }
         None => done("fake: (nothing)".into()),
@@ -503,7 +543,13 @@ mod tests {
     use super::*;
 
     fn msg(role: &str, content: &str) -> Message {
-        Message { role: role.into(), content: content.into(), tool_calls: Vec::new(), tool_call_id: None }
+        Message {
+            attachments: vec![],
+            role: role.into(),
+            content: content.into(),
+            tool_calls: Vec::new(),
+            tool_call_id: None,
+        }
     }
 
     #[test]
@@ -521,6 +567,52 @@ mod tests {
         assert_eq!(out.len(), 3);
         assert_eq!(out[1]["content"][0]["type"], "tool_use");
         assert_eq!(out[2]["content"].as_array().unwrap().len(), 2);
+    }
+
+    fn attached(kind: &str, mime: &str, name: &str, data: &str) -> super::super::Attachment {
+        super::super::Attachment {
+            name: name.into(),
+            kind: kind.into(),
+            mime: mime.into(),
+            data: data.into(),
+        }
+    }
+
+    #[test]
+    fn files_reach_each_provider_the_way_it_reads_them() {
+        let mut q = msg("user", "what is in these?");
+        q.attachments = vec![
+            attached("image", "image/png", "a.png", "QUJD"),
+            attached("text", "text/csv", "t.csv", "a,b\n1,2"),
+            attached("pdf", "application/pdf", "r.pdf", "UERG"),
+        ];
+        // OpenAI: the image as a data address, the text file inside the question, the PDF as a note
+        let o = openai_messages("sys", std::slice::from_ref(&q));
+        let parts = o[1]["content"].as_array().unwrap();
+        assert_eq!(parts[1]["image_url"]["url"], "data:image/png;base64,QUJD");
+        let text = parts[0]["text"].as_str().unwrap();
+        assert!(
+            text.contains("Attached file «t.csv»")
+                && text.contains("a,b")
+                && text.contains("cannot read PDF")
+        );
+        // Anthropic: an image block and a document block, and the text file inside the question
+        let a = anthropic_messages(std::slice::from_ref(&q));
+        let parts = a[0]["content"].as_array().unwrap();
+        assert_eq!(
+            (parts[1]["type"].as_str(), parts[1]["source"]["media_type"].as_str()),
+            (Some("image"), Some("image/png"))
+        );
+        assert_eq!(
+            (parts[2]["type"].as_str(), parts[2]["source"]["data"].as_str()),
+            (Some("document"), Some("UERG"))
+        );
+        assert!(parts[0]["text"].as_str().unwrap().contains("Attached file «t.csv»"));
+        assert!(!parts[0]["text"].as_str().unwrap().contains("cannot read PDF"));
+        // only text files: a plain question
+        let mut only = msg("user", "read");
+        only.attachments = vec![attached("text", "text/plain", "n.txt", "hello")];
+        assert!(openai_messages("s", &[only])[1]["content"].as_str().unwrap().contains("hello"));
     }
 
     #[test]

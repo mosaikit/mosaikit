@@ -721,10 +721,22 @@ export interface AssistantToolCall {
   arguments: unknown
 }
 
+/** A file attached to a question: `image` or `pdf` (`data` is base64) or `text` (`data` is the text). The kernel reads `name`, `kind`,
+ *  `mime` and `data`; `size` is for the page. The saved chat keeps no `data`. */
+export interface AssistantAttachment {
+  name: string
+  kind: 'image' | 'pdf' | 'text'
+  mime: string
+  data?: string
+  size?: number
+}
+
 /** A message of a chat: `user`, `assistant` (with the tool calls it asked for) or `tool` (the result of one call). */
 export interface AssistantMessage {
   role: 'user' | 'assistant' | 'tool'
   content: string
+  /** files attached to a question (user messages) */
+  attachments?: AssistantAttachment[]
   tool_calls?: AssistantToolCall[]
   tool_call_id?: string
 }

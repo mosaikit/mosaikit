@@ -3,7 +3,7 @@
 //! Manager; the personal access tokens; and the MCP endpoint, which a token (not a session) opens.
 
 use axum::body::Bytes;
-use axum::extract::{Path, State};
+use axum::extract::{DefaultBodyLimit, Path, State};
 use axum::http::{header, HeaderMap, StatusCode};
 use axum::response::sse::{Event as SseEvent, Sse};
 use axum::response::{IntoResponse, Response};
@@ -18,6 +18,9 @@ use crate::api::{ok, request_lang, uuid};
 use crate::auth::{Auth, Tenant};
 use crate::{ApiError, ApiResult, AppState};
 
+/// A question may carry files (up to 20 MB of them, a third more as base64) next to the chat.
+const CHAT_LIMIT: usize = 32 << 20;
+
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/api/admin/assistant", get(a_settings).put(a_set_settings))
@@ -26,8 +29,8 @@ pub fn router() -> Router<AppState> {
         .route("/api/t/{t}/manage/assistant", get(m_settings).put(m_set_settings).delete(m_clear_settings))
         .route("/api/t/{t}/assistant/status", get(status))
         .route("/api/t/{t}/assistant/tools", get(tools))
-        .route("/api/t/{t}/assistant/chat", post(chat))
-        .route("/api/t/{t}/assistant/chat/stream", post(chat_stream))
+        .route("/api/t/{t}/assistant/chat", post(chat).layer(DefaultBodyLimit::max(CHAT_LIMIT)))
+        .route("/api/t/{t}/assistant/chat/stream", post(chat_stream).layer(DefaultBodyLimit::max(CHAT_LIMIT)))
         .route("/api/t/{t}/assistant/tools/{name}/call", post(call))
         .route("/api/t/{t}/assistant/tokens", get(token_list).post(token_create))
         .route("/api/t/{t}/assistant/tokens/{id}", delete(token_revoke))
