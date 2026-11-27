@@ -260,6 +260,36 @@ pub fn check_args(schema: &Value, args: &Value) -> Result<()> {
     Ok(())
 }
 
+/// Small models write `"20"` for a number and `"true"` for a boolean: when the schema says so, the value is read as such (an empty
+/// text for a number or a boolean is left out) instead of costing a round trip.
+pub fn coerce_args(schema: &Value, args: Value) -> Value {
+    let Value::Object(mut obj) = args else { return args };
+    for (key, def) in schema["properties"].as_object().into_iter().flatten() {
+        let Some(v) = obj.get(key).cloned() else { continue };
+        let Some(text) = v.as_str().map(str::trim) else { continue };
+        let fixed = match def["type"].as_str() {
+            Some("integer") => text.parse::<i64>().ok().map(|n| json!(n)),
+            Some("number") => text.parse::<f64>().ok().map(|n| json!(n)),
+            Some("boolean") => match text.to_lowercase().as_str() {
+                "true" => Some(json!(true)),
+                "false" => Some(json!(false)),
+                _ => None,
+            },
+            _ => continue,
+        };
+        match fixed {
+            Some(f) => {
+                obj.insert(key.clone(), f);
+            }
+            None if text.is_empty() => {
+                obj.remove(key);
+            }
+            None => {}
+        }
+    }
+    Value::Object(obj)
+}
+
 pub fn clip(v: &Value) -> String {
     let s = v.to_string();
     if s.chars().count() <= MAX_RESULT_CHARS {
@@ -271,6 +301,7 @@ pub fn clip(v: &Value) -> String {
 
 /// Runs a tool as the person. `write` tools are run only from here, after the person confirmed (or a token that may write).
 pub async fn run(k: &Kernel, c: &Caller, lang: &str, tool: &Tool, args: Value) -> Result<Value> {
+    let args = coerce_args(&tool.spec.input_schema, args);
     check_args(&tool.spec.input_schema, &args)?;
     match &tool.target {
         Target::Plugin { plugin, command } => crate::crud::call(k, c, plugin, command, args).await,
@@ -391,6 +422,18 @@ mod tests {
         let got = select(&all, "tutto bene?", &["polls__create_polls".to_string()], 6);
         assert!(got.iter().any(|t| t.name == "polls__create_polls"));
         assert!(!got.iter().any(|t| t.write && t.name != "polls__create_polls"));
+    }
+
+    #[test]
+    fn numbers_and_booleans_written_as_text_are_read_as_such() {
+        let s = json!({ "type": "object", "properties": { "limit": { "type": "integer" }, "ratio": { "type": "number" },
+                        "done": { "type": "boolean" }, "q": { "type": "string" } } });
+        let a = coerce_args(&s, json!({ "limit": "20", "ratio": " 1.5 ", "done": "True", "q": "20" }));
+        assert_eq!(a, json!({ "limit": 20, "ratio": 1.5, "done": true, "q": "20" }));
+        // empty text is no value; a word that is not a number is left for the check to refuse
+        let a = coerce_args(&s, json!({ "limit": "", "done": "yes" }));
+        assert_eq!(a, json!({ "done": "yes" }));
+        assert!(check_args(&s, &a).is_err());
     }
 
     #[test]
