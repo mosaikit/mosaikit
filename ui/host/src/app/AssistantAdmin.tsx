@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { api } from '../api.ts'
@@ -96,6 +96,12 @@ export function PlatformAssistantPanel() {
       }),
     { ok: t('Assistant settings saved'), invalidate: [['admin-assistant']] },
   )
+  // the provider is saved: its models are asked at once, so the default is chosen from a list
+  const ready = !!q.data?.configured
+  useEffect(() => {
+    if (ready) void loadModels()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, q.data?.provider, q.data?.base_url, q.data?.model])
   if (q.isLoading) return <Loading />
   if (q.error) return <ErrorBox error={q.error} />
   const saved = draftOf(q.data!)
@@ -103,6 +109,8 @@ export function PlatformAssistantPanel() {
   const dirty = !!d && JSON.stringify(d) !== JSON.stringify(saved)
   const set = (p: Partial<Draft>) => setD({ ...cur, ...p })
   const needsAddress = cur.provider === 'openai_compatible'
+  // the list belongs to the saved provider: while the provider or its address changed and is not saved, the name is written by hand
+  const dirtyProvider = !!d && (d.provider !== saved.provider || d.base_url !== saved.base_url || !!d.api_key)
   // what is missing, said before the server has to refuse it
   const problem = !cur.provider
     ? t('Choose the provider.')
@@ -151,15 +159,30 @@ export function PlatformAssistantPanel() {
             </div>
           )}
           <div className="grid gap-1.5">
-            <Label htmlFor="as-model" className="text-sm font-semibold">{t('Model')}</Label>
-            <Input
-              id="as-model"
-              value={cur.model}
-              placeholder={t('e.g. {name}', { name: EXAMPLE_MODEL[cur.provider] ?? 'llama3.1' })}
-              aria-invalid={!cur.model.trim() || undefined}
-              aria-describedby={problem ? 'as-problem' : undefined}
-              onChange={(e) => set({ model: e.target.value })}
-            />
+            <Label htmlFor="as-model" className="text-sm font-semibold">{t('Default model')}</Label>
+            {offered && offered.length > 0 && !dirtyProvider ? (
+              // the provider told its models: the default is one of them
+              <Select value={cur.model} onValueChange={(v) => set({ model: v })}>
+                <SelectTrigger id="as-model" aria-label={t('Default model')} data-testid="assistant-default-model">
+                  <SelectValue placeholder={t('Choose the model')} />
+                </SelectTrigger>
+                <SelectContent>
+                  {[...(offered.some((m) => m.id === cur.model) || !cur.model ? [] : [{ id: cur.model, label: cur.model }]), ...offered].map((m) => (
+                    <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <Input
+                id="as-model"
+                value={cur.model}
+                placeholder={t('e.g. {name}', { name: EXAMPLE_MODEL[cur.provider] ?? 'llama3.1' })}
+                aria-invalid={!cur.model.trim() || undefined}
+                aria-describedby={problem ? 'as-problem' : undefined}
+                onChange={(e) => set({ model: e.target.value })}
+              />
+            )}
+            <span className="text-xs text-muted-foreground">{t('Used when a person has not chosen another model.')}</span>
             {problem && (
               <span id="as-problem" role="alert" className="text-xs font-medium text-destructive">
                 {problem}

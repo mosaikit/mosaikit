@@ -2282,4 +2282,7 @@ export const IT: Record<string, string> = {
   'Save the provider and the key first: the models are asked to the provider with them.': 'Salva prima il provider e la chiave: i modelli si chiedono al provider con quelli.',
   'Filter the models': 'Filtra i modelli',
   '{n} models allowed': '{n} modelli consentiti',
+  'Default model': 'Modello predefinito',
+  'Choose the model': 'Scegli il modello',
+  'Used when a person has not chosen another model.': 'Si usa quando una persona non ne ha scelto un altro.',
 }
