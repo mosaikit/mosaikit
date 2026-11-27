@@ -1032,19 +1032,37 @@ pub struct AssistantToolDecl {
     pub name: String,
     /// what the tool does and when to use it
     pub description: String,
-    /// a command of the plugin logic that the tool calls with the arguments of the model
-    pub command: String,
-    /// JSON Schema (an object) of the arguments
-    #[serde(default = "empty_object_schema")]
-    pub input_schema: serde_json::Value,
+    /// a command of the plugin logic that the tool calls with the arguments of the model (or `resource` and `action`)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub command: Option<String>,
+    /// a resource of the plugin that the tool lists, creates or updates (with `action`): the generic CRUD of the kernel, no
+    /// code in the plugin
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resource: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub action: Option<AssistantAction>,
+    /// JSON Schema (an object) of the arguments. Absent: `{}` for a command, derived from the fields of the resource
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input_schema: Option<serde_json::Value>,
     /// the tool changes data: the assistant proposes it and the person confirms; an MCP token reads only
-    /// unless the person turned writes on for it
+    /// unless the person turned writes on for it. `create` and `update` always write.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub write: bool,
 }
 
-fn empty_object_schema() -> serde_json::Value {
-    serde_json::json!({ "type": "object", "properties": {} })
+impl AssistantToolDecl {
+    /// Whether the tool changes data: declared, or by its action.
+    pub fn is_write(&self) -> bool {
+        self.write || matches!(self.action, Some(AssistantAction::Create | AssistantAction::Update))
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum AssistantAction {
+    List,
+    Create,
+    Update,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
@@ -1641,8 +1659,21 @@ impl Manifest {
             if !is_identifier(n) || !names.insert(n.as_str()) {
                 return Err(format!("assistant_tools: name '{n}' invalid or duplicate"));
             }
-            if !is_identifier(&t.command) {
-                return Err(format!("assistant_tools '{n}': command '{}' is not an identifier", t.command));
+            match (&t.command, &t.resource, t.action) {
+                (Some(c), None, None) if is_identifier(c) => {}
+                (Some(c), None, None) => {
+                    return Err(format!("assistant_tools '{n}': command '{c}' is not an identifier"));
+                }
+                (None, Some(r), Some(_)) => {
+                    if !self.resources.iter().any(|d| &d.name == r) {
+                        return Err(format!("assistant_tools '{n}': the resource '{r}' is not declared by the plugin"));
+                    }
+                }
+                _ => {
+                    return Err(format!(
+                        "assistant_tools '{n}': give either a command, or a resource with an action (list, create, update)"
+                    ));
+                }
             }
             let d = t.description.trim();
             if d.is_empty() || d.chars().count() > MAX_ASSISTANT_DESCRIPTION {
@@ -1650,11 +1681,13 @@ impl Manifest {
                     "assistant_tools '{n}': description required, at most {MAX_ASSISTANT_DESCRIPTION} characters"
                 ));
             }
-            if t.input_schema.get("type").and_then(|v| v.as_str()) != Some("object") {
-                return Err(format!("assistant_tools '{n}': input_schema must be an object schema (type = \"object\")"));
-            }
-            if t.input_schema.to_string().len() > 8192 {
-                return Err(format!("assistant_tools '{n}': input_schema is larger than 8 KiB"));
+            if let Some(s) = &t.input_schema {
+                if s.get("type").and_then(|v| v.as_str()) != Some("object") {
+                    return Err(format!("assistant_tools '{n}': input_schema must be an object schema (type = \"object\")"));
+                }
+                if s.to_string().len() > 8192 {
+                    return Err(format!("assistant_tools '{n}': input_schema is larger than 8 KiB"));
+                }
             }
         }
         if let Some(a) = &self.assistant {
@@ -2744,8 +2777,8 @@ prompt = \"Notes are markdown.\"
         let m = Manifest::from_toml(&ok).unwrap();
         assert_eq!(m.assistant_tools.len(), 2);
         assert!(!m.assistant_tools[0].write && m.assistant_tools[1].write);
-        assert_eq!(m.assistant_tools[0].input_schema["required"][0], "q");
-        assert_eq!(m.assistant_tools[1].input_schema["type"], "object");
+        assert_eq!(m.assistant_tools[0].input_schema.as_ref().unwrap()["required"][0], "q");
+        assert!(m.assistant_tools[1].input_schema.is_none());
         for (bad, what) in [
             ("name = \"Bad Name\"
 description = \"x\"
@@ -2768,6 +2801,20 @@ extra = 1", "extra"),
             let e = Manifest::from_toml(&with(&format!("[[assistant_tools]]
 {bad}"))).unwrap_err().to_string();
             assert!(e.contains(what), "{bad}: {e}");
+        }
+        // a resource tool: the resource must exist, the action is needed, create and update always write
+        let res = with("[[assistant_tools]]\nname = \"all\"\ndescription = \"Lists\"\nresource = \"notes\"\naction = \"list\"\n[[assistant_tools]]\nname = \"add\"\ndescription = \"Adds\"\nresource = \"notes\"\naction = \"create\"");
+        let m = Manifest::from_toml(&res).unwrap();
+        assert!(!m.assistant_tools[0].is_write() && m.assistant_tools[1].is_write());
+        for bad in [
+            "resource = \"nope\"\naction = \"list\"",
+            "resource = \"notes\"",
+            "action = \"list\"",
+            "command = \"c\"\nresource = \"notes\"\naction = \"list\"",
+            "resource = \"notes\"\naction = \"delete\"",
+        ] {
+            let e = Manifest::from_toml(&with(&format!("[[assistant_tools]]\nname = \"a\"\ndescription = \"x\"\n{bad}")));
+            assert!(e.is_err(), "{bad}");
         }
         let dup = with("[[assistant_tools]]
 name = \"a\"
