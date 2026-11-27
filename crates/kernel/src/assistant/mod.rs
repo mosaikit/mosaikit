@@ -381,6 +381,8 @@ pub async fn invoke(
         Error::not_found(format!("unknown tool '{name}'")).with_code("assistant_unknown_tool")
     })?;
     if tool.spec.write && !allow_write {
+        // a refused change is in the audit too
+        audit(k, c, name, &args, false, via).await;
         return Err(Error::forbidden("this tool changes data and this token is read-only")
             .with_code("assistant_read_only"));
     }
