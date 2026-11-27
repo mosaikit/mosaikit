@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { toast } from 'sonner'
 import { api } from '../api.ts'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -30,6 +31,9 @@ interface Draft {
   allow_byok: boolean
   hourly_limit: string
 }
+
+/** A model name to suggest, by provider. */
+const EXAMPLE_MODEL: Record<string, string> = { anthropic: 'claude-sonnet-5-5', openai: 'gpt-4.1', openai_compatible: 'llama3.1' }
 
 const PROVIDERS: { id: string; label: string; hint: string }[] = [
   { id: 'anthropic', label: 'Anthropic (Claude)', hint: '' },
@@ -75,6 +79,12 @@ export function PlatformAssistantPanel() {
   const dirty = !!d && JSON.stringify(d) !== JSON.stringify(saved)
   const set = (p: Partial<Draft>) => setD({ ...cur, ...p })
   const needsAddress = cur.provider === 'openai_compatible'
+  // what is missing, said before the server has to refuse it
+  const problem = !cur.model.trim()
+    ? t('Write the name of the model (for example {name}).', { name: EXAMPLE_MODEL[cur.provider] ?? 'llama3.1' })
+    : needsAddress && !cur.base_url.trim()
+      ? t('Write the address of the server (for example {name}).', { name: 'http://localhost:11434/v1' })
+      : ''
   return (
     <div className="grid gap-6" data-testid="assistant-admin">
       <Card>
@@ -112,7 +122,19 @@ export function PlatformAssistantPanel() {
           )}
           <div className="grid gap-1.5">
             <Label htmlFor="as-model" className="text-sm font-semibold">{t('Model')}</Label>
-            <Input id="as-model" value={cur.model} placeholder="claude-sonnet-5-5" onChange={(e) => set({ model: e.target.value })} />
+            <Input
+              id="as-model"
+              value={cur.model}
+              placeholder={t('e.g. {name}', { name: EXAMPLE_MODEL[cur.provider] ?? 'llama3.1' })}
+              aria-invalid={!cur.model.trim() || undefined}
+              aria-describedby={problem ? 'as-problem' : undefined}
+              onChange={(e) => set({ model: e.target.value })}
+            />
+            {problem && (
+              <span id="as-problem" role="alert" className="text-xs font-medium text-destructive">
+                {problem}
+              </span>
+            )}
           </div>
           <div className="grid gap-1.5">
             <Label htmlFor="as-key" className="text-sm font-semibold">{t('Key')}</Label>
@@ -144,7 +166,7 @@ export function PlatformAssistantPanel() {
           </div>
         </CardContent>
       </Card>
-      <SaveBar dirty={dirty} busy={save.isPending} onSave={() => save.mutate(cur, { onSuccess: () => setD(null) })} onCancel={() => setD(null)} />
+      <SaveBar dirty={dirty} busy={save.isPending} onSave={() => (problem ? toast.error(problem) : save.mutate(cur, { onSuccess: () => setD(null) }))} onCancel={() => setD(null)} />
     </div>
   )
 }
