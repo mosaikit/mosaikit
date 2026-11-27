@@ -107,6 +107,9 @@ fn manifest_checks(m: &Manifest, strict: bool, r: &mut Report) {
     for d in m.deprecations() {
         r.warn(d);
     }
+    if !m.resources.is_empty() && m.assistant_tools.is_empty() {
+        r.info("no [[assistant_tools]]: the AI assistant cannot read or create the items of this plugin (a list tool and a create tool on a resource need no code, see docs/devkit/manifest.md)");
+    }
     if m.requires.mosaikit.is_none() {
         let msg = "no [requires] mosaikit: the plugin says it works with any version of Mosaikit (e.g. \">=1.0, <2\")";
         if strict {
@@ -124,9 +127,11 @@ fn manifest_checks(m: &Manifest, strict: bool, r: &mut Report) {
         || m.permissions.directory
         || m.permissions.realtime
         || m.permissions.media
+        || !m.assistant_tools.is_empty()
+        || m.assistant.is_some()
         || m.tables.iter().any(|t| t.insert_for == "visitor");
     if newer && m.requires.mosaikit.is_none() {
-        let msg = "`public` settings, [[public_commands]], permissions.run_commands, permissions.run_targets, [[schedules]], permissions.directory, permissions.realtime, permissions.media, `write` of a public command and `insert_for = \"visitor\"` need a Mosaikit that knows them: set [requires] mosaikit = \">=1.0\" (an older one refuses the manifest)";
+        let msg = "`public` settings, [[public_commands]], permissions.run_commands, permissions.run_targets, [[schedules]], permissions.directory, permissions.realtime, permissions.media, [[assistant_tools]], `write` of a public command and `insert_for = \"visitor\"` need a Mosaikit that knows them: set [requires] mosaikit = \">=1.0\" (an older one refuses the manifest)";
         if strict {
             r.error(msg);
         } else {
@@ -368,6 +373,33 @@ mod tests {
         plugin(d.path(), MIN, None);
         let r = validate(d.path()).unwrap();
         assert!(r.ok() && r.warnings() == 0, "{:?}", r.findings);
+    }
+
+    #[test]
+    fn a_plugin_with_resources_and_no_assistant_tools_is_told_so_without_a_warning() {
+        let d = tempfile::tempdir().unwrap();
+        let res = "[[resources]]
+name = \"notes\"
+label = \"Notes\"
+fields = [{ key = \"title\", label = \"Title\", kind = \"text\" }]
+";
+        plugin(d.path(), &format!("{MIN}{res}"), None);
+        let r = validate(d.path()).unwrap();
+        assert!(r.ok() && r.warnings() == 0, "{:?}", r.findings);
+        assert!(r.findings.iter().any(|f| f.message.contains("[[assistant_tools]]")), "{:?}", r.findings);
+        let tool = "[[assistant_tools]]
+name = \"list_notes\"
+description = \"Lists notes\"
+resource = \"notes\"
+action = \"list\"
+";
+        plugin(d.path(), &format!("{MIN}{res}{tool}"), None);
+        let r = validate(d.path()).unwrap();
+        assert!(r.ok() && !r.findings.iter().any(|f| f.message.contains("[[assistant_tools]]")), "{:?}", r.findings);
+        // a tool on a resource the plugin does not have is an error of the manifest
+        let bad = tool.replace("resource = \"notes\"", "resource = \"nope\"");
+        plugin(d.path(), &format!("{MIN}{res}{bad}"), None);
+        assert!(validate(d.path()).unwrap().errors() > 0);
     }
 
     #[test]
