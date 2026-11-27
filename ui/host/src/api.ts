@@ -116,6 +116,69 @@ export async function api<T = unknown>(method: string, path: string, body?: unkn
   return (text ? JSON.parse(text) : null) as T
 }
 
+/**
+ * A POST whose answer is a stream of server-sent events (`event:` and `data:` lines, JSON data): `onEvent` gets each one as it
+ * arrives, the `done` event ends the call and is returned, an `error` event or a refusal throws an `ApiError`.
+ */
+export async function apiStream<T = unknown>(path: string, body: unknown, onEvent: (type: string, data: unknown) => void): Promise<T> {
+  const headers: Record<string, string> = { 'X-CSRF-Token': csrf, 'Content-Type': 'application/json', Accept: 'text/event-stream' }
+  if (language) headers['Accept-Language'] = language
+  let r: Response
+  try {
+    r = await fetch(appUrl(path), { method: 'POST', headers, body: JSON.stringify(body), credentials: 'same-origin', cache: 'no-store' })
+  } catch {
+    throw unavailable()
+  }
+  if (!r.ok || !r.body) {
+    if (r.status === 502 || r.status === 503 || r.status === 504) throw unavailable()
+    let j: { error?: unknown; code?: unknown } | null = null
+    try {
+      j = await r.json()
+    } catch {
+      throw unavailable()
+    }
+    throw new ApiError(j && typeof j.error === 'string' ? j.error : 'Something went wrong. Try again.', r.status, j && typeof j.code === 'string' ? j.code : undefined)
+  }
+  const reader = r.body.getReader()
+  const decoder = new TextDecoder()
+  let buf = ''
+  let done: T | undefined
+  const block = (raw: string) => {
+    let type = 'message'
+    let data = ''
+    for (const line of raw.split('\n')) {
+      if (line.startsWith('event:')) type = line.slice(6).trim()
+      else if (line.startsWith('data:')) data += line.slice(5).trim()
+    }
+    if (!data) return
+    let v: unknown
+    try {
+      v = JSON.parse(data)
+    } catch {
+      return
+    }
+    if (type === 'done') done = v as T
+    else if (type === 'error') {
+      const e = v as { code?: string; message?: string }
+      throw new ApiError(e.message ?? 'Something went wrong. Try again.', 500, e.code)
+    } else onEvent(type, v)
+  }
+  for (;;) {
+    const { value, done: end } = await reader.read()
+    if (value) buf += decoder.decode(value, { stream: true })
+    let i = buf.indexOf('\n\n')
+    while (i >= 0) {
+      block(buf.slice(0, i))
+      buf = buf.slice(i + 2)
+      i = buf.indexOf('\n\n')
+    }
+    if (end) break
+  }
+  if (buf.trim()) block(buf)
+  if (done === undefined) throw unavailable()
+  return done
+}
+
 export function errText(e: unknown): string {
   if (e instanceof ApiError) return translate(e.code, e.message)
   return e instanceof Error ? e.message : String(e)

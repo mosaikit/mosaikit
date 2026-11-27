@@ -5,6 +5,7 @@
 use axum::body::Bytes;
 use axum::extract::{Path, State};
 use axum::http::{header, HeaderMap, StatusCode};
+use axum::response::sse::{Event as SseEvent, Sse};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{delete, get, post};
 use axum::{Json, Router};
@@ -24,6 +25,7 @@ pub fn router() -> Router<AppState> {
         .route("/api/t/{t}/assistant/status", get(status))
         .route("/api/t/{t}/assistant/tools", get(tools))
         .route("/api/t/{t}/assistant/chat", post(chat))
+        .route("/api/t/{t}/assistant/chat/stream", post(chat_stream))
         .route("/api/t/{t}/assistant/tools/{name}/call", post(call))
         .route("/api/t/{t}/assistant/tokens", get(token_list).post(token_create))
         .route("/api/t/{t}/assistant/tokens/{id}", delete(token_revoke))
@@ -81,6 +83,42 @@ async fn chat(
 ) -> ApiResult<Response> {
     let r = assistant::chat(&s.k, &c, &request_lang(&h), req).await?;
     Ok(no_store(Json(json!(r)).into_response()))
+}
+
+/// The chat as server-sent events: `delta` (a piece of the text), `message` (a message the loop added), `tool` (a tool is about
+/// to run), then `done` (the same body `chat` answers) or `error` (`code`, `message`). The loop runs in a task of its own, so a
+/// page that leaves does not leave a half-done loop in the request.
+async fn chat_stream(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    h: HeaderMap,
+    Json(req): Json<ChatRequest>,
+) -> Response {
+    let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<SseEvent>();
+    let lang = request_lang(&h);
+    let k = s.k.clone();
+    tokio::spawn(async move {
+        let sink = tx.clone();
+        let emit = move |e: assistant::Event| {
+            let name = match &e {
+                assistant::Event::Delta { .. } => "delta",
+                assistant::Event::Message { .. } => "message",
+                assistant::Event::Tool { .. } => "tool",
+            };
+            let _ = sink.send(SseEvent::default().event(name).data(json!(e).to_string()));
+        };
+        let last = match assistant::chat_with(&k, &c, &lang, req, Some(&emit)).await {
+            Ok(r) => SseEvent::default().event("done").data(json!(r).to_string()),
+            Err(e) => SseEvent::default()
+                .event("error")
+                .data(json!({ "code": e.code(), "message": e.to_string() }).to_string()),
+        };
+        let _ = tx.send(last);
+    });
+    let body = futures_util::stream::unfold(rx, |mut rx| async move {
+        rx.recv().await.map(|e| (Ok::<_, std::convert::Infallible>(e), rx))
+    });
+    no_store(Sse::new(body).into_response())
 }
 
 #[derive(Deserialize)]

@@ -38,6 +38,7 @@ export type {
   AssistantSettings,
   AssistantSettingsInput,
   AssistantStatus,
+  AssistantStreamEvent,
   AssistantTool,
   AssistantToken,
   AssistantToolCall,

@@ -12,17 +12,30 @@ use crate::{Error, Kernel, Result};
 const TIMEOUT: Duration = Duration::from_secs(120);
 const MAX_TOKENS: u32 = 4096;
 
+/// Where the pieces of the answer go as they arrive (a streamed answer); `None`: the answer comes whole.
+pub type Delta<'a> = Option<&'a (dyn Fn(&str) + Send + Sync)>;
+
 pub async fn complete(
     k: &Kernel,
     cfg: &Resolved,
     system: &str,
     messages: &[Message],
     tools: &[ToolSpec],
+    on_delta: Delta<'_>,
 ) -> Result<Completion> {
     match cfg.provider.as_str() {
-        "anthropic" => anthropic(k, cfg, system, messages, tools).await,
-        "openai" | "openai_compatible" => openai(k, cfg, system, messages, tools).await,
-        "fake" if super::fake_allowed(k) => Ok(fake(messages)),
+        "anthropic" => anthropic(k, cfg, system, messages, tools, on_delta).await,
+        "openai" | "openai_compatible" => openai(k, cfg, system, messages, tools, on_delta).await,
+        "fake" if super::fake_allowed(k) => {
+            let c = fake(messages);
+            if let Some(d) = on_delta {
+                // a word at a time, so the streaming of the page can be tried with no model
+                for w in c.text.split_inclusive(' ') {
+                    d(w);
+                }
+            }
+            Ok(c)
+        }
         p => Err(Error::bad(format!("unknown provider '{p}'"))),
     }
 }
@@ -70,6 +83,7 @@ async fn openai(
     system: &str,
     messages: &[Message],
     tools: &[ToolSpec],
+    on_delta: Delta<'_>,
 ) -> Result<Completion> {
     let base = cfg.base_url.clone().unwrap_or_else(|| "https://api.openai.com/v1".into());
     let mut body = json!({ "model": cfg.model, "messages": openai_messages(system, messages) });
@@ -82,17 +96,98 @@ async fn openai(
             })
             .collect();
     }
+    if on_delta.is_some() {
+        body["stream"] = json!(true);
+        body["stream_options"] = json!({ "include_usage": true });
+    }
     let mut req = k.http.post(format!("{base}/chat/completions")).timeout(TIMEOUT).json(&body);
     if let Some(key) = &cfg.key {
         req = req.bearer_auth(key);
     }
-    let res = req.send().await.map_err(net)?;
+    let mut res = req.send().await.map_err(net)?;
     let status = res.status();
-    let text = res.text().await.map_err(net)?;
     if !status.is_success() {
-        return Err(upstream(status, &text));
+        return Err(upstream(status, &res.text().await.map_err(net)?));
     }
-    parse_openai(&text)
+    let Some(on) = on_delta else {
+        return parse_openai(&res.text().await.map_err(net)?);
+    };
+    let mut acc = OpenAiStream::default();
+    while let Some(chunk) = res.chunk().await.map_err(net)? {
+        acc.feed(&String::from_utf8_lossy(&chunk), on);
+    }
+    Ok(acc.finish())
+}
+
+/// The answer of an OpenAI-compatible server read as it arrives (`data: {...}` lines).
+#[derive(Default)]
+pub(crate) struct OpenAiStream {
+    buf: String,
+    text: String,
+    /// id, name, arguments (a string that grows) by index
+    calls: Vec<(String, String, String)>,
+    tin: u64,
+    tout: u64,
+}
+
+impl OpenAiStream {
+    pub(crate) fn feed(&mut self, chunk: &str, on: &(dyn Fn(&str) + Send + Sync)) {
+        self.buf.push_str(chunk);
+        while let Some(i) = self.buf.find('\n') {
+            let line: String = self.buf.drain(..=i).collect();
+            self.line(line.trim(), on);
+        }
+    }
+
+    fn line(&mut self, line: &str, on: &(dyn Fn(&str) + Send + Sync)) {
+        let Some(data) = line.strip_prefix("data:") else { return };
+        let Ok(v) = serde_json::from_str::<Value>(data.trim()) else { return };
+        if let Some(n) = v["usage"]["prompt_tokens"].as_u64() {
+            self.tin = n;
+        }
+        if let Some(n) = v["usage"]["completion_tokens"].as_u64() {
+            self.tout = n;
+        }
+        let d = &v["choices"][0]["delta"];
+        if let Some(t) = d["content"].as_str().filter(|t| !t.is_empty()) {
+            self.text.push_str(t);
+            on(t);
+        }
+        for c in d["tool_calls"].as_array().into_iter().flatten() {
+            let i = c["index"].as_u64().unwrap_or(0) as usize;
+            if self.calls.len() <= i {
+                self.calls.resize(i + 1, (String::new(), String::new(), String::new()));
+            }
+            let slot = &mut self.calls[i];
+            if let Some(id) = c["id"].as_str() {
+                slot.0 = id.to_string();
+            }
+            if let Some(n) = c["function"]["name"].as_str() {
+                slot.1.push_str(n);
+            }
+            if let Some(a) = c["function"]["arguments"].as_str() {
+                slot.2.push_str(a);
+            }
+        }
+    }
+
+    pub(crate) fn finish(self) -> Completion {
+        Completion {
+            text: self.text,
+            tool_calls: self
+                .calls
+                .into_iter()
+                .enumerate()
+                .map(|(i, (id, name, args))| ToolCall {
+                    id: if id.is_empty() { format!("call-{i}") } else { id },
+                    name,
+                    arguments: serde_json::from_str(&args).unwrap_or_else(|_| json!({})),
+                })
+                .collect(),
+            input_tokens: self.tin,
+            output_tokens: self.tout,
+        }
+    }
 }
 
 pub(crate) fn parse_openai(text: &str) -> Result<Completion> {
@@ -162,6 +257,7 @@ async fn anthropic(
     system: &str,
     messages: &[Message],
     tools: &[ToolSpec],
+    on_delta: Delta<'_>,
 ) -> Result<Completion> {
     let base = cfg.base_url.clone().unwrap_or_else(|| "https://api.anthropic.com".into());
     let mut body = json!({
@@ -172,6 +268,9 @@ async fn anthropic(
             .map(|t| json!({ "name": t.name, "description": t.description, "input_schema": t.input_schema }))
             .collect();
     }
+    if on_delta.is_some() {
+        body["stream"] = json!(true);
+    }
     let mut req = k
         .http
         .post(format!("{base}/v1/messages"))
@@ -181,13 +280,90 @@ async fn anthropic(
     if let Some(key) = &cfg.key {
         req = req.header("x-api-key", key);
     }
-    let res = req.send().await.map_err(net)?;
+    let mut res = req.send().await.map_err(net)?;
     let status = res.status();
-    let text = res.text().await.map_err(net)?;
     if !status.is_success() {
-        return Err(upstream(status, &text));
+        return Err(upstream(status, &res.text().await.map_err(net)?));
     }
-    parse_anthropic(&text)
+    let Some(on) = on_delta else {
+        return parse_anthropic(&res.text().await.map_err(net)?);
+    };
+    let mut acc = AnthropicStream::default();
+    while let Some(chunk) = res.chunk().await.map_err(net)? {
+        acc.feed(&String::from_utf8_lossy(&chunk), on);
+    }
+    Ok(acc.finish())
+}
+
+/// The answer of Anthropic read as it arrives (server-sent events: the JSON of every `data:` line names its type).
+#[derive(Default)]
+pub(crate) struct AnthropicStream {
+    buf: String,
+    text: String,
+    /// id, name, input (a JSON string that grows), in the order of the blocks
+    calls: Vec<(String, String, String)>,
+    tin: u64,
+    tout: u64,
+}
+
+impl AnthropicStream {
+    pub(crate) fn feed(&mut self, chunk: &str, on: &(dyn Fn(&str) + Send + Sync)) {
+        self.buf.push_str(chunk);
+        while let Some(i) = self.buf.find('\n') {
+            let line: String = self.buf.drain(..=i).collect();
+            self.line(line.trim(), on);
+        }
+    }
+
+    fn line(&mut self, line: &str, on: &(dyn Fn(&str) + Send + Sync)) {
+        let Some(data) = line.strip_prefix("data:") else { return };
+        let Ok(v) = serde_json::from_str::<Value>(data.trim()) else { return };
+        match v["type"].as_str() {
+            Some("message_start") => self.tin = v["message"]["usage"]["input_tokens"].as_u64().unwrap_or(0),
+            Some("message_delta") => self.tout = v["usage"]["output_tokens"].as_u64().unwrap_or(self.tout),
+            Some("content_block_start") if v["content_block"]["type"] == "tool_use" => self.calls.push((
+                v["content_block"]["id"].as_str().unwrap_or_default().to_string(),
+                v["content_block"]["name"].as_str().unwrap_or_default().to_string(),
+                String::new(),
+            )),
+            Some("content_block_delta") => match v["delta"]["type"].as_str() {
+                Some("text_delta") => {
+                    if let Some(t) = v["delta"]["text"].as_str() {
+                        self.text.push_str(t);
+                        on(t);
+                    }
+                }
+                Some("input_json_delta") => {
+                    if let (Some(p), Some(last)) = (v["delta"]["partial_json"].as_str(), self.calls.last_mut()) {
+                        last.2.push_str(p);
+                    }
+                }
+                _ => {}
+            },
+            _ => {}
+        }
+    }
+
+    pub(crate) fn finish(self) -> Completion {
+        Completion {
+            text: self.text,
+            tool_calls: self
+                .calls
+                .into_iter()
+                .map(|(id, name, input)| ToolCall {
+                    id,
+                    name,
+                    arguments: if input.trim().is_empty() {
+                        json!({})
+                    } else {
+                        serde_json::from_str(&input).unwrap_or_else(|_| json!({}))
+                    },
+                })
+                .collect(),
+            input_tokens: self.tin,
+            output_tokens: self.tout,
+        }
+    }
 }
 
 pub(crate) fn parse_anthropic(text: &str) -> Result<Completion> {
@@ -298,6 +474,49 @@ mod tests {
         .unwrap();
         assert_eq!(a.text, "hi");
         assert_eq!(a.tool_calls[0].arguments["b"], 1);
+    }
+
+    #[test]
+    fn an_openai_stream_is_put_together_from_pieces() {
+        let shown = std::sync::Mutex::new(String::new());
+        let on = |t: &str| shown.lock().unwrap().push_str(t);
+        let mut s = OpenAiStream::default();
+        // a line split in two chunks, text, then a tool call whose arguments arrive in parts, then the usage
+        s.feed("data: {\"choices\":[{\"delta\":{\"content\":\"Hel", &on);
+        s.feed("lo\"}}]}\n\ndata: {\"choices\":[{\"delta\":{\"content\":\" you\"}}]}\n", &on);
+        s.feed("data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"c1\",\"function\":{\"name\":\"n\",\"arguments\":\"{\\\"a\\\"\"}}]}}]}\n", &on);
+        s.feed("data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\":3}\"}}]}}]}\n", &on);
+        s.feed("data: {\"choices\":[],\"usage\":{\"prompt_tokens\":7,\"completion_tokens\":9}}\ndata: [DONE]\n", &on);
+        let c = s.finish();
+        assert_eq!(*shown.lock().unwrap(), "Hello you");
+        assert_eq!(c.text, "Hello you");
+        assert_eq!((c.tool_calls[0].id.as_str(), c.tool_calls[0].name.as_str()), ("c1", "n"));
+        assert_eq!(c.tool_calls[0].arguments["a"], 3);
+        assert_eq!((c.input_tokens, c.output_tokens), (7, 9));
+    }
+
+    #[test]
+    fn an_anthropic_stream_is_put_together_from_events() {
+        let shown = std::sync::Mutex::new(String::new());
+        let on = |t: &str| shown.lock().unwrap().push_str(t);
+        let mut s = AnthropicStream::default();
+        let lines = [
+            "event: message_start",
+            "data: {\"type\":\"message_start\",\"message\":{\"usage\":{\"input_tokens\":11}}}",
+            "data: {\"type\":\"content_block_start\",\"content_block\":{\"type\":\"text\"}}",
+            "data: {\"type\":\"content_block_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":\"Hi\"}}",
+            "data: {\"type\":\"content_block_start\",\"content_block\":{\"type\":\"tool_use\",\"id\":\"t1\",\"name\":\"x\"}}",
+            "data: {\"type\":\"content_block_delta\",\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"{\\\"b\\\":\"}}",
+            "data: {\"type\":\"content_block_delta\",\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"2}\"}}",
+            "data: {\"type\":\"message_delta\",\"usage\":{\"output_tokens\":5}}",
+        ];
+        for l in lines {
+            s.feed(&format!("{l}\n"), &on);
+        }
+        let c = s.finish();
+        assert_eq!(*shown.lock().unwrap(), "Hi");
+        assert_eq!(c.tool_calls[0].arguments["b"], 2);
+        assert_eq!((c.input_tokens, c.output_tokens), (11, 5));
     }
 
     #[test]
